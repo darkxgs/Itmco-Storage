@@ -27,6 +27,27 @@ const branches = [
   "فرع الزقازيق",
   "فرع أسيوط",
   "فرع السويس",
+  "فرع الأقصر",
+  "فرع أسوان",
+  "فرع بني سويف",
+  "فرع الفيوم",
+  "فرع المنيا",
+  "فرع سوهاج",
+  "فرع قنا",
+  "فرع الغردقة",
+  "فرع شرم الشيخ",
+  "فرع دمياط",
+  "فرع كفر الشيخ",
+  "فرع البحيرة",
+  "فرع المطرية",
+  "فرع الإسماعيلية",
+  "فرع بورسعيد",
+  "فرع العريش",
+  "فرع مرسى مطروح",
+  "فرع الوادي الجديد",
+  "فرع البحر الأحمر",
+  "فرع جنوب سيناء",
+  "فرع شمال سيناء",
 ]
 
 
@@ -428,7 +449,7 @@ export default function IssuancePage() {
         {/* All Issuances Table */}
         <Card className="bg-slate-800 border-slate-700 mt-6">
           <CardHeader>
-            <CardTitle className="text-white">جميع الإصدارات</CardTitle>
+            <CardTitle className="text-white">سجل الإصدارات</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
