@@ -1,10 +1,6 @@
 {
   "version": 2,
   "name": "itmco-inventory-system",
-  "env": {
-    "NEXT_PUBLIC_SUPABASE_URL": "@next_public_supabase_url",
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@next_public_supabase_anon_key"
-  },
   "functions": {
     "app/**/*.{js,ts,tsx}": {
       "maxDuration": 30
