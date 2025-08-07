@@ -38,9 +38,17 @@ npm install
 \`\`\`
 
 ### 2. إعداد قاعدة البيانات
+
+#### للمشاريع الجديدة:
 1. أنشئ مشروع جديد في [Supabase](https://supabase.com)
 2. شغل السكريبت `scripts/init-database-simple.sql` في SQL Editor
 3. شغل السكريبت `scripts/seed-database-updated.sql` لإضافة البيانات الأولية
+
+#### للمشاريع الموجودة (ترحيل):
+إذا كان لديك مشروع موجود، شغل السكريبت التالي لإضافة عمود الوصف:
+\`\`\`sql
+ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT;
+\`\`\`
 
 ### 3. متغيرات البيئة
 أنشئ ملف `.env.local`:
@@ -53,6 +61,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 \`\`\`bash
 npm run dev
 \`\`\`
+
+### 5. التحقق من التثبيت
+- اذهب إلى `/test` لاختبار الاتصال بقاعدة البيانات
+- جرب إضافة منتج جديد في صفحة إدارة المخزون
 
 ## النشر على Vercel
 
@@ -123,6 +135,23 @@ vercel --prod
 - عرض المخزون
 - البحث المتقدم
 - لوحة التحكم
+
+## استكشاف الأخطاء الشائعة
+
+### خطأ "Could not find the 'description' column"
+هذا يعني أن عمود الوصف غير موجود في قاعدة البيانات. الحل:
+\`\`\`sql
+ALTER TABLE products ADD COLUMN IF NOT EXISTS description TEXT;
+\`\`\`
+
+### خطأ "Missing environment variables"
+تأكد من إضافة متغيرات البيئة في `.env.local` أو في إعدادات Vercel.
+
+### خطأ "relation does not exist"
+تأكد من تشغيل سكريبت إنشاء الجداول `scripts/init-database-simple.sql`.
+
+### خطأ في تسجيل الدخول
+تأكد من تشغيل سكريبت البيانات الأولية `scripts/seed-database-updated.sql`.
 
 ## الدعم والصيانة
 

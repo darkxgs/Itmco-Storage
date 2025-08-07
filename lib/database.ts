@@ -1,5 +1,5 @@
 import { supabase } from "./supabase"
-import type { Product, Issuance } from "./supabase"
+import type { Product, ProductInsert, ProductUpdate, Issuance, IssuanceInsert } from "./supabase"
 
 // Enhanced error handling wrapper
 async function withErrorHandling<T>(operation: () => Promise<T>, errorMessage: string): Promise<T> {
@@ -21,7 +21,7 @@ export async function getProducts() {
   }, "Failed to fetch products")
 }
 
-export async function createProduct(product: Omit<Product, "id" | "created_at" | "updated_at">) {
+export async function createProduct(product: ProductInsert & { minStock?: number }) {
   return withErrorHandling(async () => {
     // Validate required fields
     if (!product.name || !product.brand || !product.model || !product.category) {
@@ -29,12 +29,15 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
     }
 
     // Map minStock to min_stock for database
-    const dbProduct = {
-      ...product,
-      min_stock: product.minStock || 0,
+    const dbProduct: ProductInsert = {
+      name: product.name,
+      brand: product.brand,
+      model: product.model,
+      category: product.category,
       stock: product.stock || 0,
+      min_stock: product.minStock || 0,
+      description: product.description || null,
     }
-    delete dbProduct.minStock
 
     const { data, error } = await supabase.from("products").insert(dbProduct).select().single()
 
@@ -48,17 +51,17 @@ export async function createProduct(product: Omit<Product, "id" | "created_at" |
   }, "Failed to create product")
 }
 
-export async function updateProduct(id: number, updates: Partial<Product>) {
+export async function updateProduct(id: number, updates: ProductUpdate & { minStock?: number }) {
   return withErrorHandling(async () => {
     // Map minStock to min_stock for database
-    const dbUpdates = {
+    const dbUpdates: ProductUpdate = {
       ...updates,
       updated_at: new Date().toISOString(),
     }
 
     if (updates.minStock !== undefined) {
       dbUpdates.min_stock = updates.minStock
-      delete dbUpdates.minStock
+      delete (dbUpdates as any).minStock
     }
 
     const { data, error } = await supabase.from("products").update(dbUpdates).eq("id", id).select().single()
@@ -108,7 +111,7 @@ export async function getIssuances() {
   }, "Failed to fetch issuances")
 }
 
-export async function createIssuance(issuance: Omit<Issuance, "id" | "created_at">) {
+export async function createIssuance(issuance: IssuanceInsert) {
   return withErrorHandling(async () => {
     // Validate stock availability
     const { data: product } = await supabase.from("products").select("stock").eq("id", issuance.product_id).single()
@@ -121,20 +124,8 @@ export async function createIssuance(issuance: Omit<Issuance, "id" | "created_at
       throw new Error("Insufficient stock")
     }
 
-    // Map frontend fields to database format
-    const dbIssuance = {
-      product_id: issuance.product_id,
-      product_name: issuance.product_name,
-      brand: issuance.brand,
-      model: issuance.model,
-      quantity: issuance.quantity,
-      customer_name: issuance.customer_name,
-      branch: issuance.branch,
-      engineer: issuance.engineer,
-      serial_number: issuance.serial_number,
-      notes: issuance.notes,
-      issued_by: issuance.issued_by,
-    }
+    // Use the issuance data directly as it matches the database format
+    const dbIssuance: IssuanceInsert = issuance
 
     // Use transaction to ensure data consistency
     const { data, error } = await supabase.from("issuances").insert(dbIssuance).select().single()
@@ -384,7 +375,7 @@ export async function searchProducts(
     minStock?: number
     maxStock?: number
   },
-) {
+): Promise<Product[]> {
   return withErrorHandling(async () => {
     let queryBuilder = supabase.from("products").select("*")
 
@@ -434,7 +425,7 @@ export async function searchProducts(
 }
 
 // Bulk operations
-export async function bulkUpdateProducts(updates: Array<{ id: number; updates: Partial<Product> }>) {
+export async function bulkUpdateProducts(updates: Array<{ id: number; updates: ProductUpdate & { minStock?: number } }>) {
   return withErrorHandling(async () => {
     const results = await Promise.allSettled(
       updates.map(({ id, updates: productUpdates }) => updateProduct(id, productUpdates)),

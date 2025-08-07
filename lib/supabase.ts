@@ -40,94 +40,132 @@ export type Database = {
           updated_at?: string
         }
       }
-      inventory: {
+      products: {
         Row: {
-          id: string
-          item_name: string
-          item_code: string
+          id: number
+          name: string
+          brand: string
+          model: string
           category: string
-          quantity: number
-          unit: string
-          location: string
-          supplier: string
-          purchase_date: string
-          expiry_date: string | null
-          cost_per_unit: number
-          total_cost: number
-          status: "available" | "low_stock" | "out_of_stock"
-          notes: string | null
+          stock: number
+          min_stock: number
+          description: string | null
           created_at: string
           updated_at: string
-          created_by: string
         }
         Insert: {
-          id?: string
-          item_name: string
-          item_code: string
+          id?: number
+          name: string
+          brand: string
+          model: string
           category: string
-          quantity: number
-          unit: string
-          location: string
-          supplier: string
-          purchase_date: string
-          expiry_date?: string | null
-          cost_per_unit: number
-          total_cost: number
-          status?: "available" | "low_stock" | "out_of_stock"
-          notes?: string | null
+          stock?: number
+          min_stock?: number
+          description?: string | null
           created_at?: string
           updated_at?: string
-          created_by: string
         }
         Update: {
-          id?: string
-          item_name?: string
-          item_code?: string
+          id?: number
+          name?: string
+          brand?: string
+          model?: string
           category?: string
-          quantity?: number
-          unit?: string
-          location?: string
-          supplier?: string
-          purchase_date?: string
-          expiry_date?: string | null
-          cost_per_unit?: number
-          total_cost?: number
-          status?: "available" | "low_stock" | "out_of_stock"
-          notes?: string | null
+          stock?: number
+          min_stock?: number
+          description?: string | null
           created_at?: string
           updated_at?: string
-          created_by?: string
+        }
+      }
+      issuances: {
+        Row: {
+          id: number
+          product_id: number
+          product_name: string
+          brand: string
+          model: string
+          quantity: number
+          customer_name: string
+          branch: string
+          engineer: string
+          serial_number: string
+          notes: string | null
+          issued_by: string
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          product_id: number
+          product_name: string
+          brand: string
+          model: string
+          quantity: number
+          customer_name: string
+          branch: string
+          engineer: string
+          serial_number: string
+          notes?: string | null
+          issued_by: string
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          product_id?: number
+          product_name?: string
+          brand?: string
+          model?: string
+          quantity?: number
+          customer_name?: string
+          branch?: string
+          engineer?: string
+          serial_number?: string
+          notes?: string | null
+          issued_by?: string
+          created_at?: string
         }
       }
       activity_logs: {
         Row: {
-          id: string
+          id: number
           user_id: string
           user_name: string
           action: string
           module: string
           details: string
-          timestamp: string
+          created_at: string
         }
         Insert: {
-          id?: string
+          id?: number
           user_id: string
           user_name: string
           action: string
           module: string
           details: string
-          timestamp?: string
+          created_at?: string
         }
         Update: {
-          id?: string
+          id?: number
           user_id?: string
           user_name?: string
           action?: string
           module?: string
           details?: string
-          timestamp?: string
+          created_at?: string
         }
       }
     }
   }
 }
+
+// Type aliases for easier use
+export type Product = Database['public']['Tables']['products']['Row']
+export type ProductInsert = Database['public']['Tables']['products']['Insert']
+export type ProductUpdate = Database['public']['Tables']['products']['Update']
+
+export type Issuance = Database['public']['Tables']['issuances']['Row']
+export type IssuanceInsert = Database['public']['Tables']['issuances']['Insert']
+export type IssuanceUpdate = Database['public']['Tables']['issuances']['Update']
+
+export type User = Database['public']['Tables']['users']['Row']
+export type ActivityLog = Database['public']['Tables']['activity_logs']['Row']
