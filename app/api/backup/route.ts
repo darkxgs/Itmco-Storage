@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import { supabase } from "@/lib/supabase"
+import { createSecurityMiddleware, SecurityError } from "@/lib/security"
+import { logActivity } from "@/lib/auth"
 
 export async function GET() {
   try {
@@ -57,15 +59,28 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const { type = "full", tables = ["users", "products", "issuances", "activity_logs"] } = await request.json()
+    // Apply security middleware
+    const securityMiddleware = createSecurityMiddleware()
+    const secureRequest = await securityMiddleware(request as any)
+    
+    const { type = "full", tables = ["users", "products", "issuances", "activity_logs", "security_logs"] } = await secureRequest.json()
+
+    // Validate table names (whitelist approach)
+    const allowedTables = ["users", "products", "issuances", "activity_logs", "security_logs", "backup_history"]
+    const invalidTables = tables.filter((table: string) => !allowedTables.includes(table))
+    
+    if (invalidTables.length > 0) {
+      throw new SecurityError(`Invalid table names: ${invalidTables.join(', ')}`, 'INVALID_INPUT')
+    }
 
     const backupData: any = {
       metadata: {
         timestamp: new Date().toISOString(),
-        version: "1.0",
+        version: "2.0",
         system: "ITMCO Inventory Management",
         type,
         tables,
+        backupId: `manual_${Date.now()}`
       },
       data: {},
     }
@@ -85,9 +100,41 @@ export async function POST(request: Request) {
       }
     }
 
+    // Log backup activity
+    await logActivity(
+      'system',
+      'نظام النسخ الاحتياطي',
+      'نسخ احتياطي يدوي',
+      'النظام',
+      `تم إنشاء نسخة احتياطية يدوية - ${tables.length} جداول`
+    )
+
+    // Store backup metadata
+    await supabase.from('backup_history').insert({
+      backup_id: backupData.metadata.backupId,
+      timestamp: backupData.metadata.timestamp,
+      type: 'manual',
+      record_counts: backupData.metadata.recordCounts,
+      size: JSON.stringify(backupData).length,
+      status: 'completed'
+    })
+
     return NextResponse.json(backupData)
   } catch (error) {
     console.error("Custom backup error:", error)
+    
+    if (error instanceof SecurityError) {
+      return NextResponse.json(
+        {
+          error: "Security violation",
+          message: error.message,
+          type: error.type,
+          timestamp: new Date().toISOString(),
+        },
+        { status: 403 }
+      )
+    }
+    
     return NextResponse.json(
       {
         error: "Custom backup failed",
