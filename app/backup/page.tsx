@@ -44,28 +44,28 @@ export default function BackupPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    const userData = localStorage.getItem("user")
-    if (!userData) {
-      router.push("/login")
+    if (user && user.role !== "admin") {
+      toast({
+        title: "غير مصرح لك",
+        description: "ليس لديك صلاحية للوصول إلى هذه الصفحة",
+        variant: "destructive",
+      })
+      window.location.href = "/dashboard"
       return
     }
-    const parsedUser = JSON.parse(userData)
-    if (parsedUser.role !== "admin") {
-      router.push("/dashboard")
-      return
-    }
-    setUser(parsedUser)
 
-    // Load backup history from localStorage
-    const history = localStorage.getItem("backup_history")
-    if (history) {
-      setBackupHistory(JSON.parse(history))
-    }
+    if (user) {
+      // Load backup history from localStorage
+      const history = localStorage.getItem("backup_history")
+      if (history) {
+        setBackupHistory(JSON.parse(history))
+      }
 
-    // Check auto-backup setting
-    const autoBackup = localStorage.getItem("auto_backup_enabled")
-    setAutoBackupEnabled(autoBackup === "true")
-  }, [router])
+      // Check auto-backup setting
+      const autoBackup = localStorage.getItem("auto_backup_enabled")
+      setAutoBackupEnabled(autoBackup === "true")
+    }
+  }, [user, toast])
 
   const handleCreateBackup = async () => {
     setLoading(true)

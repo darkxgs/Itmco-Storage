@@ -26,10 +26,7 @@ BEGIN
     
     -- Insert sample issuances if engineer exists
     IF engineer_id IS NOT NULL THEN
-        INSERT INTO issuances (product_id, product_name, brand, model, quantity, customer_name, branch, engineer, serial_number, notes, issued_by) VALUES
-        (1, 'آلة عد النقود المتقدمة', 'Canon', 'CC-2000', 2, 'أحمد محمد السعيد', 'الفرع الرئيسي - الرياض', 'م. خالد العتيبي', 'SN001234567', 'تم التسليم بحالة ممتازة', engineer_id),
-        (4, 'ساعة أمان رقمية', 'Seiko', 'SW-100', 5, 'سارة أحمد الزهراني', 'فرع جدة', 'م. فهد المالكي', 'SN001234568', 'طلب عاجل للمشروع الجديد', engineer_id),
-        (5, 'نظام حضور بصمة الإصبع', 'ZKTeco', 'AT-200', 1, 'محمد عبدالله القحطاني', 'فرع الدمام', 'م. عبدالرحمن الشهري', 'SN001234569', 'تركيب في المبنى الإداري', engineer_id)
-        ON CONFLICT DO NOTHING;
+        -- Sample issuances removed - database will start clean
+        -- Users can add their own issuances through the application
     END IF;
 END $$;
