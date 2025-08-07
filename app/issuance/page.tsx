@@ -11,90 +11,16 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { ShoppingCart, Calendar, User, Building } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
+import { ShoppingCart, Calendar, User, Building, Edit, Trash2, Loader2 } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { getProducts, getIssuances, createIssuance } from "@/lib/database"
+import { getProducts, getIssuances, createIssuance, updateIssuance, deleteIssuance, BRANCHES } from "@/lib/database"
 import { logActivity } from "@/lib/auth"
 
-const branches = [
-  "الفرع الرئيسي - القاهرة",
-  "فرع الجيزة",
-  "فرع الإسكندرية",
-  "فرع المنصورة",
-  "فرع طنطا",
-  "فرع الزقازيق",
-  "فرع أسيوط",
-  "فرع السويس",
-  "فرع الأقصر",
-  "فرع أسوان",
-  "فرع بني سويف",
-  "فرع الفيوم",
-  "فرع المنيا",
-  "فرع سوهاج",
-  "فرع قنا",
-  "فرع الغردقة",
-  "فرع شرم الشيخ",
-  "فرع دمياط",
-  "فرع كفر الشيخ",
-  "فرع البحيرة",
-  "فرع المطرية",
-  "فرع الإسماعيلية",
-  "فرع بورسعيد",
-  "فرع العريش",
-  "فرع مرسى مطروح",
-  "فرع الوادي الجديد",
-  "فرع البحر الأحمر",
-  "فرع جنوب سيناء",
-  "فرع شمال سيناء",
-]
 
-
-const initialIssuances = [
-  {
-    id: 1,
-    productId: 1,
-    productName: "آلة عد النقود المتقدمة",
-    brand: "Canon",
-    model: "CC-2000",
-    quantity: 2,
-    customerName: "أحمد محمد السعيد",
-    branch: "الفرع الرئيسي - الرياض",
-    engineer: "م. خالد العتيبي",
-    serialNumber: "SN001234567",
-    date: "2024-01-15",
-    notes: "تم التسليم بحالة ممتازة",
-  },
-  {
-    id: 2,
-    productId: 4,
-    productName: "ساعة أمان رقمية",
-    brand: "Seiko",
-    model: "SW-100",
-    quantity: 5,
-    customerName: "سارة أحمد الزهراني",
-    branch: "فرع جدة",
-    engineer: "م. فهد المالكي",
-    serialNumber: "SN001234568",
-    date: "2024-01-14",
-    notes: "طلب عاجل للمشروع الجديد",
-  },
-  {
-    id: 3,
-    productId: 5,
-    productName: "نظام حضور بصمة الإصبع",
-    brand: "ZKTeco",
-    model: "AT-200",
-    quantity: 1,
-    customerName: "محمد عبدالله القحطاني",
-    branch: "فرع الدمام",
-    engineer: "م. عبدالرحمن الشهري",
-    serialNumber: "SN001234569",
-    date: "2024-01-13",
-    notes: "تركيب في المبنى الإداري",
-  },
-]
 
 export default function IssuancePage() {
   const { user, loading: authLoading } = useAuth()
@@ -108,6 +34,9 @@ export default function IssuancePage() {
   const [engineer, setEngineer] = useState("")
   const [serialNumber, setSerialNumber] = useState("")
   const [notes, setNotes] = useState("")
+  const [editingIssuance, setEditingIssuance] = useState(null)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -201,13 +130,7 @@ export default function IssuancePage() {
       )
 
       // Reset form
-      setSelectedProduct("")
-      setQuantity(1)
-      setCustomerName("")
-      setSelectedBranch("")
-      setEngineer("")
-      setSerialNumber("")
-      setNotes("")
+      resetForm()
 
       toast({
         title: "تم بنجاح",
@@ -227,6 +150,144 @@ export default function IssuancePage() {
     return product ? product.stock : 0
   }
 
+  const handleEditIssuance = (issuance: any) => {
+    setEditingIssuance(issuance)
+    setSelectedProduct(issuance.productId?.toString() || issuance.product_id?.toString() || "")
+    setQuantity(issuance.quantity)
+    setCustomerName(issuance.customerName || issuance.customer_name || "")
+    setSelectedBranch(issuance.branch)
+    setEngineer(issuance.engineer)
+    setSerialNumber(issuance.serialNumber || issuance.serial_number || "")
+    setNotes(issuance.notes || "")
+    setIsEditDialogOpen(true)
+  }
+
+  const handleUpdateIssuance = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!editingIssuance || !selectedProduct || !customerName || !selectedBranch || !engineer || !serialNumber) {
+      toast({
+        title: "خطأ",
+        description: "يرجى ملء جميع الحقول المطلوبة",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const product = products.find((p) => p.id.toString() === selectedProduct)
+    if (!product) {
+      toast({
+        title: "خطأ",
+        description: "المنتج المحدد غير موجود",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const updates = {
+        product_id: product.id,
+        product_name: product.name,
+        brand: product.brand,
+        model: product.model,
+        quantity,
+        customer_name: customerName,
+        branch: selectedBranch,
+        engineer,
+        serial_number: serialNumber,
+        notes,
+      }
+
+      const updatedIssuance = await updateIssuance(editingIssuance.id, updates, editingIssuance.quantity)
+      
+      // Update local state
+      setIssuances(issuances.map((i) => (i.id === editingIssuance.id ? updatedIssuance : i)))
+      
+      // Update local product stock if quantity changed
+      if (quantity !== editingIssuance.quantity) {
+        const stockDifference = quantity - editingIssuance.quantity
+        setProducts(products.map((p) => (p.id === product.id ? { ...p, stock: p.stock - stockDifference } : p)))
+      }
+
+      // Log activity
+      await logActivity(
+        user.id,
+        user.name,
+        "تعديل إصدار",
+        "الإصدار",
+        `تم تعديل إصدار ${product.name} للعميل ${customerName}`,
+      )
+
+      setIsEditDialogOpen(false)
+      setEditingIssuance(null)
+      resetForm()
+
+      toast({
+        title: "تم بنجاح",
+        description: "تم تحديث الإصدار بنجاح",
+      })
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في تحديث الإصدار",
+        variant: "destructive",
+      })
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleDeleteIssuance = async (issuance: any) => {
+    try {
+      await deleteIssuance(issuance.id)
+      
+      // Update local state
+      setIssuances(issuances.filter((i) => i.id !== issuance.id))
+      
+      // Return stock to product
+      const product = products.find((p) => p.id === (issuance.productId || issuance.product_id))
+      if (product) {
+        setProducts(products.map((p) => (p.id === product.id ? { ...p, stock: p.stock + issuance.quantity } : p)))
+      }
+
+      // Log activity
+      await logActivity(
+        user.id,
+        user.name,
+        "حذف إصدار",
+        "الإصدار",
+        `تم حذف إصدار ${issuance.productName || issuance.product_name} للعميل ${issuance.customerName || issuance.customer_name}`,
+      )
+
+      toast({
+        title: "تم بنجاح",
+        description: "تم حذف الإصدار بنجاح",
+      })
+    } catch (error: any) {
+      toast({
+        title: "خطأ",
+        description: error.message || "فشل في حذف الإصدار",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const resetForm = () => {
+    setSelectedProduct("")
+    setQuantity(1)
+    setCustomerName("")
+    setSelectedBranch("")
+    setEngineer("")
+    setSerialNumber("")
+    setNotes("")
+  }
+
+  const canEditOrDelete = (issuance: any) => {
+    // Admin can edit/delete all issuances, others can only edit/delete their own
+    return user.role === "admin" || (issuance.issuedBy || issuance.issued_by) === user.id
+  }
+
   if (authLoading || !user) {
     return (
       <div className="flex min-h-screen bg-slate-900 items-center justify-center">
@@ -239,7 +300,7 @@ export default function IssuancePage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-900">
+    <div className="flex min-h-screen bg-slate-900" dir="rtl">
       <Sidebar />
       <div className="flex-1 p-6">
         <div className="mb-8">
@@ -286,16 +347,16 @@ export default function IssuancePage() {
           {/* Issuance Form */}
           <Card className="bg-slate-800 border-slate-700">
             <CardHeader>
-              <CardTitle className="text-white">نموذج إصدار منتج</CardTitle>
+              <CardTitle className="text-white text-right">نموذج إصدار منتج</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="product" className="text-slate-300">
+                  <Label htmlFor="product" className="text-slate-300 text-right">
                     المنتج
                   </Label>
                   <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
                       <SelectValue placeholder="اختر المنتج" />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-700 border-slate-600">
@@ -316,7 +377,7 @@ export default function IssuancePage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="quantity" className="text-slate-300">
+                  <Label htmlFor="quantity" className="text-slate-300 text-right">
                     الكمية
                   </Label>
                   <Input
@@ -326,7 +387,7 @@ export default function IssuancePage() {
                     max={selectedProduct ? getAvailableStock(selectedProduct) : 1}
                     value={quantity}
                     onChange={(e) => setQuantity(Number.parseInt(e.target.value) || 1)}
-                    className="bg-slate-700 border-slate-600 text-white"
+                    className="bg-slate-700 border-slate-600 text-white text-center"
                   />
                   {selectedProduct && (
                     <p className="text-xs text-slate-400">متوفر: {getAvailableStock(selectedProduct)} قطعة</p>
@@ -334,7 +395,7 @@ export default function IssuancePage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="customer" className="text-slate-300">
+                  <Label htmlFor="customer" className="text-slate-300 text-right">
                     اسم العميل
                   </Label>
                   <Input
@@ -342,20 +403,20 @@ export default function IssuancePage() {
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="أدخل اسم العميل"
-                    className="bg-slate-700 border-slate-600 text-white"
+                    className="bg-slate-700 border-slate-600 text-white text-right"
                   />
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="branch" className="text-slate-300">
+                  <Label htmlFor="branch" className="text-slate-300 text-right">
                     الفرع
                   </Label>
                   <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
                       <SelectValue placeholder="اختر الفرع" />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-700 border-slate-600">
-                      {branches.map((branch) => (
+                      {BRANCHES.map((branch) => (
                         <SelectItem key={branch} value={branch}>
                           {branch}
                         </SelectItem>
@@ -365,7 +426,7 @@ export default function IssuancePage() {
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="engineer" className="text-slate-300">
+                  <Label htmlFor="engineer" className="text-slate-300 text-right">
                     المهندس المستلم
                   </Label>
                   <Input
@@ -373,12 +434,12 @@ export default function IssuancePage() {
                     value={engineer}
                     onChange={(e) => setEngineer(e.target.value)}
                     placeholder="أدخل اسم المهندس"
-                    className="bg-slate-700 border-slate-600 text-white"
+                    className="bg-slate-700 border-slate-600 text-white text-right"
                   />
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="serial" className="text-slate-300">
+                  <Label htmlFor="serial" className="text-slate-300 text-right">
                     الرقم التسلسلي
                   </Label>
                   <Input
@@ -386,12 +447,12 @@ export default function IssuancePage() {
                     value={serialNumber}
                     onChange={(e) => setSerialNumber(e.target.value)}
                     placeholder="أدخل الرقم التسلسلي"
-                    className="bg-slate-700 border-slate-600 text-white"
+                    className="bg-slate-700 border-slate-600 text-white text-right"
                   />
                 </div>
 
                 <div className="grid gap-2">
-                  <Label htmlFor="notes" className="text-slate-300">
+                  <Label htmlFor="notes" className="text-slate-300 text-right">
                     ملاحظات (اختياري)
                   </Label>
                   <Textarea
@@ -399,7 +460,7 @@ export default function IssuancePage() {
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="أدخل أي ملاحظات إضافية"
-                    className="bg-slate-700 border-slate-600 text-white"
+                    className="bg-slate-700 border-slate-600 text-white text-right"
                     rows={3}
                   />
                 </div>
@@ -414,7 +475,7 @@ export default function IssuancePage() {
           {/* Recent Issuances */}
           <Card className="bg-slate-800 border-slate-700">
             <CardHeader>
-              <CardTitle className="text-white">الإصدارات الأخيرة</CardTitle>
+              <CardTitle className="text-white text-right">الإصدارات الأخيرة</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-4 max-h-96 overflow-y-auto">
@@ -449,36 +510,81 @@ export default function IssuancePage() {
         {/* All Issuances Table */}
         <Card className="bg-slate-800 border-slate-700 mt-6">
           <CardHeader>
-            <CardTitle className="text-white">سجل الإصدارات</CardTitle>
+            <CardTitle className="text-white text-right">سجل الإصدارات</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow className="border-slate-700">
-                    <TableHead className="text-slate-300">التاريخ</TableHead>
-                    <TableHead className="text-slate-300">المنتج</TableHead>
-                    <TableHead className="text-slate-300">العلامة/الموديل</TableHead>
-                    <TableHead className="text-slate-300">الكمية</TableHead>
-                    <TableHead className="text-slate-300">العميل</TableHead>
-                    <TableHead className="text-slate-300">الفرع</TableHead>
-                    <TableHead className="text-slate-300">المهندس</TableHead>
-                    <TableHead className="text-slate-300">الرقم التسلسلي</TableHead>
+                    <TableHead className="text-slate-300 text-right">التاريخ</TableHead>
+                    <TableHead className="text-slate-300 text-right">المنتج</TableHead>
+                    <TableHead className="text-slate-300 text-right">العلامة/الموديل</TableHead>
+                    <TableHead className="text-slate-300 text-center">الكمية</TableHead>
+                    <TableHead className="text-slate-300 text-right">العميل</TableHead>
+                    <TableHead className="text-slate-300 text-right">الفرع</TableHead>
+                    <TableHead className="text-slate-300 text-right">المهندس</TableHead>
+                    <TableHead className="text-slate-300 text-right">الرقم التسلسلي</TableHead>
+                    <TableHead className="text-slate-300 text-center">الإجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {issuances.map((issuance) => (
                     <TableRow key={issuance.id} className="border-slate-700">
-                      <TableCell className="text-slate-300">{issuance.date}</TableCell>
-                      <TableCell className="text-white font-medium">{issuance.productName}</TableCell>
-                      <TableCell className="text-slate-300">
+                      <TableCell className="text-slate-300 text-right">{issuance.date}</TableCell>
+                      <TableCell className="text-white font-medium text-right">{issuance.productName || issuance.product_name}</TableCell>
+                      <TableCell className="text-slate-300 text-right">
                         {issuance.brand} {issuance.model}
                       </TableCell>
-                      <TableCell className="text-white">{issuance.quantity}</TableCell>
-                      <TableCell className="text-slate-300">{issuance.customerName}</TableCell>
-                      <TableCell className="text-slate-300">{issuance.branch}</TableCell>
-                      <TableCell className="text-slate-300">{issuance.engineer}</TableCell>
-                      <TableCell className="text-slate-300">{issuance.serialNumber}</TableCell>
+                      <TableCell className="text-white text-center">{issuance.quantity}</TableCell>
+                      <TableCell className="text-slate-300 text-right">{issuance.customerName || issuance.customer_name}</TableCell>
+                      <TableCell className="text-slate-300 text-right">{issuance.branch}</TableCell>
+                      <TableCell className="text-slate-300 text-right">{issuance.engineer}</TableCell>
+                      <TableCell className="text-slate-300 text-right">{issuance.serialNumber || issuance.serial_number}</TableCell>
+                      <TableCell className="text-center">
+                        {canEditOrDelete(issuance) && (
+                          <div className="flex justify-center gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditIssuance(issuance)}
+                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-400/10"
+                            >
+                              <Edit className="w-4 h-4" />
+                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-400 hover:text-red-300 hover:bg-red-400/10"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="bg-slate-800 border-slate-700 text-white" dir="rtl">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="text-right">تأكيد الحذف</AlertDialogTitle>
+                                  <AlertDialogDescription className="text-slate-300 text-right">
+                                    هل أنت متأكد من حذف هذا الإصدار؟ سيتم إرجاع الكمية إلى المخزون.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter className="flex-row-reverse">
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteIssuance(issuance)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    حذف
+                                  </AlertDialogAction>
+                                  <AlertDialogCancel className="bg-slate-700 hover:bg-slate-600">
+                                    إلغاء
+                                  </AlertDialogCancel>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        )}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -486,6 +592,148 @@ export default function IssuancePage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Edit Issuance Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="text-right">تعديل الإصدار</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleUpdateIssuance} className="space-y-4 max-h-96 overflow-y-auto">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-product" className="text-slate-300 text-right">
+                  المنتج
+                </Label>
+                <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
+                    <SelectValue placeholder="اختر المنتج" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-700 border-slate-600">
+                    {products.map((product) => (
+                      <SelectItem key={product.id} value={product.id.toString()}>
+                        <div className="flex justify-between items-center w-full">
+                          <span>
+                            {product.name} - {product.brand} {product.model}
+                          </span>
+                          <Badge variant="secondary" className="mr-2">
+                            متوفر: {product.stock}
+                          </Badge>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-quantity" className="text-slate-300 text-right">
+                  الكمية
+                </Label>
+                <Input
+                  id="edit-quantity"
+                  type="number"
+                  min="1"
+                  value={quantity}
+                  onChange={(e) => setQuantity(Number.parseInt(e.target.value) || 1)}
+                  className="bg-slate-700 border-slate-600 text-white text-right"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-customer" className="text-slate-300 text-right">
+                  اسم العميل
+                </Label>
+                <Input
+                  id="edit-customer"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="أدخل اسم العميل"
+                  className="bg-slate-700 border-slate-600 text-white text-right"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-branch" className="text-slate-300 text-right">
+                  الفرع
+                </Label>
+                <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
+                    <SelectValue placeholder="اختر الفرع" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-700 border-slate-600">
+                    {BRANCHES.map((branch) => (
+                      <SelectItem key={branch} value={branch}>
+                        {branch}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-engineer" className="text-slate-300 text-right">
+                  المهندس المستلم
+                </Label>
+                <Input
+                  id="edit-engineer"
+                  value={engineer}
+                  onChange={(e) => setEngineer(e.target.value)}
+                  placeholder="أدخل اسم المهندس"
+                  className="bg-slate-700 border-slate-600 text-white text-right"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-serial" className="text-slate-300 text-right">
+                  الرقم التسلسلي
+                </Label>
+                <Input
+                  id="edit-serial"
+                  value={serialNumber}
+                  onChange={(e) => setSerialNumber(e.target.value)}
+                  placeholder="أدخل الرقم التسلسلي"
+                  className="bg-slate-700 border-slate-600 text-white text-right"
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-notes" className="text-slate-300 text-right">
+                  ملاحظات (اختياري)
+                </Label>
+                <Textarea
+                  id="edit-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="أدخل أي ملاحظات إضافية"
+                  className="bg-slate-700 border-slate-600 text-white text-right"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsEditDialogOpen(false)}
+                  disabled={submitting}
+                  className="bg-transparent"
+                >
+                  إلغاء
+                </Button>
+                <Button type="submit" disabled={submitting}>
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                      جاري التحديث...
+                    </>
+                  ) : (
+                    "تحديث الإصدار"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   )

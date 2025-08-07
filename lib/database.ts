@@ -156,6 +156,107 @@ export async function createIssuance(issuance: IssuanceInsert) {
   }, "Failed to create issuance")
 }
 
+export async function updateIssuance(id: number, updates: Partial<IssuanceInsert>, originalQuantity: number) {
+  return withErrorHandling(async () => {
+    // Get current issuance data
+    const { data: currentIssuance, error: fetchError } = await supabase
+      .from("issuances")
+      .select("*")
+      .eq("id", id)
+      .single()
+
+    if (fetchError || !currentIssuance) {
+      throw new Error("Issuance not found")
+    }
+
+    // If quantity is being updated, check stock availability
+    if (updates.quantity && updates.quantity !== originalQuantity) {
+      const { data: product } = await supabase
+        .from("products")
+        .select("stock")
+        .eq("id", currentIssuance.product_id)
+        .single()
+
+      if (!product) {
+        throw new Error("Product not found")
+      }
+
+      // Calculate available stock (current stock + original quantity)
+      const availableStock = product.stock + originalQuantity
+
+      if (updates.quantity > availableStock) {
+        throw new Error("Insufficient stock for the requested quantity")
+      }
+
+      // Update product stock
+      const stockDifference = updates.quantity - originalQuantity
+      const { error: updateStockError } = await supabase
+        .from("products")
+        .update({
+          stock: product.stock - stockDifference,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", currentIssuance.product_id)
+
+      if (updateStockError) throw updateStockError
+    }
+
+    // Update issuance
+    const { data, error } = await supabase
+      .from("issuances")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single()
+
+    if (error) throw error
+
+    // Map back to frontend format
+    return {
+      ...data,
+      productId: data.product_id,
+      productName: data.product_name,
+      customerName: data.customer_name,
+      serialNumber: data.serial_number,
+      issuedBy: data.issued_by,
+      date: data.created_at.split("T")[0],
+    }
+  }, "Failed to update issuance")
+}
+
+export async function deleteIssuance(id: number) {
+  return withErrorHandling(async () => {
+    // Get issuance data before deletion
+    const { data: issuance, error: fetchError } = await supabase
+      .from("issuances")
+      .select("product_id, quantity")
+      .eq("id", id)
+      .single()
+
+    if (fetchError || !issuance) {
+      throw new Error("Issuance not found")
+    }
+
+    // Delete the issuance
+    const { error: deleteError } = await supabase.from("issuances").delete().eq("id", id)
+
+    if (deleteError) throw deleteError
+
+    // Return stock to product
+    const { error: updateStockError } = await supabase
+      .from("products")
+      .update({
+        stock: supabase.sql`stock + ${issuance.quantity}`,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", issuance.product_id)
+
+    if (updateStockError) throw updateStockError
+
+    return { success: true }
+  }, "Failed to delete issuance")
+}
+
 // Enhanced activity logs with pagination
 export async function getActivityLogs(limit = 100, offset = 0) {
   return withErrorHandling(async () => {
@@ -495,7 +596,7 @@ export const BRANCHES = [
   "فرع الغردقة",
   "فرع شرم الشيخ",
   "فرع العريش",
-  
+
 ];
 
 
