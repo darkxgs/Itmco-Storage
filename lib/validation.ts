@@ -74,6 +74,11 @@ export function validateData<T>(
   schema: z.ZodSchema<T>,
   data: unknown,
 ): { success: boolean; data?: T; errors?: string[] } {
+  // Handle null/undefined data
+  if (data === null || data === undefined) {
+    return { success: false, errors: ["البيانات مطلوبة"] }
+  }
+
   try {
     const validatedData = schema.parse(data)
     return { success: true, data: validatedData }

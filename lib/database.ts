@@ -1,5 +1,6 @@
 import { supabase } from "./supabase"
 import type { Product, ProductInsert, ProductUpdate, Issuance, IssuanceInsert } from "./supabase"
+import { validateInput, validateObject, createSecureQuery, SecurityError } from "./security"
 
 // Enhanced error handling wrapper
 async function withErrorHandling<T>(operation: () => Promise<T>, errorMessage: string): Promise<T> {
@@ -23,23 +24,31 @@ export async function getProducts() {
 
 export async function createProduct(product: ProductInsert & { minStock?: number }) {
   return withErrorHandling(async () => {
+    // Validate and sanitize input
+    const sanitizedProduct = validateObject(product)
+    
     // Validate required fields
-    if (!product.name || !product.brand || !product.model || !product.category) {
-      throw new Error("Missing required fields")
+    if (!sanitizedProduct.name || !sanitizedProduct.brand || !sanitizedProduct.model || !sanitizedProduct.category) {
+      throw new SecurityError("Missing required fields", "INVALID_INPUT")
+    }
+
+    // Additional validation for product data
+    if (sanitizedProduct.stock < 0 || sanitizedProduct.minStock < 0) {
+      throw new SecurityError("Stock values cannot be negative", "INVALID_INPUT")
     }
 
     // Map minStock to min_stock for database
     const dbProduct: ProductInsert = {
-      name: product.name,
-      brand: product.brand,
-      model: product.model,
-      category: product.category,
-      stock: product.stock || 0,
-      min_stock: product.minStock || 0,
-      description: product.description || null,
+      name: validateInput(sanitizedProduct.name),
+      brand: validateInput(sanitizedProduct.brand),
+      model: validateInput(sanitizedProduct.model),
+      category: validateInput(sanitizedProduct.category),
+      stock: Math.max(0, Number(sanitizedProduct.stock) || 0),
+      min_stock: Math.max(0, Number(sanitizedProduct.minStock) || 0),
+      description: sanitizedProduct.description ? validateInput(sanitizedProduct.description) : null,
     }
 
-    const { data, error } = await supabase.from("products").insert(dbProduct).select().single()
+    const { data, error } = await createSecureQuery("products", "insert").insert(dbProduct).select().single()
 
     if (error) throw error
 
@@ -53,18 +62,38 @@ export async function createProduct(product: ProductInsert & { minStock?: number
 
 export async function updateProduct(id: number, updates: ProductUpdate & { minStock?: number }) {
   return withErrorHandling(async () => {
+    // Validate and sanitize input
+    const sanitizedUpdates = validateObject(updates)
+    const productId = Number(id)
+    
+    if (!productId || productId <= 0) {
+      throw new SecurityError("Invalid product ID", "INVALID_INPUT")
+    }
+
+    // Additional validation
+    if (sanitizedUpdates.stock !== undefined && sanitizedUpdates.stock < 0) {
+      throw new SecurityError("Stock cannot be negative", "INVALID_INPUT")
+    }
+
     // Map minStock to min_stock for database
     const dbUpdates: ProductUpdate = {
-      ...updates,
       updated_at: new Date().toISOString(),
     }
 
-    if (updates.minStock !== undefined) {
-      dbUpdates.min_stock = updates.minStock
-      delete (dbUpdates as any).minStock
+    // Only update provided fields
+    if (sanitizedUpdates.name !== undefined) dbUpdates.name = validateInput(sanitizedUpdates.name)
+    if (sanitizedUpdates.brand !== undefined) dbUpdates.brand = validateInput(sanitizedUpdates.brand)
+    if (sanitizedUpdates.model !== undefined) dbUpdates.model = validateInput(sanitizedUpdates.model)
+    if (sanitizedUpdates.category !== undefined) dbUpdates.category = validateInput(sanitizedUpdates.category)
+    if (sanitizedUpdates.stock !== undefined) dbUpdates.stock = Math.max(0, Number(sanitizedUpdates.stock))
+    if (sanitizedUpdates.description !== undefined) {
+      dbUpdates.description = sanitizedUpdates.description ? validateInput(sanitizedUpdates.description) : null
+    }
+    if (sanitizedUpdates.minStock !== undefined) {
+      dbUpdates.min_stock = Math.max(0, Number(sanitizedUpdates.minStock))
     }
 
-    const { data, error } = await supabase.from("products").update(dbUpdates).eq("id", id).select().single()
+    const { data, error } = await createSecureQuery("products", "update").update(dbUpdates).eq("id", productId).select().single()
 
     if (error) throw error
 
@@ -78,14 +107,20 @@ export async function updateProduct(id: number, updates: ProductUpdate & { minSt
 
 export async function deleteProduct(id: number) {
   return withErrorHandling(async () => {
-    // Check if product has any issuances
-    const { data: issuances } = await supabase.from("issuances").select("id").eq("product_id", id).limit(1)
-
-    if (issuances && issuances.length > 0) {
-      throw new Error("Cannot delete product with existing issuances")
+    const productId = Number(id)
+    
+    if (!productId || productId <= 0) {
+      throw new SecurityError("Invalid product ID", "INVALID_INPUT")
     }
 
-    const { error } = await supabase.from("products").delete().eq("id", id)
+    // Check if product has any issuances
+    const { data: issuances } = await createSecureQuery("issuances", "select").select("id").eq("product_id", productId).limit(1)
+
+    if (issuances && issuances.length > 0) {
+      throw new SecurityError("Cannot delete product with existing issuances", "INVALID_INPUT")
+    }
+
+    const { error } = await createSecureQuery("products", "delete").delete().eq("id", productId)
 
     if (error) throw error
   }, "Failed to delete product")

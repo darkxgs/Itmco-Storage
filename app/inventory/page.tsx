@@ -58,6 +58,7 @@ export default function InventoryPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<any>(null)
   const [newProduct, setNewProduct] = useState({
     name: "",
@@ -139,6 +140,11 @@ export default function InventoryPage() {
   const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)
 
   const validateForm = (productData: any) => {
+    if (!productData) {
+      setFormErrors(["بيانات المنتج مطلوبة"])
+      return false
+    }
+    
     const validation = validateData(productSchema, productData)
     if (!validation.success) {
       setFormErrors(validation.errors || [])
@@ -200,6 +206,15 @@ export default function InventoryPage() {
   }
 
   const handleEditProduct = async () => {
+    if (!editingProduct) {
+      toast({
+        title: "خطأ",
+        description: "لم يتم تحديد منتج للتعديل",
+        variant: "destructive",
+      })
+      return
+    }
+
     if (!validateForm(editingProduct)) {
       toast({
         title: "بيانات غير صحيحة",
@@ -218,10 +233,11 @@ export default function InventoryPage() {
       await logActivity(user.id, user.name, "تعديل منتج", "إدارة المخزون", `تم تعديل المنتج: ${editingProduct.name}`)
 
       setEditingProduct(null)
+      setIsEditDialogOpen(false)
 
       toast({
         title: "تم التحديث بنجاح",
-        description: `تم تحديث بيانات المنتج "${editingProduct.name}"`,
+        description: `تم تحديث بيانات المنتج "${editingProduct.name}"`
       })
     } catch (error: any) {
       console.error("Error updating product:", error)
@@ -769,12 +785,19 @@ export default function InventoryPage() {
                             </TableCell>
                             <TableCell className="text-center py-4">
                               <div className="flex gap-2 justify-center">
-                                <Dialog>
+                                <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                                   <DialogTrigger asChild>
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => setEditingProduct({ ...product })}
+                                      onClick={() => {
+                                        setEditingProduct({
+                                          ...product,
+                                          minStock: product.minStock || product.min_stock || 5,
+                                          description: product.description || ""
+                                        })
+                                        setIsEditDialogOpen(true)
+                                      }}
                                     >
                                       <Edit className="w-4 h-4" />
                                     </Button>
