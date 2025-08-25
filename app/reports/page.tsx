@@ -12,7 +12,8 @@ import { Download, FileText, Calendar, TrendingUp, Package, AlertTriangle } from
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { getMonthlyIssuances, getProductFrequency, getBranchPerformance, getIssuances } from "@/lib/database"
+import { getMonthlyIssuances, getProductFrequency, getBranchPerformance, getFilteredIssuances, CATEGORIES, BRANCHES } from "@/lib/database"
+import { exportToCSV, exportToPDF, exportToExcel, validateExportData, generateSummaryStats } from "@/lib/export-utils"
 import { ErrorBoundary } from "@/components/error-boundary"
 
 export default function ReportsPage() {
@@ -21,12 +22,25 @@ export default function ReportsPage() {
   const [selectedBranch, setSelectedBranch] = useState("all")
   const { toast } = useToast()
 
+  // Enhanced filtering state
+  const [filters, setFilters] = useState({
+    startDate: "",
+    endDate: "",
+    branch: "all",
+    category: "all",
+    productName: "",
+    engineer: "",
+    customer: ""
+  })
+
   const [monthlyData, setMonthlyData] = useState([])
   const [productFrequency, setProductFrequency] = useState([])
   const [branchData, setBranchData] = useState([])
   const [recentTransactions, setRecentTransactions] = useState([])
+  const [allTransactions, setAllTransactions] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
 
   useEffect(() => {
     if (user && !["admin", "inventory_manager"].includes(user.role)) {
@@ -34,72 +48,180 @@ export default function ReportsPage() {
     }
   }, [user])
 
-  useEffect(() => {
-    const loadReportsData = async () => {
-      if (!user) return
-
-      try {
-        setLoading(true)
-        setError(null)
-
-        const [monthly, products, branches, transactions] = await Promise.all([
-          getMonthlyIssuances(),
-          getProductFrequency(),
-          getBranchPerformance(),
-          getIssuances(),
-        ])
-
-        setMonthlyData(monthly)
-        setProductFrequency(products)
-        setBranchData(branches)
-        setRecentTransactions(transactions.slice(0, 10))
-      } catch (error) {
-        console.error("Error loading reports data:", error)
-        setError("فشل في تحميل بيانات التقارير")
-      } finally {
-        setLoading(false)
+  const fetchData = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      // Prepare filter parameters
+      const filterParams = {
+        startDate: filters.startDate || undefined,
+        endDate: filters.endDate || undefined,
+        branch: filters.branch !== "all" ? filters.branch : undefined,
+        category: filters.category !== "all" ? filters.category : undefined,
+        productName: filters.productName || undefined,
+        engineer: filters.engineer || undefined,
+        customer: filters.customer || undefined
       }
+      
+      const [monthly, frequency, branch, filtered, recent] = await Promise.all([
+        getMonthlyIssuances(),
+        getProductFrequency(filterParams.startDate, filterParams.endDate, filterParams.branch, filterParams.category),
+        getBranchPerformance(filterParams.startDate, filterParams.endDate, filterParams.category, filterParams.productName),
+        getFilteredIssuances(filterParams),
+        getFilteredIssuances({ ...filterParams, limit: 10 })
+      ])
+      
+      setMonthlyData(monthly)
+      setProductFrequency(frequency)
+      setBranchData(branch)
+      setAllTransactions(filtered)
+      setRecentTransactions(recent)
+    } catch (err) {
+      console.error('Error fetching data:', err)
+      setError('Failed to load report data')
+      toast({
+        title: "Error",
+        description: "Failed to load report data",
+        variant: "destructive",
+      })
+    } finally {
+      setLoading(false)
     }
-
-    loadReportsData()
-  }, [user])
-
-  const handleExportExcel = () => {
-    // Create CSV content
-    const csvData = [
-      ["التاريخ", "المنتج", "العميل", "الفرع", "الكمية", "المهندس"],
-      ...recentTransactions.map((t) => [
-        new Date(t.created_at).toLocaleDateString("ar-SA"),
-        t.product_name || t.productName,
-        t.customer_name || t.customerName,
-        t.branch,
-        t.quantity,
-        t.engineer,
-      ]),
-    ]
-
-    const csvContent = csvData.map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n")
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", `reports_${new Date().toISOString().split("T")[0]}.csv`)
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    toast({
-      title: "تصدير Excel",
-      description: "تم تصدير التقرير بصيغة CSV بنجاح",
-    })
   }
 
-  const handleExportPDF = () => {
-    toast({
-      title: "تصدير PDF",
-      description: "ميزة تصدير PDF ستكون متاحة قريباً",
-    })
+  useEffect(() => {
+    if (!authLoading && user) {
+      fetchData()
+    }
+  }, [authLoading, user, filters])
+
+  const handleExportCSV = async () => {
+    try {
+      setExporting(true)
+      
+      // Validate data before export
+      const validationResult = validateExportData(allTransactions)
+      if (!validationResult.isValid) {
+        toast({
+          title: "خطأ في البيانات",
+          description: validationResult.errors.join(', '),
+          variant: "destructive",
+        })
+        return
+      }
+      
+      // Generate summary statistics
+      const summaryStats = generateSummaryStats(validationResult.data)
+      
+      await exportToCSV({
+        data: validationResult.data,
+        filename: `تقرير_الإصدارات_${new Date().toISOString().split('T')[0]}`,
+        filters,
+        summaryStats
+      })
+
+      toast({
+        title: "تم التصدير بنجاح",
+        description: "تم تصدير التقرير إلى ملف CSV مع تفاصيل كاملة",
+      })
+    } catch (error) {
+      console.error('Error exporting to CSV:', error)
+      toast({
+        title: "خطأ في التصدير",
+        description: "فشل في تصدير التقرير",
+        variant: "destructive",
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleExportExcel = async () => {
+    try {
+      setExporting(true)
+      
+      // Validate data before export
+      const validationResult = validateExportData(allTransactions)
+      if (!validationResult.isValid) {
+        toast({
+          title: "خطأ في البيانات",
+          description: validationResult.errors.join(', '),
+          variant: "destructive",
+        })
+        return
+      }
+      
+      // Generate summary statistics
+      const summaryStats = generateSummaryStats(validationResult.data)
+      
+      await exportToExcel({
+        data: validationResult.data,
+        filename: `تقرير_الإصدارات_${new Date().toISOString().split('T')[0]}`,
+        filters,
+        summaryStats
+      })
+
+      toast({
+        title: "تم التصدير بنجاح",
+        description: "تم تصدير التقرير إلى ملف Excel مع تفاصيل كاملة",
+      })
+    } catch (error) {
+      console.error('Error exporting to Excel:', error)
+      toast({
+        title: "خطأ في التصدير",
+        description: "فشل في تصدير التقرير",
+        variant: "destructive",
+      })
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const handleExportPDF = async () => {
+    try {
+      setExporting(true)
+      
+      // Validate data before export
+      const validationResult = validateExportData(allTransactions)
+      if (!validationResult.isValid) {
+        toast({
+          title: "خطأ في البيانات",
+          description: validationResult.errors.join(', '),
+          variant: "destructive",
+        })
+        return
+      }
+      
+      // Generate summary statistics
+      const summaryStats = generateSummaryStats(validationResult.data)
+      
+      await exportToPDF({
+        data: validationResult.data,
+        filename: `تقرير_الإصدارات_${new Date().toISOString().split('T')[0]}`,
+        filters,
+        summaryStats,
+        chartData: {
+          monthlyData,
+          productFrequency,
+          branchData
+        }
+      })
+
+      toast({
+        title: "تم التصدير بنجاح",
+        description: "تم تصدير التقرير إلى ملف PDF مع الرسوم البيانية",
+      })
+    } catch (error) {
+      console.error('Error exporting to PDF:', error)
+      toast({
+        title: "خطأ في التصدير",
+        description: "فشل في تصدير التقرير",
+        variant: "destructive",
+      })
+    } finally {
+      setExporting(false)
+    }
   }
 
   if (!user) {
@@ -136,45 +258,136 @@ export default function ReportsPage() {
               <CardTitle className="text-white">فلاتر التقارير</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col sm:flex-row gap-4 items-end">
-                <div className="grid gap-2 flex-1">
-                  <label className="text-sm text-slate-300">الفترة الزمنية</label>
-                  <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-700 border-slate-600">
-                      <SelectItem value="daily">يومي</SelectItem>
-                      <SelectItem value="weekly">أسبوعي</SelectItem>
-                      <SelectItem value="monthly">شهري</SelectItem>
-                      <SelectItem value="yearly">سنوي</SelectItem>
-                    </SelectContent>
-                  </Select>
+              {/* Enhanced Filtering Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <div>
+                  <label className="text-sm text-slate-300">تاريخ البداية</label>
+                  <input
+                    type="date"
+                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    value={filters.startDate}
+                    onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
+                  />
                 </div>
-                <div className="grid gap-2 flex-1">
+                <div>
+                  <label className="text-sm text-slate-300">تاريخ النهاية</label>
+                  <input
+                    type="date"
+                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    value={filters.endDate}
+                    onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
+                  />
+                </div>
+                <div>
                   <label className="text-sm text-slate-300">الفرع</label>
-                  <Select value={selectedBranch} onValueChange={setSelectedBranch}>
+                  <Select value={filters.branch} onValueChange={(value) => setFilters(prev => ({ ...prev, branch: value }))}>
                     <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                      <SelectValue />
+                      <SelectValue placeholder="اختر الفرع" />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-700 border-slate-600">
                       <SelectItem value="all">جميع الفروع</SelectItem>
-                      {branchData.map((branch) => (
-                        <SelectItem key={branch.branch} value={branch.branch}>
-                          {branch.branch}
-                        </SelectItem>
+                      {BRANCHES.map(branch => (
+                        <SelectItem key={branch} value={branch}>{branch}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+                <div>
+                  <label className="text-sm text-slate-300">الفئة</label>
+                  <Select value={filters.category} onValueChange={(value) => setFilters(prev => ({ ...prev, category: value }))}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="اختر الفئة" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600">
+                      <SelectItem value="all">جميع الفئات</SelectItem>
+                      {CATEGORIES.map(category => (
+                        <SelectItem key={category} value={category}>{category}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              {/* Additional Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div>
+                  <label className="text-sm text-slate-300">اسم المنتج</label>
+                  <input
+                    type="text"
+                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    placeholder="البحث بالاسم أو رقم القطعة"
+                    value={filters.productName}
+                    onChange={(e) => setFilters(prev => ({ ...prev, productName: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-300">المهندس</label>
+                  <input
+                    type="text"
+                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    placeholder="اسم المهندس"
+                    value={filters.engineer}
+                    onChange={(e) => setFilters(prev => ({ ...prev, engineer: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-300">العميل</label>
+                  <input
+                    type="text"
+                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    placeholder="اسم العميل"
+                    value={filters.customer}
+                    onChange={(e) => setFilters(prev => ({ ...prev, customer: e.target.value }))}
+                  />
+                </div>
+              </div>
+              
+              {/* Filter Actions */}
+              <div className="flex gap-2 items-center justify-between">
                 <div className="flex gap-2">
-                  <Button onClick={handleExportExcel} className="bg-green-600 hover:bg-green-700">
-                    <Download className="w-4 h-4 ml-2" />
-                    CSV
+                  <Button 
+                    variant="outline" 
+                    className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                    onClick={() => setFilters({
+                      startDate: "",
+                      endDate: "",
+                      branch: "all",
+                      category: "all",
+                      productName: "",
+                      engineer: "",
+                      customer: ""
+                    })}
+                  >
+                    مسح الفلاتر
                   </Button>
-                  <Button onClick={handleExportPDF} className="bg-red-600 hover:bg-red-700">
+                  <div className="text-sm text-slate-400 flex items-center">
+                    عدد النتائج: {allTransactions.length}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    onClick={handleExportCSV} 
+                    className="bg-green-600 hover:bg-green-700"
+                    disabled={exporting}
+                  >
+                    <Download className="w-4 h-4 ml-2" />
+                    {exporting ? "جاري التصدير..." : "CSV"}
+                  </Button>
+                  <Button 
+                    onClick={handleExportExcel} 
+                    className="bg-blue-600 hover:bg-blue-700"
+                    disabled={exporting}
+                  >
+                    <Download className="w-4 h-4 ml-2" />
+                    {exporting ? "جاري التصدير..." : "Excel"}
+                  </Button>
+                  <Button 
+                    onClick={handleExportPDF} 
+                    className="bg-red-600 hover:bg-red-700"
+                    disabled={exporting}
+                  >
                     <FileText className="w-4 h-4 ml-2" />
-                    PDF
+                    {exporting ? "جاري التصدير..." : "PDF"}
                   </Button>
                 </div>
               </div>

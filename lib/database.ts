@@ -438,18 +438,105 @@ export async function getWeeklyIssuanceData() {
   }, "Failed to fetch weekly issuance data")
 }
 
-// Enhanced reports functions
-export async function getMonthlyIssuances() {
+// Enhanced reports functions with advanced filtering
+export async function getFilteredIssuances(filters: {
+  startDate?: string
+  endDate?: string
+  branch?: string
+  category?: string
+  productName?: string
+  engineer?: string
+  customer?: string
+} = {}) {
   return withErrorHandling(async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from("issuances")
-      .select("created_at, quantity")
-      .gte("created_at", new Date(Date.now() - 6 * 30 * 24 * 60 * 60 * 1000).toISOString())
+      .select(`
+        *,
+        products!inner(
+          id,
+          name,
+          brand,
+          model,
+          category,
+          description
+        )
+      `)
+      .order("created_at", { ascending: false })
+
+    // Apply date filters
+    if (filters.startDate) {
+      query = query.gte("created_at", filters.startDate)
+    }
+    if (filters.endDate) {
+      query = query.lte("created_at", filters.endDate)
+    }
+
+    // Apply branch filter
+    if (filters.branch && filters.branch !== "all") {
+      query = query.eq("branch", filters.branch)
+    }
+
+    // Apply engineer filter
+    if (filters.engineer) {
+      query = query.ilike("engineer", `%${filters.engineer}%`)
+    }
+
+    // Apply customer filter
+    if (filters.customer) {
+      query = query.ilike("customer_name", `%${filters.customer}%`)
+    }
+
+    const { data, error } = await query
 
     if (error) throw error
 
+    let results = data || []
+
+    // Apply product-based filters (client-side for complex joins)
+    if (filters.category && filters.category !== "all") {
+      results = results.filter(item => item.products?.category === filters.category)
+    }
+
+    if (filters.productName) {
+      results = results.filter(item => 
+        item.product_name?.toLowerCase().includes(filters.productName.toLowerCase()) ||
+        item.products?.name?.toLowerCase().includes(filters.productName.toLowerCase())
+      )
+    }
+
+    // Map to enhanced format with product details
+    return results.map(item => ({
+      ...item,
+      productId: item.product_id,
+      productName: item.product_name,
+      customerName: item.customer_name,
+      serialNumber: item.serial_number,
+      issuedBy: item.issued_by,
+      date: item.created_at.split("T")[0],
+      // Enhanced product information
+      productDetails: {
+        category: item.products?.category,
+        partNumber: null, // Part number not available in current schema
+        brand: item.products?.brand || item.brand,
+        model: item.products?.model || item.model,
+        description: item.products?.description
+      }
+    }))
+  }, "Failed to fetch filtered issuances")
+}
+
+export async function getMonthlyIssuances(filters: {
+  startDate?: string
+  endDate?: string
+  branch?: string
+  category?: string
+} = {}) {
+  return withErrorHandling(async () => {
+    const issuances = await getFilteredIssuances(filters)
+
     // Group by month
-    const monthlyData = (data || []).reduce((acc: any, item) => {
+    const monthlyData = issuances.reduce((acc: any, item) => {
       const month = new Date(item.created_at).toLocaleDateString("ar-SA", { month: "long" })
       if (!acc[month]) {
         acc[month] = { month, issued: 0 }
@@ -462,18 +549,29 @@ export async function getMonthlyIssuances() {
   }, "Failed to fetch monthly issuances")
 }
 
-export async function getProductFrequency() {
+export async function getProductFrequency(filters: {
+  startDate?: string
+  endDate?: string
+  branch?: string
+  category?: string
+} = {}) {
   return withErrorHandling(async () => {
-    const { data, error } = await supabase.from("issuances").select("product_name, quantity")
+    const issuances = await getFilteredIssuances(filters)
 
-    if (error) throw error
-
-    // Group by product
-    const productData = (data || []).reduce((acc: any, item) => {
-      if (!acc[item.product_name]) {
-        acc[item.product_name] = { name: item.product_name, count: 0 }
+    // Group by product with enhanced details
+    const productData = issuances.reduce((acc: any, item) => {
+      const productKey = item.product_name
+      if (!acc[productKey]) {
+        acc[productKey] = {
+          name: item.product_name,
+          category: item.productDetails?.category,
+          partNumber: item.productDetails?.partNumber,
+          brand: item.productDetails?.brand,
+          model: item.productDetails?.model,
+          count: 0
+        }
       }
-      acc[item.product_name].count += item.quantity || 0
+      acc[productKey].count += item.quantity || 0
       return acc
     }, {})
 
@@ -483,14 +581,17 @@ export async function getProductFrequency() {
   }, "Failed to fetch product frequency")
 }
 
-export async function getBranchPerformance() {
+export async function getBranchPerformance(filters: {
+  startDate?: string
+  endDate?: string
+  category?: string
+  productName?: string
+} = {}) {
   return withErrorHandling(async () => {
-    const { data, error } = await supabase.from("issuances").select("branch, quantity")
-
-    if (error) throw error
+    const issuances = await getFilteredIssuances(filters)
 
     // Group by branch
-    const branchData = (data || []).reduce((acc: any, item) => {
+    const branchData = issuances.reduce((acc: any, item) => {
       if (!acc[item.branch]) {
         acc[item.branch] = { branch: item.branch, count: 0 }
       }
