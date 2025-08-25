@@ -1,7 +1,5 @@
 import jsPDF from 'jspdf'
 import 'jspdf-autotable'
-import { format } from 'date-fns'
-import { ar } from 'date-fns/locale'
 import * as XLSX from 'xlsx-js-style'
 import html2canvas from 'html2canvas'
 
@@ -48,39 +46,11 @@ export interface ExportOptions {
 // Enhanced CSV Export
 export function exportToCSV(options: ExportOptions): void {
   const { data, title = 'تقرير الإصدارات', filename, filters, summaryStats } = options
-  const headers = [
-    'رقم الإصدار',
-    'التاريخ',
-    'اسم المنتج',
-    'الفئة',
-    'رقم القطعة',
-    'الماركة',
-    'الموديل',
-    'اسم العميل',
-    'الفرع',
-    'الكمية',
-    'المهندس',
-    'الرقم التسلسلي',
-    'ملاحظات'
-  ]
+  const headers = TABLE_HEADERS
 
   const csvData = [
     headers,
-    ...data.map(item => [
-      item.id.toString(),
-      new Date(item.date).toLocaleDateString('ar-SA'),
-      item.productName || '',
-      item.category || '',
-      item.partNumber || '',
-      item.brand || '',
-      item.model || '',
-      item.customerName || '',
-      item.branch || '',
-      item.quantity.toString(),
-      item.engineer || '',
-      item.serialNumber || '',
-      item.notes || ''
-    ])
+    ...data.map(mapRowForStrings)
   ]
 
   // Add filter information as header
@@ -174,20 +144,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any }): void 
   }
 
   // Table headers and rows
-  const tableHeaders = [
-    'رقم الإصدار',
-    'التاريخ',
-    'المنتج',
-    'الفئة',
-    'رقم القطعة',
-    'الماركة',
-    'العميل',
-    'الفرع',
-    'الكمية',
-    'المهندس',
-    'الرقم التسلسلي',
-    'ملاحظات'
-  ]
+  const tableHeaders = TABLE_HEADERS
 
   const cellStyle = "style=\"border:1px solid #e5e7eb;padding:6px;color:#111827;vertical-align:middle;\""
 
@@ -221,7 +178,10 @@ export function exportToPDF(options: ExportOptions & { chartData?: any }): void 
     </table>
   `
 
-  container.innerHTML = headerHtml + filtersHtml + tableHtml
+  const totalQuantity = data.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+  const summaryHtml = `<div style="margin-top:8px;font-weight:700;">إجمالي الكمية: ${totalQuantity}</div>`
+
+  container.innerHTML = headerHtml + filtersHtml + tableHtml + summaryHtml
   document.body.appendChild(container)
 
   const runCapture = () => html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true }).then(canvas => {
@@ -272,6 +232,37 @@ export function exportToPDF(options: ExportOptions & { chartData?: any }): void 
 }
 
 // Excel Export Function
+// Shared headers and row-mapping used by CSV, PDF and Excel exports
+const TABLE_HEADERS = [
+  'رقم الإصدار',
+  'التاريخ',
+  'المنتج',
+  'الفئة',
+  'رقم القطعة',
+  'الماركة',
+  'العميل',
+  'الفرع',
+  'الكمية',
+  'المهندس',
+  'الرقم التسلسلي',
+  'ملاحظات'
+] as const
+
+const mapRowForStrings = (item: ExportData): string[] => [
+  `${item.id ?? ''}`,
+  new Date(item.date).toLocaleDateString('ar-SA'),
+  item.productName ?? '',
+  item.category ?? '',
+  item.partNumber ?? '',
+  item.brand ?? '',
+  item.customerName ?? '',
+  item.branch ?? '',
+  `${item.quantity ?? ''}`,
+  item.engineer ?? '',
+  item.serialNumber ?? '',
+  item.notes ?? ''
+]
+
 export function exportToExcel(options: ExportOptions): void {
   const { data, title = 'تقرير الإصدارات', filename, filters } = options
   const safeFilters = filters || {}
@@ -299,20 +290,9 @@ export function exportToExcel(options: ExportOptions): void {
     headerInfo.push([''])
   }
 
-  const tableHeaders = [
-    'رقم الإصدار',
-    'التاريخ',
-    'المنتج',
-    'الفئة',
-    'رقم القطعة',
-    'الماركة',
-    'العميل',
-    'الفرع',
-    'الكمية',
-    'المهندس',
-    'الرقم التسلسلي',
-    'ملاحظات'
-  ]
+  const tableHeaders = TABLE_HEADERS
+
+  // removed local mapRowForStrings (now shared at top-level)
 
   // Build rows
   const tableData = data.map(item => [
@@ -370,7 +350,10 @@ export function exportToExcel(options: ExportOptions): void {
   const firstRowNumber = headerRowIndex + 1 // Excel row number (1-based)
   const lastRowNumber = headerInfo.length + 1 + tableData.length
   worksheet['!autofilter'] = { ref: `B${firstRowNumber}:${lastCol}${lastRowNumber}` }
-  
+  // Ensure header row height for readability
+  ;(worksheet as any)['!rows'] = (worksheet as any)['!rows'] || []
+  ;(worksheet as any)['!rows'][headerRowIndex] = { hpt: 24 }
+
   // Styling: header row (blue background, white bold text) and data borders
   const headerStyle = {
     font: { bold: true, color: { rgb: 'FFFFFFFF' } },
@@ -385,7 +368,7 @@ export function exportToExcel(options: ExportOptions): void {
   }
 
   const dataStyle = {
-    alignment: { horizontal: 'center', vertical: 'center' as const },
+    alignment: { horizontal: 'center', vertical: 'center' as const, wrapText: true },
     border: {
       top: { style: 'thin', color: { rgb: 'FFE5E7EB' } },
       bottom: { style: 'thin', color: { rgb: 'FFE5E7EB' } },
