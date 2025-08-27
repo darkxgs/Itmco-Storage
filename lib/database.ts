@@ -277,11 +277,22 @@ export async function deleteIssuance(id: number) {
 
     if (deleteError) throw deleteError
 
+    // Get current product stock
+    const { data: product, error: productError } = await supabase
+      .from("products")
+      .select("stock")
+      .eq("id", issuance.product_id)
+      .single()
+
+    if (productError || !product) {
+      throw new Error("Product not found")
+    }
+
     // Return stock to product
     const { error: updateStockError } = await supabase
       .from("products")
       .update({
-        stock: supabase.sql`stock + ${issuance.quantity}`,
+        stock: product.stock + issuance.quantity,
         updated_at: new Date().toISOString(),
       })
       .eq("id", issuance.product_id)

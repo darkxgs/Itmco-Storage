@@ -77,6 +77,8 @@ CREATE POLICY "Enable delete for all users" ON products FOR DELETE USING (true);
 
 CREATE POLICY "Enable read access for all users" ON issuances FOR SELECT USING (true);
 CREATE POLICY "Enable insert for all users" ON issuances FOR INSERT WITH CHECK (true);
+CREATE POLICY "Enable update for all users" ON issuances FOR UPDATE USING (true);
+CREATE POLICY "Enable delete for all users" ON issuances FOR DELETE USING (true);
 
 CREATE POLICY "Enable read access for all users" ON activity_logs FOR SELECT USING (true);
 CREATE POLICY "Enable insert for all users" ON activity_logs FOR INSERT WITH CHECK (true);
