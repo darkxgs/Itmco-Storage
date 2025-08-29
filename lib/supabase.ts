@@ -40,6 +40,111 @@ export type Database = {
           updated_at?: string
         }
       }
+      branches: {
+        Row: {
+          id: number
+          name: string
+          code: string
+          address: string | null
+          phone: string | null
+          manager_name: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          name: string
+          code: string
+          address?: string | null
+          phone?: string | null
+          manager_name?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          name?: string
+          code?: string
+          address?: string | null
+          phone?: string | null
+          manager_name?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      customers: {
+        Row: {
+          id: number
+          name: string
+          code: string | null
+          email: string | null
+          phone: string | null
+          address: string | null
+          contact_person: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          name: string
+          code?: string | null
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          contact_person?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          name?: string
+          code?: string | null
+          email?: string | null
+          phone?: string | null
+          address?: string | null
+          contact_person?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      warehouses: {
+        Row: {
+          id: number
+          warehouse_number: string
+          name: string
+          location: string | null
+          description: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          warehouse_number?: string
+          name: string
+          location?: string | null
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          warehouse_number?: string
+          name?: string
+          location?: string | null
+          description?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
       products: {
         Row: {
           id: number
@@ -49,6 +154,9 @@ export type Database = {
           category: string
           stock: number
           min_stock: number
+          item_code: string | null
+          warehouse_id: number | null
+          price: number | null
           description: string | null
           created_at: string
           updated_at: string
@@ -61,6 +169,9 @@ export type Database = {
           category: string
           stock?: number
           min_stock?: number
+          item_code?: string | null
+          warehouse_id?: number | null
+          price?: number | null
           description?: string | null
           created_at?: string
           updated_at?: string
@@ -73,6 +184,9 @@ export type Database = {
           category?: string
           stock?: number
           min_stock?: number
+          item_code?: string | null
+          warehouse_id?: number | null
+          price?: number | null
           description?: string | null
           created_at?: string
           updated_at?: string
@@ -92,6 +206,11 @@ export type Database = {
           serial_number: string
           notes: string | null
           issued_by: string
+          customer_id: number | null
+          branch_id: number | null
+          item_code: string | null
+          warehouse_id: number | null
+          date: string
           created_at: string
         }
         Insert: {
@@ -107,6 +226,11 @@ export type Database = {
           serial_number: string
           notes?: string | null
           issued_by: string
+          customer_id?: number | null
+          branch_id?: number | null
+          item_code?: string | null
+          warehouse_id?: number | null
+          date: string
           created_at?: string
         }
         Update: {
@@ -122,6 +246,58 @@ export type Database = {
           serial_number?: string
           notes?: string | null
           issued_by?: string
+          customer_id?: number | null
+          branch_id?: number | null
+          item_code?: string | null
+          warehouse_id?: number | null
+          date?: string
+          created_at?: string
+        }
+      }
+      release_items: {
+        Row: {
+          id: number
+          issuance_id: number
+          product_id: number | null
+          item_code: string | null
+          product_name: string
+          brand: string
+          model: string
+          quantity: number
+          unit_price: number | null
+          total_price: number | null
+          serial_numbers: string[] | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          issuance_id: number
+          product_id?: number | null
+          item_code?: string | null
+          product_name: string
+          brand: string
+          model: string
+          quantity: number
+          unit_price?: number | null
+          total_price?: number | null
+          serial_numbers?: string[] | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          issuance_id?: number
+          product_id?: number | null
+          item_code?: string | null
+          product_name?: string
+          brand?: string
+          model?: string
+          quantity?: number
+          unit_price?: number | null
+          total_price?: number | null
+          serial_numbers?: string[] | null
+          notes?: string | null
           created_at?: string
         }
       }
@@ -166,6 +342,22 @@ export type ProductUpdate = Database['public']['Tables']['products']['Update']
 export type Issuance = Database['public']['Tables']['issuances']['Row']
 export type IssuanceInsert = Database['public']['Tables']['issuances']['Insert']
 export type IssuanceUpdate = Database['public']['Tables']['issuances']['Update']
+
+export type Branch = Database['public']['Tables']['branches']['Row']
+export type BranchInsert = Database['public']['Tables']['branches']['Insert']
+export type BranchUpdate = Database['public']['Tables']['branches']['Update']
+
+export type Customer = Database['public']['Tables']['customers']['Row']
+export type CustomerInsert = Database['public']['Tables']['customers']['Insert']
+export type CustomerUpdate = Database['public']['Tables']['customers']['Update']
+
+export type Warehouse = Database['public']['Tables']['warehouses']['Row']
+export type WarehouseInsert = Database['public']['Tables']['warehouses']['Insert']
+export type WarehouseUpdate = Database['public']['Tables']['warehouses']['Update']
+
+export type ReleaseItem = Database['public']['Tables']['release_items']['Row']
+export type ReleaseItemInsert = Database['public']['Tables']['release_items']['Insert']
+export type ReleaseItemUpdate = Database['public']['Tables']['release_items']['Update']
 
 export type User = Database['public']['Tables']['users']['Row']
 export type ActivityLog = Database['public']['Tables']['activity_logs']['Row']

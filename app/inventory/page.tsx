@@ -13,6 +13,17 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import {
   Plus,
   Search,
   Edit,
@@ -30,7 +41,7 @@ import {
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { getProducts, createProduct, updateProduct, deleteProduct } from "@/lib/database"
+import { getProducts, createProduct, updateProduct, deleteProduct, getWarehouses, searchByItemCode, generateNextItemCode } from "@/lib/database"
 import { logActivity } from "@/lib/auth"
 import { validateData, productSchema } from "@/lib/validation"
 import { Pagination } from "@/components/ui/pagination"
@@ -51,12 +62,15 @@ const ITEMS_PER_PAGE = 10
 export default function InventoryPage() {
   const { user, loading: authLoading } = useAuth()
   const [products, setProducts] = useState([])
+  const [warehouses, setWarehouses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
   const [stockFilter, setStockFilter] = useState("all")
+  const [warehouseFilter, setWarehouseFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<any>(null)
@@ -65,6 +79,9 @@ export default function InventoryPage() {
     brand: "",
     model: "",
     category: "",
+    item_code: "",
+    warehouse_id: "",
+    price: "",
     stock: 0,
     minStock: 5,
     description: "",
@@ -85,23 +102,27 @@ export default function InventoryPage() {
   }, [user, toast])
 
   useEffect(() => {
-    const loadProducts = async () => {
+    const loadData = async () => {
       if (!user) return
 
       try {
         setLoading(true)
-        const data = await getProducts()
-        setProducts(data)
+        const [productsData, warehousesData] = await Promise.all([
+          getProducts(),
+          getWarehouses()
+        ])
+        setProducts(productsData)
+        setWarehouses(warehousesData)
 
         toast({
           title: "تم تحميل البيانات",
-          description: `تم تحميل ${data.length} منتج بنجاح`,
+          description: `تم تحميل ${productsData.length} منتج بنجاح`,
         })
       } catch (error) {
-        console.error("Error loading products:", error)
+        console.error("Error loading data:", error)
         toast({
           title: "خطأ في التحميل",
-          description: "فشل في تحميل قائمة المنتجات. يرجى إعادة المحاولة",
+          description: "فشل في تحميل البيانات. يرجى إعادة المحاولة",
           variant: "destructive",
         })
       } finally {
@@ -109,7 +130,7 @@ export default function InventoryPage() {
       }
     }
 
-    loadProducts()
+    loadData()
   }, [user, toast])
 
   const filteredProducts = useMemo(() => {
@@ -118,9 +139,12 @@ export default function InventoryPage() {
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.brand.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.model.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.category.toLowerCase().includes(searchTerm.toLowerCase())
+        product.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (product.item_code && product.item_code.toLowerCase().includes(searchTerm.toLowerCase()))
 
       const matchesCategory = categoryFilter === "all" || product.category === categoryFilter
+
+      const matchesWarehouse = warehouseFilter === "all" || product.warehouse_id === warehouseFilter
 
       const matchesStock =
         stockFilter === "all" ||
@@ -128,9 +152,9 @@ export default function InventoryPage() {
         (stockFilter === "out" && product.stock === 0) ||
         (stockFilter === "available" && product.stock > (product.min_stock || product.minStock))
 
-      return matchesSearch && matchesCategory && matchesStock
+      return matchesSearch && matchesCategory && matchesWarehouse && matchesStock
     })
-  }, [products, searchTerm, categoryFilter, stockFilter])
+  }, [products, searchTerm, categoryFilter, warehouseFilter, stockFilter])
 
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
@@ -152,6 +176,23 @@ export default function InventoryPage() {
     }
     setFormErrors([])
     return true
+  }
+
+  const handleGenerateItemCode = async () => {
+    try {
+      const newItemCode = await generateNextItemCode()
+      setNewProduct({ ...newProduct, item_code: newItemCode })
+      toast({
+        title: "تم إنشاء كود الصنف",
+        description: `كود الصنف الجديد: ${newItemCode}`,
+      })
+    } catch (error: any) {
+      toast({
+        title: "فشل في إنشاء كود الصنف",
+        description: error.message || "حدث خطأ أثناء إنشاء كود الصنف",
+        variant: "destructive",
+      })
+    }
   }
 
   const handleAddProduct = async () => {
@@ -183,6 +224,9 @@ export default function InventoryPage() {
         brand: "",
         model: "",
         category: "",
+        item_code: "",
+        warehouse_id: "",
+        price: "",
         stock: 0,
         minStock: 5,
         description: "",
@@ -270,21 +314,29 @@ export default function InventoryPage() {
       })
     } catch (error: any) {
       console.error("Error deleting product:", error)
+      
+      let errorMessage = "حدث خطأ أثناء حذف المنتج. يرجى المحاولة مرة أخرى"
+      
+      if (error.message && error.message.includes("Cannot delete product with existing issuances")) {
+        errorMessage = "لا يمكن حذف هذا المنتج لأنه مرتبط بعمليات إصدار موجودة. يرجى حذف عمليات الإصدار أولاً أو تحويلها لمنتج آخر."
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
       toast({
         title: "فشل في حذف المنتج",
-        description: error.message || "حدث خطأ أثناء حذف المنتج. يرجى المحاولة مرة أخرى",
+        description: errorMessage,
         variant: "destructive",
       })
     }
   }
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedProducts.length === 0) return
+    setIsBulkDeleteDialogOpen(true)
+  }
 
-    if (!confirm(`هل أنت متأكد من حذف ${selectedProducts.length} منتج؟`)) {
-      return
-    }
-
+  const confirmBulkDelete = async () => {
     try {
       const deletedNames = selectedProducts.map((id) => products.find((p) => p.id === id)?.name).filter(Boolean)
 
@@ -295,6 +347,7 @@ export default function InventoryPage() {
       await logActivity(user.id, user.name, "حذف متعدد", "إدارة المخزون", `تم حذف ${selectedProducts.length} منتج`)
 
       setSelectedProducts([])
+      setIsBulkDeleteDialogOpen(false)
 
       toast({
         title: "تم الحذف بنجاح",
@@ -302,9 +355,18 @@ export default function InventoryPage() {
       })
     } catch (error: any) {
       console.error("Error bulk deleting products:", error)
+      
+      let errorMessage = "حدث خطأ أثناء حذف المنتجات. يرجى المحاولة مرة أخرى"
+      
+      if (error.message && error.message.includes("Cannot delete product with existing issuances")) {
+        errorMessage = "لا يمكن حذف بعض المنتجات لأنها مرتبطة بعمليات إصدار موجودة. يرجى حذف عمليات الإصدار أولاً أو تحويلها لمنتجات أخرى."
+      }
+      
+      setIsBulkDeleteDialogOpen(false)
+      
       toast({
         title: "فشل في الحذف المتعدد",
-        description: error.message || "حدث خطأ أثناء حذف المنتجات. يرجى المحاولة مرة أخرى",
+        description: errorMessage,
         variant: "destructive",
       })
     }
@@ -376,6 +438,7 @@ export default function InventoryPage() {
     setSearchTerm("")
     setCategoryFilter("all")
     setStockFilter("all")
+    setWarehouseFilter("all")
     setCurrentPage(1)
 
     toast({
@@ -473,10 +536,28 @@ export default function InventoryPage() {
                 <CardTitle className="text-white text-right">قائمة المنتجات ({filteredProducts.length})</CardTitle>
                 <div className="flex flex-wrap gap-2">
                   {selectedProducts.length > 0 && (
-                    <Button onClick={handleBulkDelete} variant="destructive" size="sm">
-                      <Trash2 className="w-4 h-4 ml-2" />
-                      حذف المحدد ({selectedProducts.length})
-                    </Button>
+                    <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
+                      <AlertDialogTrigger asChild>
+                        <Button onClick={handleBulkDelete} variant="destructive" size="sm">
+                          <Trash2 className="w-4 h-4 ml-2" />
+                          حذف المحدد ({selectedProducts.length})
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>تأكيد الحذف</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            هل أنت متأكد من حذف {selectedProducts.length} منتج؟ هذا الإجراء لا يمكن التراجع عنه.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>إلغاء</AlertDialogCancel>
+                          <AlertDialogAction onClick={confirmBulkDelete} className="bg-red-600 hover:bg-red-700">
+                            حذف
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
                   )}
                   <Button onClick={handleExportProducts} variant="outline" size="sm" className="bg-transparent">
                     <Download className="w-4 h-4 ml-2" />
@@ -569,6 +650,65 @@ export default function InventoryPage() {
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="grid gap-2">
+                            <Label htmlFor="item_code" className="text-right">
+                              كود الصنف *
+                            </Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="item_code"
+                                value={newProduct.item_code}
+                                onChange={(e) => setNewProduct({ ...newProduct, item_code: e.target.value })}
+                                className="bg-slate-700 border-slate-600 text-right font-mono flex-1"
+                                placeholder="مثل: ITM-01"
+                              />
+                              <Button
+                                type="button"
+                                onClick={handleGenerateItemCode}
+                                className="bg-blue-600 hover:bg-blue-700 text-white px-3"
+                                size="sm"
+                              >
+                                إنشاء تلقائي
+                              </Button>
+                            </div>
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="warehouse" className="text-right">
+                              المخزن *
+                            </Label>
+                            <Select
+                              value={newProduct.warehouse_id}
+                              onValueChange={(value) => setNewProduct({ ...newProduct, warehouse_id: value })}
+                            >
+                              <SelectTrigger className="bg-slate-700 border-slate-600 text-right">
+                                <SelectValue placeholder="اختر المخزن" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-slate-700 border-slate-600">
+                                {warehouses.map((warehouse) => (
+                                  <SelectItem key={warehouse.id} value={warehouse.id} className="text-right">
+                                    {warehouse.name} - {warehouse.warehouse_number}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-3 gap-4">
+                          <div className="grid gap-2">
+                            <Label htmlFor="price" className="text-right">
+                              السعر (اختياري)
+                            </Label>
+                            <Input
+                              id="price"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={newProduct.price}
+                              onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                              className="bg-slate-700 border-slate-600 text-center"
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div className="grid gap-2">
                             <Label htmlFor="stock" className="text-right">
                               الكمية المتوفرة
                             </Label>
@@ -635,11 +775,11 @@ export default function InventoryPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Search and Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                   <Input
-                    placeholder="البحث في المنتجات..."
+                    placeholder="البحث بالاسم أو كود الصنف..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10 bg-slate-700 border-slate-600 text-white text-right"
@@ -656,6 +796,21 @@ export default function InventoryPage() {
                     {categories.map((category) => (
                       <SelectItem key={category} value={category} className="text-right">
                         {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
+                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
+                    <SelectValue placeholder="جميع المخازن" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-700 border-slate-600">
+                    <SelectItem value="all" className="text-right">
+                      جميع المخازن
+                    </SelectItem>
+                    {warehouses.map((warehouse) => (
+                      <SelectItem key={warehouse.id} value={warehouse.id} className="text-right">
+                        {warehouse.name} - {warehouse.warehouse_number}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -702,10 +857,13 @@ export default function InventoryPage() {
                           }}
                         />
                       </TableHead>
-                      <TableHead className="text-slate-300 text-right min-w-[200px]">اسم المنتج</TableHead>
-                      <TableHead className="text-slate-300 text-right min-w-[120px]">العلامة التجارية</TableHead>
-                      <TableHead className="text-slate-300 text-right min-w-[100px]">الموديل</TableHead>
-                      <TableHead className="text-slate-300 text-right min-w-[150px]">الفئة</TableHead>
+                      <TableHead className="text-slate-300 text-right min-w-[180px]">اسم المنتج</TableHead>
+                      <TableHead className="text-slate-300 text-right min-w-[100px]">كود الصنف</TableHead>
+                      <TableHead className="text-slate-300 text-right min-w-[100px]">العلامة التجارية</TableHead>
+                      <TableHead className="text-slate-300 text-right min-w-[80px]">الموديل</TableHead>
+                      <TableHead className="text-slate-300 text-right min-w-[120px]">الفئة</TableHead>
+                      <TableHead className="text-slate-300 text-right min-w-[100px]">المخزن</TableHead>
+                      <TableHead className="text-slate-300 text-center min-w-[80px]">السعر</TableHead>
                       <TableHead className="text-slate-300 text-center min-w-[80px]">المخزون</TableHead>
                       <TableHead className="text-slate-300 text-center min-w-[100px]">الحالة</TableHead>
                       <TableHead className="text-slate-300 text-center min-w-[120px]">الإجراءات</TableHead>
@@ -744,6 +902,7 @@ export default function InventoryPage() {
                       paginatedProducts.map((product) => {
                         const status = getStockStatus(product.stock, product.min_stock || product.minStock)
                         const StatusIcon = status.icon
+                        const warehouse = warehouses.find(w => w.id === product.warehouse_id)
                         return (
                           <TableRow key={product.id} className="border-slate-700 hover:bg-slate-800/30">
                             <TableCell className="text-center">
@@ -766,9 +925,20 @@ export default function InventoryPage() {
                                 )}
                               </div>
                             </TableCell>
+                            <TableCell className="text-slate-300 text-right py-4">
+                              <span className="font-mono text-blue-400">{product.item_code || '-'}</span>
+                            </TableCell>
                             <TableCell className="text-slate-300 text-right py-4">{product.brand}</TableCell>
                             <TableCell className="text-slate-300 text-right py-4">{product.model}</TableCell>
                             <TableCell className="text-slate-300 text-right py-4">{product.category}</TableCell>
+                            <TableCell className="text-slate-300 text-right py-4">
+                              {warehouse ? `${warehouse.name} - ${warehouse.warehouse_number}` : '-'}
+                            </TableCell>
+                            <TableCell className="text-center py-4">
+                              <span className="text-green-400 font-medium">
+                                {product.price ? `${Number(product.price).toLocaleString()} ج.م` : '-'}
+                              </span>
+                            </TableCell>
                             <TableCell className="text-center py-4">
                               <div className="flex items-center justify-center gap-2">
                                 <span className={`${status.color} font-medium`}>{product.stock.toLocaleString()}</span>
@@ -888,6 +1058,59 @@ export default function InventoryPage() {
                                               ))}
                                             </SelectContent>
                                           </Select>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                          <div className="grid gap-2">
+                                            <Label htmlFor="edit-item-code" className="text-right">
+                                              كود الصنف
+                                            </Label>
+                                            <Input
+                                              id="edit-item-code"
+                                              value={editingProduct.item_code || ''}
+                                              onChange={(e) =>
+                                                setEditingProduct({ ...editingProduct, item_code: e.target.value })
+                                              }
+                                              className="bg-slate-700 border-slate-600 text-right font-mono"
+                                            />
+                                          </div>
+                                          <div className="grid gap-2">
+                                            <Label htmlFor="edit-warehouse" className="text-right">
+                                              المخزن
+                                            </Label>
+                                            <Select
+                                              value={editingProduct.warehouse_id || ''}
+                                              onValueChange={(value) =>
+                                                setEditingProduct({ ...editingProduct, warehouse_id: value })
+                                              }
+                                            >
+                                              <SelectTrigger className="bg-slate-700 border-slate-600 text-right">
+                                                <SelectValue />
+                                              </SelectTrigger>
+                                              <SelectContent className="bg-slate-700 border-slate-600">
+                                                {warehouses.map((warehouse) => (
+                                                  <SelectItem key={warehouse.id} value={warehouse.id} className="text-right">
+                                                    {warehouse.name} - {warehouse.warehouse_number}
+                                                  </SelectItem>
+                                                ))}
+                                              </SelectContent>
+                                            </Select>
+                                          </div>
+                                        </div>
+                                        <div className="grid gap-2">
+                                          <Label htmlFor="edit-price" className="text-right">
+                                            السعر (اختياري)
+                                          </Label>
+                                          <Input
+                                            id="edit-price"
+                                            type="number"
+                                            step="0.01"
+                                            value={editingProduct.price || ''}
+                                            onChange={(e) =>
+                                              setEditingProduct({ ...editingProduct, price: e.target.value ? parseFloat(e.target.value) : null })
+                                            }
+                                            className="bg-slate-700 border-slate-600 text-right"
+                                            placeholder="أدخل السعر"
+                                          />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                           <div className="grid gap-2">

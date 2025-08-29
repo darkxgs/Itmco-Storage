@@ -12,7 +12,7 @@ import { Download, FileText, Calendar, TrendingUp, Package, AlertTriangle } from
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { getMonthlyIssuances, getProductFrequency, getBranchPerformance, getFilteredIssuances, CATEGORIES, BRANCHES } from "@/lib/database"
+import { getMonthlyIssuances, getProductFrequency, getBranchPerformance, getFilteredIssuances, CATEGORIES, getBranches, getCustomers, getWarehouses } from "@/lib/database"
 import { exportToCSV, exportToPDF, exportToExcel, validateExportData, generateSummaryStats } from "@/lib/export-utils"
 import { ErrorBoundary } from "@/components/error-boundary"
 
@@ -30,8 +30,16 @@ export default function ReportsPage() {
     category: "all",
     productName: "",
     engineer: "",
-    customer: ""
+    customer: "",
+    warehouse: "all",
+    serialNumber: "",
+    itemCode: ""
   })
+
+  // New state for dynamic data
+  const [branches, setBranches] = useState([])
+  const [customers, setCustomers] = useState([])
+  const [warehouses, setWarehouses] = useState([])
 
   const [monthlyData, setMonthlyData] = useState([])
   const [productFrequency, setProductFrequency] = useState([])
@@ -53,6 +61,17 @@ export default function ReportsPage() {
       setLoading(true)
       setError(null)
       
+      // Load dynamic data first
+      const [branchesData, customersData, warehousesData] = await Promise.all([
+        getBranches(),
+        getCustomers(),
+        getWarehouses()
+      ])
+      
+      setBranches(branchesData)
+      setCustomers(customersData)
+      setWarehouses(warehousesData)
+      
       // Prepare filter parameters
       const filterParams = {
         startDate: filters.startDate || undefined,
@@ -61,7 +80,10 @@ export default function ReportsPage() {
         category: filters.category !== "all" ? filters.category : undefined,
         productName: filters.productName || undefined,
         engineer: filters.engineer || undefined,
-        customer: filters.customer || undefined
+        customer: filters.customer || undefined,
+        warehouse: filters.warehouse !== "all" ? filters.warehouse : undefined,
+        serialNumber: filters.serialNumber || undefined,
+        itemCode: filters.itemCode || undefined
       }
       
       const [monthly, frequency, branch, filtered, recent] = await Promise.all([
@@ -286,8 +308,8 @@ export default function ReportsPage() {
                     </SelectTrigger>
                     <SelectContent className="bg-slate-700 border-slate-600">
                       <SelectItem value="all">جميع الفروع</SelectItem>
-                      {BRANCHES.map(branch => (
-                        <SelectItem key={branch} value={branch}>{branch}</SelectItem>
+                      {branches.map(branch => (
+                        <SelectItem key={branch.id} value={branch.id.toString()}>{branch.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -321,6 +343,30 @@ export default function ReportsPage() {
                   />
                 </div>
                 <div>
+                  <label className="text-sm text-slate-300">كود الصنف</label>
+                  <input
+                    type="text"
+                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    placeholder="أدخل كود الصنف"
+                    value={filters.itemCode}
+                    onChange={(e) => setFilters(prev => ({ ...prev, itemCode: e.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-slate-300">الرقم التسلسلي</label>
+                  <input
+                    type="text"
+                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    placeholder="أدخل الرقم التسلسلي"
+                    value={filters.serialNumber}
+                    onChange={(e) => setFilters(prev => ({ ...prev, serialNumber: e.target.value }))}
+                  />
+                </div>
+              </div>
+              
+              {/* More Filters */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div>
                   <label className="text-sm text-slate-300">المهندس</label>
                   <input
                     type="text"
@@ -332,13 +378,31 @@ export default function ReportsPage() {
                 </div>
                 <div>
                   <label className="text-sm text-slate-300">العميل</label>
-                  <input
-                    type="text"
-                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
-                    placeholder="اسم العميل"
-                    value={filters.customer}
-                    onChange={(e) => setFilters(prev => ({ ...prev, customer: e.target.value }))}
-                  />
+                  <Select value={filters.customer} onValueChange={(value) => setFilters(prev => ({ ...prev, customer: value }))}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="اختر العميل" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600">
+                      <SelectItem value="all">جميع العملاء</SelectItem>
+                      {customers.map(customer => (
+                        <SelectItem key={customer.id} value={customer.id.toString()}>{customer.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="text-sm text-slate-300">المخزن</label>
+                  <Select value={filters.warehouse} onValueChange={(value) => setFilters(prev => ({ ...prev, warehouse: value }))}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="اختر المخزن" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600">
+                      <SelectItem value="all">جميع المخازن</SelectItem>
+                      {warehouses.map(warehouse => (
+                        <SelectItem key={warehouse.id} value={warehouse.id.toString()}>{warehouse.name} - {warehouse.warehouse_number}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               
@@ -355,7 +419,10 @@ export default function ReportsPage() {
                       category: "all",
                       productName: "",
                       engineer: "",
-                      customer: ""
+                      customer: "all",
+                      warehouse: "all",
+                      serialNumber: "",
+                      itemCode: ""
                     })}
                   >
                     مسح الفلاتر
@@ -586,7 +653,7 @@ export default function ReportsPage() {
                           {recentTransactions.map((transaction) => (
                             <TableRow key={transaction.id} className="border-slate-700">
                               <TableCell className="text-slate-300">
-                                {new Date(transaction.created_at).toLocaleDateString("ar-SA")}
+                                {new Date(transaction.created_at).toLocaleDateString("en-US")}
                               </TableCell>
                               <TableCell className="text-white font-medium">
                                 {transaction.product_name || transaction.productName}

@@ -21,6 +21,8 @@ import {
   Bell,
   Menu,
   X,
+  Building2,
+  UserCheck,
 } from "lucide-react"
 
 const navigation = [
@@ -52,6 +54,18 @@ const navigation = [
     name: "إدارة المستخدمين",
     href: "/users",
     icon: Users,
+    roles: ["admin"],
+  },
+  {
+    name: "إدارة العملاء",
+    href: "/customers",
+    icon: UserCheck,
+    roles: ["admin"],
+  },
+  {
+    name: "إدارة الفروع",
+    href: "/branches",
+    icon: Building2,
     roles: ["admin"],
   },
   {

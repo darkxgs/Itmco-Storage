@@ -291,7 +291,7 @@ export function createSecurityMiddleware(config: SecurityConfig = defaultSecurit
 // Utility function to create secure database queries
 export function createSecureQuery(tableName: string, operation: 'select' | 'insert' | 'update' | 'delete') {
   // Whitelist allowed table names
-  const allowedTables = ['users', 'products', 'issuances', 'activity_logs']
+  const allowedTables = ['users', 'products', 'issuances', 'activity_logs', 'customers', 'branches']
   
   if (!allowedTables.includes(tableName)) {
     throw new SecurityError(

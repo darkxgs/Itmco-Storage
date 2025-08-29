@@ -1,5 +1,12 @@
 import { supabase } from "./supabase"
-import type { Product, ProductInsert, ProductUpdate, Issuance, IssuanceInsert } from "./supabase"
+import type { 
+  Product, ProductInsert, ProductUpdate, 
+  Issuance, IssuanceInsert,
+  Branch, BranchInsert, BranchUpdate,
+  Customer, CustomerInsert, CustomerUpdate,
+  Warehouse, WarehouseInsert, WarehouseUpdate,
+  ReleaseItem, ReleaseItemInsert, ReleaseItemUpdate
+} from "./supabase"
 import { validateInput, validateObject, createSecureQuery, SecurityError } from "./security"
 
 // Enhanced error handling wrapper
@@ -22,6 +29,31 @@ export async function getProducts() {
   }, "Failed to fetch products")
 }
 
+// Generate next item code in format ITM-01, ITM-02, etc.
+export async function generateNextItemCode(): Promise<string> {
+  return withErrorHandling(async () => {
+    const { data, error } = await supabase
+      .from("products")
+      .select("item_code")
+      .not("item_code", "is", null)
+      .order("id", { ascending: false })
+      .limit(1)
+
+    if (error) throw error
+
+    let nextNumber = 1
+    if (data && data.length > 0 && data[0].item_code) {
+      const lastCode = data[0].item_code
+      const match = lastCode.match(/ITM-(\d+)$/)
+      if (match) {
+        nextNumber = parseInt(match[1]) + 1
+      }
+    }
+
+    return `ITM-${nextNumber.toString().padStart(2, '0')}`
+  }, "Failed to generate item code")
+}
+
 export async function createProduct(product: ProductInsert & { minStock?: number }) {
   return withErrorHandling(async () => {
     // Validate and sanitize input
@@ -37,12 +69,21 @@ export async function createProduct(product: ProductInsert & { minStock?: number
       throw new SecurityError("Stock values cannot be negative", "INVALID_INPUT")
     }
 
+    // Generate item code if not provided
+    let itemCode = sanitizedProduct.item_code
+    if (!itemCode) {
+      itemCode = await generateNextItemCode()
+    }
+
     // Map minStock to min_stock for database
     const dbProduct: ProductInsert = {
       name: validateInput(sanitizedProduct.name),
       brand: validateInput(sanitizedProduct.brand),
       model: validateInput(sanitizedProduct.model),
       category: validateInput(sanitizedProduct.category),
+      item_code: itemCode,
+      warehouse_id: sanitizedProduct.warehouse_id ? Number(sanitizedProduct.warehouse_id) : null,
+      price: sanitizedProduct.price ? Number(sanitizedProduct.price) : null,
       stock: Math.max(0, Number(sanitizedProduct.stock) || 0),
       min_stock: Math.max(0, Number(sanitizedProduct.minStock) || 0),
       description: sanitizedProduct.description ? validateInput(sanitizedProduct.description) : null,
@@ -458,6 +499,10 @@ export async function getFilteredIssuances(filters: {
   productName?: string
   engineer?: string
   customer?: string
+  warehouse?: string
+  serialNumber?: string
+  itemCode?: string
+  limit?: number
 } = {}) {
   return withErrorHandling(async () => {
     let query = supabase
@@ -485,7 +530,12 @@ export async function getFilteredIssuances(filters: {
 
     // Apply branch filter
     if (filters.branch && filters.branch !== "all") {
-      query = query.eq("branch", filters.branch)
+      // Check if it's an ID (numeric) or name (string)
+      if (!isNaN(Number(filters.branch))) {
+        query = query.eq("branch_id", filters.branch)
+      } else {
+        query = query.eq("branch", filters.branch)
+      }
     }
 
     // Apply engineer filter
@@ -494,8 +544,28 @@ export async function getFilteredIssuances(filters: {
     }
 
     // Apply customer filter
-    if (filters.customer) {
-      query = query.ilike("customer_name", `%${filters.customer}%`)
+    if (filters.customer && filters.customer !== "all") {
+      // Check if it's an ID (numeric) or name (string)
+      if (!isNaN(Number(filters.customer))) {
+        query = query.eq("customer_id", filters.customer)
+      } else {
+        query = query.ilike("customer_name", `%${filters.customer}%`)
+      }
+    }
+
+    // Apply warehouse filter
+    if (filters.warehouse && filters.warehouse !== "all") {
+      query = query.eq("warehouse_id", filters.warehouse)
+    }
+
+    // Apply serial number filter
+    if (filters.serialNumber) {
+      query = query.ilike("serial_number", `%${filters.serialNumber}%`)
+    }
+
+    // Apply limit if specified
+    if (filters.limit) {
+      query = query.limit(filters.limit)
     }
 
     const { data, error } = await query
@@ -513,6 +583,13 @@ export async function getFilteredIssuances(filters: {
       results = results.filter(item => 
         item.product_name?.toLowerCase().includes(filters.productName.toLowerCase()) ||
         item.products?.name?.toLowerCase().includes(filters.productName.toLowerCase())
+      )
+    }
+
+    // Apply item code filter (client-side)
+    if (filters.itemCode) {
+      results = results.filter(item => 
+        item.products?.item_code?.toLowerCase().includes(filters.itemCode.toLowerCase())
       )
     }
 
@@ -769,4 +846,396 @@ export function calculateStockValue(products: Product[]): number {
     const cost = (product as any).cost || 0
     return total + product.stock * cost
   }, 0)
+}
+
+// ==================== BRANCHES FUNCTIONS ====================
+
+export async function getBranches() {
+  return withErrorHandling(async () => {
+    const { data, error } = await supabase
+      .from("branches")
+      .select("*")
+      .order("name", { ascending: true })
+
+    if (error) throw error
+    return data || []
+  }, "Failed to fetch branches")
+}
+
+export async function createBranch(branch: BranchInsert) {
+  return withErrorHandling(async () => {
+    const sanitizedBranch = validateObject(branch)
+    
+    if (!sanitizedBranch.name || !sanitizedBranch.code) {
+      throw new SecurityError("Missing required fields: name and code", "INVALID_INPUT")
+    }
+
+    const dbBranch: BranchInsert = {
+      name: validateInput(sanitizedBranch.name),
+      code: validateInput(sanitizedBranch.code),
+      address: sanitizedBranch.address ? validateInput(sanitizedBranch.address) : null,
+      phone: sanitizedBranch.phone ? validateInput(sanitizedBranch.phone) : null,
+      manager_name: sanitizedBranch.manager_name ? validateInput(sanitizedBranch.manager_name) : null,
+      is_active: sanitizedBranch.is_active !== undefined ? sanitizedBranch.is_active : true,
+    }
+
+    const { data, error } = await createSecureQuery("branches", "insert")
+      .insert(dbBranch)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }, "Failed to create branch")
+}
+
+export async function updateBranch(id: number, updates: BranchUpdate) {
+  return withErrorHandling(async () => {
+    const sanitizedUpdates = validateObject(updates)
+    const branchId = Number(id)
+    
+    if (!branchId || branchId <= 0) {
+      throw new SecurityError("Invalid branch ID", "INVALID_INPUT")
+    }
+
+    const dbUpdates: BranchUpdate = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (sanitizedUpdates.name !== undefined) dbUpdates.name = validateInput(sanitizedUpdates.name)
+    if (sanitizedUpdates.code !== undefined) dbUpdates.code = validateInput(sanitizedUpdates.code)
+    if (sanitizedUpdates.address !== undefined) {
+      dbUpdates.address = sanitizedUpdates.address ? validateInput(sanitizedUpdates.address) : null
+    }
+    if (sanitizedUpdates.phone !== undefined) {
+      dbUpdates.phone = sanitizedUpdates.phone ? validateInput(sanitizedUpdates.phone) : null
+    }
+    if (sanitizedUpdates.manager_name !== undefined) {
+      dbUpdates.manager_name = sanitizedUpdates.manager_name ? validateInput(sanitizedUpdates.manager_name) : null
+    }
+    if (sanitizedUpdates.is_active !== undefined) dbUpdates.is_active = sanitizedUpdates.is_active
+
+    const { data, error } = await createSecureQuery("branches", "update")
+      .update(dbUpdates)
+      .eq("id", branchId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }, "Failed to update branch")
+}
+
+export async function deleteBranch(id: number) {
+  return withErrorHandling(async () => {
+    const branchId = Number(id)
+    
+    if (!branchId || branchId <= 0) {
+      throw new SecurityError("Invalid branch ID", "INVALID_INPUT")
+    }
+
+    const { error } = await createSecureQuery("branches", "delete")
+      .delete()
+      .eq("id", branchId)
+
+    if (error) throw error
+    return { success: true }
+  }, "Failed to delete branch")
+}
+
+// ==================== CUSTOMERS FUNCTIONS ====================
+
+export async function getCustomers() {
+  return withErrorHandling(async () => {
+    const { data, error } = await supabase
+      .from("customers")
+      .select("*")
+      .order("name", { ascending: true })
+
+    if (error) throw error
+    return data || []
+  }, "Failed to fetch customers")
+}
+
+export async function createCustomer(customer: CustomerInsert) {
+  return withErrorHandling(async () => {
+    const sanitizedCustomer = validateObject(customer)
+    
+    if (!sanitizedCustomer.name) {
+      throw new SecurityError("Missing required field: name", "INVALID_INPUT")
+    }
+
+    const dbCustomer: CustomerInsert = {
+      name: validateInput(sanitizedCustomer.name),
+      code: sanitizedCustomer.code ? validateInput(sanitizedCustomer.code) : null,
+      email: sanitizedCustomer.email ? validateInput(sanitizedCustomer.email) : null,
+      phone: sanitizedCustomer.phone ? validateInput(sanitizedCustomer.phone) : null,
+      address: sanitizedCustomer.address ? validateInput(sanitizedCustomer.address) : null,
+      contact_person: sanitizedCustomer.contact_person ? validateInput(sanitizedCustomer.contact_person) : null,
+      is_active: sanitizedCustomer.is_active !== undefined ? sanitizedCustomer.is_active : true,
+    }
+
+    const { data, error } = await createSecureQuery("customers", "insert")
+      .insert(dbCustomer)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }, "Failed to create customer")
+}
+
+export async function updateCustomer(id: number, updates: CustomerUpdate) {
+  return withErrorHandling(async () => {
+    const sanitizedUpdates = validateObject(updates)
+    const customerId = Number(id)
+    
+    if (!customerId || customerId <= 0) {
+      throw new SecurityError("Invalid customer ID", "INVALID_INPUT")
+    }
+
+    const dbUpdates: CustomerUpdate = {
+      updated_at: new Date().toISOString(),
+    }
+
+    if (sanitizedUpdates.name !== undefined) dbUpdates.name = validateInput(sanitizedUpdates.name)
+    if (sanitizedUpdates.code !== undefined) {
+      dbUpdates.code = sanitizedUpdates.code ? validateInput(sanitizedUpdates.code) : null
+    }
+    if (sanitizedUpdates.email !== undefined) {
+      dbUpdates.email = sanitizedUpdates.email ? validateInput(sanitizedUpdates.email) : null
+    }
+    if (sanitizedUpdates.phone !== undefined) {
+      dbUpdates.phone = sanitizedUpdates.phone ? validateInput(sanitizedUpdates.phone) : null
+    }
+    if (sanitizedUpdates.address !== undefined) {
+      dbUpdates.address = sanitizedUpdates.address ? validateInput(sanitizedUpdates.address) : null
+    }
+    if (sanitizedUpdates.contact_person !== undefined) {
+      dbUpdates.contact_person = sanitizedUpdates.contact_person ? validateInput(sanitizedUpdates.contact_person) : null
+    }
+    if (sanitizedUpdates.is_active !== undefined) dbUpdates.is_active = sanitizedUpdates.is_active
+
+    const { data, error } = await createSecureQuery("customers", "update")
+      .update(dbUpdates)
+      .eq("id", customerId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }, "Failed to update customer")
+}
+
+export async function deleteCustomer(id: number) {
+  return withErrorHandling(async () => {
+    const customerId = Number(id)
+    
+    if (!customerId || customerId <= 0) {
+      throw new SecurityError("Invalid customer ID", "INVALID_INPUT")
+    }
+
+    const { error } = await createSecureQuery("customers", "delete")
+      .delete()
+      .eq("id", customerId)
+
+    if (error) throw error
+    return { success: true }
+  }, "Failed to delete customer")
+}
+
+// ==================== WAREHOUSES FUNCTIONS ====================
+
+// Generate next warehouse number in format WH-01, WH-02, etc.
+export async function generateNextWarehouseNumber(): Promise<string> {
+  return withErrorHandling(async () => {
+    const { data, error } = await supabase
+      .from("warehouses")
+      .select("warehouse_number")
+      .not("warehouse_number", "is", null)
+      .order("id", { ascending: false })
+      .limit(1)
+
+    if (error) throw error
+
+    let nextNumber = 1
+    if (data && data.length > 0 && data[0].warehouse_number) {
+      const lastNumber = data[0].warehouse_number
+      const match = lastNumber.match(/WH-(\d+)$/)
+      if (match) {
+        nextNumber = parseInt(match[1]) + 1
+      }
+    }
+
+    return `WH-${nextNumber.toString().padStart(2, '0')}`
+  }, "Failed to generate warehouse number")
+}
+
+export async function getWarehouses() {
+  return withErrorHandling(async () => {
+    const { data, error } = await supabase
+      .from("warehouses")
+      .select("*")
+      .order("warehouse_number", { ascending: true })
+
+    if (error) throw error
+    return data || []
+  }, "Failed to fetch warehouses")
+}
+
+export async function createWarehouse(warehouse: WarehouseInsert) {
+  return withErrorHandling(async () => {
+    const sanitizedWarehouse = validateObject(warehouse)
+    
+    if (!sanitizedWarehouse.name) {
+      throw new SecurityError("Missing required field: name", "INVALID_INPUT")
+    }
+
+    // Generate warehouse number if not provided
+    let warehouseNumber = sanitizedWarehouse.warehouse_number
+    if (!warehouseNumber) {
+      warehouseNumber = await generateNextWarehouseNumber()
+    }
+
+    const dbWarehouse: WarehouseInsert = {
+      name: validateInput(sanitizedWarehouse.name),
+      warehouse_number: warehouseNumber,
+      location: sanitizedWarehouse.location ? validateInput(sanitizedWarehouse.location) : null,
+      description: sanitizedWarehouse.description ? validateInput(sanitizedWarehouse.description) : null,
+      is_active: sanitizedWarehouse.is_active !== undefined ? sanitizedWarehouse.is_active : true,
+    }
+
+    const { data, error } = await createSecureQuery("warehouses", "insert")
+      .insert(dbWarehouse)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }, "Failed to create warehouse")
+}
+
+export async function updateWarehouse(id: number, updates: WarehouseUpdate) {
+  return withErrorHandling(async () => {
+    const sanitizedUpdates = validateObject(updates)
+    const warehouseId = Number(id)
+    
+    if (!warehouseId || warehouseId <= 0) {
+      throw new SecurityError("Invalid warehouse ID", "INVALID_INPUT")
+    }
+
+    const dbUpdates: WarehouseUpdate = {
+      updated_at: new Date().toISOString(),
+    }
+
+    // Note: warehouse_number should not be updatable
+    if (sanitizedUpdates.name !== undefined) dbUpdates.name = validateInput(sanitizedUpdates.name)
+    if (sanitizedUpdates.location !== undefined) {
+      dbUpdates.location = sanitizedUpdates.location ? validateInput(sanitizedUpdates.location) : null
+    }
+    if (sanitizedUpdates.description !== undefined) {
+      dbUpdates.description = sanitizedUpdates.description ? validateInput(sanitizedUpdates.description) : null
+    }
+    if (sanitizedUpdates.is_active !== undefined) dbUpdates.is_active = sanitizedUpdates.is_active
+
+    const { data, error } = await createSecureQuery("warehouses", "update")
+      .update(dbUpdates)
+      .eq("id", warehouseId)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }, "Failed to update warehouse")
+}
+
+export async function deleteWarehouse(id: number) {
+  return withErrorHandling(async () => {
+    const warehouseId = Number(id)
+    
+    if (!warehouseId || warehouseId <= 0) {
+      throw new SecurityError("Invalid warehouse ID", "INVALID_INPUT")
+    }
+
+    const { error } = await createSecureQuery("warehouses", "delete")
+      .delete()
+      .eq("id", warehouseId)
+
+    if (error) throw error
+    return { success: true }
+  }, "Failed to delete warehouse")
+}
+
+// ==================== SEARCH FUNCTIONS ====================
+
+export async function searchByItemCode(itemCode: string) {
+  return withErrorHandling(async () => {
+    if (!itemCode.trim()) {
+      throw new SecurityError("Item code is required", "INVALID_INPUT")
+    }
+
+    const sanitizedCode = validateInput(itemCode.trim())
+    
+    const { data, error } = await supabase
+      .from("products")
+      .select(`
+        *,
+        warehouses:warehouse_id(id, warehouse_number, name, location)
+      `)
+      .ilike("item_code", `%${sanitizedCode}%`)
+      .order("item_code", { ascending: true })
+
+    if (error) throw error
+    return data || []
+  }, "Failed to search by item code")
+}
+
+export async function searchIssuancesByFilters(filters: {
+  itemCode?: string
+  branchName?: string
+  customerName?: string
+  serialNumber?: string
+  startDate?: string
+  endDate?: string
+}) {
+  return withErrorHandling(async () => {
+    let query = supabase
+      .from("issuances")
+      .select(`
+        *,
+        branches:branch_id(id, name, code),
+        customers:customer_id(id, name, code),
+        warehouses:warehouse_id(id, warehouse_number, name)
+      `)
+
+    if (filters.itemCode) {
+      query = query.ilike("item_code", `%${validateInput(filters.itemCode)}%`)
+    }
+    
+    if (filters.branchName) {
+      query = query.ilike("branch", `%${validateInput(filters.branchName)}%`)
+    }
+    
+    if (filters.customerName) {
+      query = query.ilike("customer_name", `%${validateInput(filters.customerName)}%`)
+    }
+    
+    if (filters.serialNumber) {
+      query = query.ilike("serial_number", `%${validateInput(filters.serialNumber)}%`)
+    }
+    
+    if (filters.startDate) {
+      query = query.gte("created_at", filters.startDate)
+    }
+    
+    if (filters.endDate) {
+      query = query.lte("created_at", filters.endDate)
+    }
+
+    query = query.order("created_at", { ascending: false })
+
+    const { data, error } = await query
+    if (error) throw error
+    return data || []
+  }, "Failed to search issuances")
 }

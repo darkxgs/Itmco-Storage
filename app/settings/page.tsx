@@ -252,7 +252,7 @@ export default function SettingsPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="bg-slate-700 border-slate-600">
-                        <SelectItem value="SAR">ريال سعودي (SAR)</SelectItem>
+                        <SelectItem value="EGP">جنيه مصري (EGP)</SelectItem>
                         <SelectItem value="USD">دولار أمريكي (USD)</SelectItem>
                         <SelectItem value="EUR">يورو (EUR)</SelectItem>
                       </SelectContent>
