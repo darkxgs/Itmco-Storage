@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
-import { ShoppingCart, Calendar, User, Building, Edit, Trash2, Loader2 } from "lucide-react"
+import { ShoppingCart, Calendar, User, Building, Edit, Trash2, Loader2, Plus, X, Search } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
@@ -26,6 +26,7 @@ type Product = {
   model: string
   stock: number
   product_code?: string
+  item_code?: string
 }
 
 export default function IssuancePage() {
@@ -53,6 +54,9 @@ export default function IssuancePage() {
   const [filterCustomer, setFilterCustomer] = useState("")
   const [filterWarehouse, setFilterWarehouse] = useState("")
   const [itemCodeSearch, setItemCodeSearch] = useState("")
+  const [productCodeSearch, setProductCodeSearch] = useState("")
+  const [selectedProducts, setSelectedProducts] = useState<Array<{id: number, name: string, brand: string, model: string, quantity: number, stock: number, product_code?: string}>>([])
+  const [showProductSearch, setShowProductSearch] = useState(false)
   const { toast } = useToast()
 
   // Filter issuances based on search criteria
@@ -135,10 +139,12 @@ export default function IssuancePage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedProduct || quantity <= 0) {
+    
+    // Check if we have products to issue
+    if (selectedProducts.length === 0) {
       toast({
         title: "خطأ",
-        description: "يرجى اختيار المنتج وإدخال كمية صحيحة",
+        description: "يرجى إضافة منتجات للإصدار",
         variant: "destructive",
       })
       return
@@ -164,20 +170,6 @@ export default function IssuancePage() {
 
     setSubmitting(true)
     try {
-      const product = products.find(p => p.id.toString() === selectedProduct)
-      if (!product) {
-        throw new Error('المنتج غير موجود')
-      }
-
-      if (product.stock < quantity) {
-        toast({
-          title: "خطأ",
-          description: "الكمية المطلوبة غير متوفرة في المخزون",
-          variant: "destructive",
-        })
-        return
-      }
-
       const branch = branches.find(b => b.id.toString() === selectedBranch)
       if (!branch) {
         throw new Error('الفرع غير موجود')
@@ -189,36 +181,60 @@ export default function IssuancePage() {
         finalCustomerName = customer ? customer.name : customerName
       }
 
-      const issuanceData = {
-        product_id: Number.parseInt(selectedProduct),
-        product_name: product.name,
-        brand: product.brand,
-        model: product.model,
-        quantity,
-        customer_id: selectedCustomer ? Number.parseInt(selectedCustomer) : null,
-        customer_name: finalCustomerName,
-        branch: branch.name,
-        branch_id: Number.parseInt(selectedBranch),
-        warehouse_id: selectedWarehouse && selectedWarehouse !== "none" ? Number.parseInt(selectedWarehouse) : null,
-        engineer,
-        serial_number: serialNumber,
-        notes,
-        issued_by: user.id,
-        date: new Date().toISOString().split('T')[0]
+      // Check stock availability for all products
+      for (const selectedProd of selectedProducts) {
+        const product = products.find(p => p.id === selectedProd.id)
+        if (!product) {
+          throw new Error(`المنتج ${selectedProd.name} غير موجود`)
+        }
+        if (product.stock < selectedProd.quantity) {
+          toast({
+            title: "خطأ",
+            description: `الكمية المطلوبة للمنتج ${selectedProd.name} غير متوفرة في المخزون`,
+            variant: "destructive",
+          })
+          return
+        }
       }
 
-      await createIssuance(issuanceData)
-      
-      // Log the activity
-      await logActivity(user.id, 'issuance_created', {
-        product_name: product.name,
-        quantity,
-        customer: selectedCustomer ? customers.find(c => c.id.toString() === selectedCustomer)?.name : customerName
+      // Create issuances for all selected products
+      const issuancePromises = selectedProducts.map(async (selectedProd) => {
+        const product = products.find(p => p.id === selectedProd.id)
+        if (!product) return
+
+        const issuanceData = {
+          product_id: selectedProd.id,
+          product_name: selectedProd.name,
+          brand: selectedProd.brand,
+          model: selectedProd.model,
+          quantity: selectedProd.quantity,
+          customer_id: selectedCustomer ? Number.parseInt(selectedCustomer) : null,
+          customer_name: finalCustomerName,
+          branch: branch.name,
+          branch_id: Number.parseInt(selectedBranch),
+          warehouse_id: selectedWarehouse && selectedWarehouse !== "none" ? Number.parseInt(selectedWarehouse) : null,
+          engineer,
+          serial_number: serialNumber,
+          notes,
+          issued_by: user.id,
+          date: new Date().toISOString().split('T')[0]
+        }
+
+        await createIssuance(issuanceData)
+        
+        // Log the activity
+        await logActivity(user.id, 'issuance_created', {
+          product_name: selectedProd.name,
+          quantity: selectedProd.quantity,
+          customer: finalCustomerName
+        })
       })
+
+      await Promise.all(issuancePromises)
 
       toast({
         title: "نجح",
-        description: "تم إصدار المنتج بنجاح",
+        description: `تم إصدار ${selectedProducts.length} منتج بنجاح`,
       })
 
       // Refresh data
@@ -234,7 +250,7 @@ export default function IssuancePage() {
       console.error('Error creating issuance:', error)
       toast({
         title: "خطأ",
-        description: "حدث خطأ في إصدار المنتج",
+        description: "حدث خطأ في إصدار المنتجات",
         variant: "destructive",
       })
     } finally {
@@ -364,6 +380,85 @@ export default function IssuancePage() {
     setEngineer("")
     setSerialNumber("")
     setNotes("")
+    setSelectedProducts([])
+    setProductCodeSearch("")
+  }
+
+  const addProductToList = () => {
+    if (!selectedProduct || quantity <= 0) {
+      toast({
+        title: "خطأ",
+        description: "يرجى اختيار منتج وكمية صحيحة",
+        variant: "destructive",
+      })
+      return
+    }
+
+    const product = products.find(p => p.id.toString() === selectedProduct)
+    if (!product) return
+
+    const existingProductIndex = selectedProducts.findIndex(p => p.id === product.id)
+    if (existingProductIndex >= 0) {
+      const updatedProducts = [...selectedProducts]
+      updatedProducts[existingProductIndex].quantity += quantity
+      setSelectedProducts(updatedProducts)
+    } else {
+      setSelectedProducts([...selectedProducts, {
+        id: product.id,
+        name: product.name,
+        brand: product.brand,
+        model: product.model,
+        quantity: quantity,
+        stock: product.stock,
+        product_code: product.item_code || product.product_code
+      }])
+    }
+
+    setSelectedProduct("")
+    setQuantity(1)
+  }
+
+  const removeProductFromList = (productId: number) => {
+    setSelectedProducts(selectedProducts.filter(p => p.id !== productId))
+  }
+
+  const updateProductQuantity = (productId: number, newQuantity: number) => {
+    if (newQuantity <= 0) {
+      removeProductFromList(productId)
+      return
+    }
+    setSelectedProducts(selectedProducts.map(p => 
+      p.id === productId ? { ...p, quantity: newQuantity } : p
+    ))
+  }
+
+  const searchProductByCode = (code: string) => {
+    const product = products.find(p => p.item_code === code || p.product_code === code)
+    if (product) {
+      setSelectedProduct(product.id.toString())
+      setProductCodeSearch("")
+      setShowProductSearch(false)
+    } else {
+      toast({
+        title: "لم يتم العثور على المنتج",
+        description: `لا يوجد منتج بالكود ${code}`,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const filteredProductCodes = useMemo(() => {
+    if (!productCodeSearch) return products.filter(p => p.item_code || p.product_code)
+    return products.filter(p => {
+      const code = p.item_code || p.product_code
+      return code && code.toLowerCase().includes(productCodeSearch.toLowerCase())
+    })
+  }, [products, productCodeSearch])
+
+  const selectProductByCode = (product: Product) => {
+    setSelectedProduct(product.id.toString())
+    setProductCodeSearch(product.item_code || product.product_code || "")
+    setShowProductSearch(false)
   }
 
   const canEditOrDelete = (issuance: any) => {
@@ -452,44 +547,163 @@ export default function IssuancePage() {
                   <Label htmlFor="product" className="text-slate-300 text-right">
                     المنتج
                   </Label>
-                  <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
-                      <SelectValue placeholder="اختر المنتج" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-slate-700 border-slate-600">
-                      {products.map((product) => (
-                        <SelectItem key={product.id} value={product.id.toString()}>
-                          <div className="flex justify-between items-center w-full">
-                            <span>
-                              {product.name} - {product.brand} {product.model}
-                            </span>
-                            <Badge variant="secondary" className="mr-2">
-                              متوفر: {product.stock}
-                            </Badge>
+                  <div className="flex gap-2">
+                    <Select value={selectedProduct} onValueChange={setSelectedProduct}>
+                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right flex-1">
+                        <SelectValue placeholder="اختر المنتج" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-700 border-slate-600">
+                        {products.map((product) => (
+                          <SelectItem key={product.id} value={product.id.toString()}>
+                            <div className="flex justify-between items-center w-full">
+                              <span>
+                                {product.name} - {product.brand} {product.model}
+                                {(product.item_code || product.product_code) && ` (${product.item_code || product.product_code})`}
+                              </span>
+                              <Badge variant="secondary" className="mr-2">
+                                متوفر: {product.stock}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      onClick={() => setShowProductSearch(!showProductSearch)}
+                      variant="outline"
+                      size="icon"
+                      className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                    >
+                      <Search className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  
+                  {showProductSearch && (
+                    <div className="mt-2 p-3 bg-slate-700 rounded-lg border border-slate-600">
+                      <Label htmlFor="productCode" className="text-slate-300 text-right text-sm">
+                        البحث بكود المنتج
+                      </Label>
+                      <div className="relative mt-1">
+                        <Input
+                          id="productCode"
+                          value={productCodeSearch}
+                          onChange={(e) => setProductCodeSearch(e.target.value)}
+                          placeholder="أدخل كود المنتج (مثل: ITM-01)"
+                          className="bg-slate-600 border-slate-500 text-white text-right"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter' && filteredProductCodes.length === 1) {
+                              selectProductByCode(filteredProductCodes[0])
+                            }
+                          }}
+                        />
+                        {(productCodeSearch || filteredProductCodes.length > 0) && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-slate-600 border border-slate-500 rounded-lg max-h-40 overflow-y-auto z-10">
+                            {filteredProductCodes.length > 0 ? (
+                              filteredProductCodes.map((product) => (
+                                <div
+                                  key={product.id}
+                                  className="p-2 hover:bg-slate-500 cursor-pointer border-b border-slate-500 last:border-b-0"
+                                  onClick={() => selectProductByCode(product)}
+                                  onDoubleClick={() => selectProductByCode(product)}
+                                >
+                                  <div className="text-white text-right text-sm font-medium">
+                                    {product.item_code || product.product_code}
+                                  </div>
+                                  <div className="text-slate-300 text-right text-xs">
+                                    {product.name} - {product.brand} {product.model}
+                                  </div>
+                                  <div className="text-slate-400 text-right text-xs">
+                                    متوفر: {product.stock} قطعة
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-2 text-slate-400 text-right text-sm">
+                                لا توجد منتجات تطابق البحث
+                              </div>
+                            )}
                           </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        )}
+                      </div>
+                      <div className="mt-2 text-xs text-slate-400 text-right">
+                        اكتب للبحث أو انقر نقرة مزدوجة للاختيار
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid gap-2">
                   <Label htmlFor="quantity" className="text-slate-300 text-right">
                     الكمية
                   </Label>
-                  <Input
-                    id="quantity"
-                    type="number"
-                    min="1"
-                    max={selectedProduct ? getAvailableStock(selectedProduct) : 1}
-                    value={quantity}
-                    onChange={(e) => setQuantity(Number.parseInt(e.target.value) || 1)}
-                    className="bg-slate-700 border-slate-600 text-white text-center"
-                  />
+                  <div className="flex gap-2">
+                    <Input
+                      id="quantity"
+                      type="number"
+                      min="1"
+                      max={selectedProduct ? getAvailableStock(selectedProduct) : 1}
+                      value={quantity}
+                      onChange={(e) => setQuantity(Number.parseInt(e.target.value) || 1)}
+                      className="bg-slate-700 border-slate-600 text-white text-center flex-1"
+                    />
+                    <Button
+                      type="button"
+                      onClick={addProductToList}
+                      disabled={!selectedProduct || quantity <= 0}
+                      className="bg-green-600 hover:bg-green-700 px-4"
+                    >
+                      <Plus className="w-4 h-4 ml-1" />
+                      إضافة
+                    </Button>
+                  </div>
                   {selectedProduct && (
                     <p className="text-xs text-slate-400">متوفر: {getAvailableStock(selectedProduct)} قطعة</p>
                   )}
                 </div>
+
+                {/* Selected Products List */}
+                {selectedProducts.length > 0 && (
+                  <div className="grid gap-2">
+                    <Label className="text-slate-300 text-right">
+                      المنتجات المضافة ({selectedProducts.length})
+                    </Label>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {selectedProducts.map((product) => (
+                        <div key={product.id} className="flex items-center justify-between bg-slate-700 p-3 rounded-lg border border-slate-600">
+                          <div className="flex-1 text-right">
+                            <div className="text-white text-sm font-medium">
+                              {product.name} - {product.brand} {product.model}
+                            </div>
+                            {(product.item_code || product.product_code) && (
+                              <div className="text-slate-400 text-xs">
+                                كود: {product.item_code || product.product_code}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              min="1"
+                              max={product.stock}
+                              value={product.quantity}
+                              onChange={(e) => updateProductQuantity(product.id, Number.parseInt(e.target.value) || 1)}
+                              className="bg-slate-600 border-slate-500 text-white text-center w-16"
+                            />
+                            <Button
+                              type="button"
+                              onClick={() => removeProductFromList(product.id)}
+                              variant="destructive"
+                              size="sm"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid gap-2">
                   <Label className="text-slate-300 text-right">
@@ -600,14 +814,14 @@ export default function IssuancePage() {
                   />
                 </div>
 
-                <Button type="submit" disabled={submitting} className="w-full">
+                <Button type="submit" disabled={submitting || selectedProducts.length === 0} className="w-full">
                   {submitting ? (
                     <>
                       <Loader2 className="w-4 h-4 ml-2 animate-spin" />
                       جاري الإصدار...
                     </>
                   ) : (
-                    "إصدار المنتج"
+                    selectedProducts.length > 0 ? `إصدار ${selectedProducts.length} منتج` : "إضافة منتجات للإصدار"
                   )}
                 </Button>
               </form>
