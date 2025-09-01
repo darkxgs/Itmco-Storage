@@ -25,7 +25,6 @@ type Product = {
   brand: string
   model: string
   stock: number
-  product_code?: string
   item_code?: string
 }
 
@@ -55,7 +54,9 @@ export default function IssuancePage() {
   const [filterWarehouse, setFilterWarehouse] = useState("")
   const [itemCodeSearch, setItemCodeSearch] = useState("")
   const [productCodeSearch, setProductCodeSearch] = useState("")
-  const [selectedProducts, setSelectedProducts] = useState<Array<{id: number, name: string, brand: string, model: string, quantity: number, stock: number, product_code?: string}>>([])
+  const [selectedProducts, setSelectedProducts] = useState<Array<{id: number, name: string, brand: string, model: string, quantity: number, stock: number, item_code?: string}>>([])  
+  const [itemSearchResults, setItemSearchResults] = useState<Product[]>([])
+  const [isItemSearching, setIsItemSearching] = useState(false)
   const [showProductSearch, setShowProductSearch] = useState(false)
   const { toast } = useToast()
 
@@ -70,12 +71,15 @@ export default function IssuancePage() {
       const matchesBranch = !filterBranch || filterBranch === "all" || issuance.branch_id?.toString() === filterBranch
       const matchesCustomer = !filterCustomer || filterCustomer === "all" || issuance.customer_id?.toString() === filterCustomer
       const matchesWarehouse = !filterWarehouse || filterWarehouse === "all" || issuance.warehouse_id?.toString() === filterWarehouse
+      
+      // Find the product associated with this issuance to check item_code
+      const product = products.find(p => p.id === issuance.product_id)
       const matchesItemCode = !itemCodeSearch || 
-        (issuance.productCode || issuance.product_code || "").toLowerCase().includes(itemCodeSearch.toLowerCase())
+        (product?.item_code || "").toLowerCase().includes(itemCodeSearch.toLowerCase())
       
       return matchesSearch && matchesBranch && matchesCustomer && matchesWarehouse && matchesItemCode
     })
-  }, [issuances, searchTerm, filterBranch, filterCustomer, filterWarehouse, itemCodeSearch])
+  }, [issuances, products, searchTerm, filterBranch, filterCustomer, filterWarehouse, itemCodeSearch])
 
   useEffect(() => {
     const loadData = async () => {
@@ -410,7 +414,7 @@ export default function IssuancePage() {
         model: product.model,
         quantity: quantity,
         stock: product.stock,
-        product_code: product.item_code || product.product_code
+        product_code: product.item_code
       }])
     }
 
@@ -432,33 +436,129 @@ export default function IssuancePage() {
     ))
   }
 
-  const searchProductByCode = (code: string) => {
-    const product = products.find(p => p.item_code === code || p.product_code === code)
-    if (product) {
-      setSelectedProduct(product.id.toString())
+  const searchProductByCode = async (code: string) => {
+    // First try local search
+    const localProduct = products.find(p => p.item_code === code)
+    if (localProduct) {
+      setSelectedProduct(localProduct.id.toString())
       setProductCodeSearch("")
       setShowProductSearch(false)
-    } else {
+      return
+    }
+    
+    // If not found locally, search in database
+    setIsSearching(true)
+    try {
+      const results = await searchByItemCode(code)
+      if (results.length > 0) {
+        const product = results[0]
+        setSelectedProduct(product.id.toString())
+        setProductCodeSearch("")
+        setShowProductSearch(false)
+        // Update search results for dropdown
+        setSearchResults(results)
+      } else {
+        toast({
+          title: "لم يتم العثور على المنتج",
+          description: `لا يوجد منتج بالكود ${code}`,
+          variant: "destructive",
+        })
+      }
+    } catch (error) {
+      console.error('Error searching by item code:', error)
       toast({
-        title: "لم يتم العثور على المنتج",
-        description: `لا يوجد منتج بالكود ${code}`,
+        title: "خطأ في البحث",
+        description: "حدث خطأ أثناء البحث عن المنتج",
         variant: "destructive",
       })
+    } finally {
+      setIsSearching(false)
     }
   }
 
+  const [searchResults, setSearchResults] = useState<Product[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+
+  // Auto-search when productCodeSearch changes
+  useEffect(() => {
+    const searchInDatabase = async () => {
+      if (productCodeSearch.trim() && productCodeSearch.length >= 2) {
+        setIsSearching(true)
+        try {
+          const results = await searchByItemCode(productCodeSearch)
+          setSearchResults(results)
+        } catch (error) {
+          console.error('Error searching by item code:', error)
+          setSearchResults([])
+        } finally {
+          setIsSearching(false)
+        }
+      } else {
+        setSearchResults([])
+      }
+    }
+
+    const timeoutId = setTimeout(searchInDatabase, 300) // Debounce search
+    return () => clearTimeout(timeoutId)
+  }, [productCodeSearch])
+
+  // Auto-search when itemCodeSearch changes (for filter section)
+  useEffect(() => {
+    const searchInDatabase = async () => {
+      if (itemCodeSearch.trim() && itemCodeSearch.length >= 2) {
+        setIsItemSearching(true)
+        try {
+          const results = await searchByItemCode(itemCodeSearch)
+          setItemSearchResults(results)
+        } catch (error) {
+          console.error('Error searching by item code:', error)
+          setItemSearchResults([])
+        } finally {
+          setIsItemSearching(false)
+        }
+      } else {
+        setItemSearchResults([])
+      }
+    }
+
+    const timeoutId = setTimeout(searchInDatabase, 300) // Debounce search
+    return () => clearTimeout(timeoutId)
+  }, [itemCodeSearch])
+
   const filteredProductCodes = useMemo(() => {
-    if (!productCodeSearch) return products.filter(p => p.item_code || p.product_code)
-    return products.filter(p => {
-      const code = p.item_code || p.product_code
+    if (!productCodeSearch) return products.filter(p => p.item_code)
+    
+    // First try local search for immediate feedback
+    const localResults = products.filter(p => {
+      const code = p.item_code
       return code && code.toLowerCase().includes(productCodeSearch.toLowerCase())
     })
-  }, [products, productCodeSearch])
+    
+    // If we have search results from database, use them, otherwise use local results
+    return searchResults.length > 0 ? searchResults : localResults
+  }, [products, productCodeSearch, searchResults])
 
   const selectProductByCode = (product: Product) => {
     setSelectedProduct(product.id.toString())
-    setProductCodeSearch(product.item_code || product.product_code || "")
+    setProductCodeSearch(product.item_code || "")
     setShowProductSearch(false)
+  }
+
+  const filteredItemCodes = useMemo(() => {
+    if (!itemCodeSearch) return products.filter(p => p.item_code)
+    
+    // First try local search for immediate feedback
+    const localResults = products.filter(p => {
+      const code = p.item_code
+      return code && code.toLowerCase().includes(itemCodeSearch.toLowerCase())
+    })
+    
+    // If we have search results from database, use them, otherwise use local results
+    return itemSearchResults.length > 0 ? itemSearchResults : localResults
+  }, [products, itemCodeSearch, itemSearchResults])
+
+  const selectItemByCode = (product: Product) => {
+    setItemCodeSearch(product.item_code || "")
   }
 
   const canEditOrDelete = (issuance: any) => {
@@ -558,7 +658,7 @@ export default function IssuancePage() {
                             <div className="flex justify-between items-center w-full">
                               <span>
                                 {product.name} - {product.brand} {product.model}
-                                {(product.item_code || product.product_code) && ` (${product.item_code || product.product_code})`}
+                                {product.item_code && ` (${product.item_code})`}
                               </span>
                               <Badge variant="secondary" className="mr-2">
                                 متوفر: {product.stock}
@@ -608,7 +708,7 @@ export default function IssuancePage() {
                                   onDoubleClick={() => selectProductByCode(product)}
                                 >
                                   <div className="text-white text-right text-sm font-medium">
-                                    {product.item_code || product.product_code}
+                                    {product.item_code}
                                   </div>
                                   <div className="text-slate-300 text-right text-xs">
                                     {product.name} - {product.brand} {product.model}
@@ -675,11 +775,11 @@ export default function IssuancePage() {
                             <div className="text-white text-sm font-medium">
                               {product.name} - {product.brand} {product.model}
                             </div>
-                            {(product.item_code || product.product_code) && (
-                              <div className="text-slate-400 text-xs">
-                                كود: {product.item_code || product.product_code}
-                              </div>
-                            )}
+                            {product.item_code && (
+                            <div className="text-xs text-slate-400">
+                              كود: {product.item_code}
+                            </div>
+                          )}
                           </div>
                           <div className="flex items-center gap-2">
                             <Input
@@ -846,14 +946,49 @@ export default function IssuancePage() {
               </div>
               
               <div>
-                <Label htmlFor="itemCode" className="text-slate-300 text-right">البحث بكود الصنف</Label>
-                <Input
-                  id="itemCode"
-                  value={itemCodeSearch}
-                  onChange={(e) => setItemCodeSearch(e.target.value)}
-                  placeholder="أدخل كود الصنف للبحث"
-                  className="bg-slate-700 border-slate-600 text-white text-right"
-                />
+                <Label htmlFor="itemCode" className="text-slate-300 text-right">البحث بكود المنتج</Label>
+                <div className="relative">
+                  <Input
+                    id="itemCode"
+                    value={itemCodeSearch}
+                    onChange={(e) => setItemCodeSearch(e.target.value)}
+                    placeholder="أدخل كود المنتج للبحث (مثل: ITM-06)"
+                    className="bg-slate-700 border-slate-600 text-white text-right"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && filteredItemCodes.length === 1) {
+                        selectItemByCode(filteredItemCodes[0])
+                      }
+                    }}
+                  />
+                  {(itemCodeSearch || filteredItemCodes.length > 0) && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-slate-600 border border-slate-500 rounded-lg max-h-40 overflow-y-auto z-10">
+                      {filteredItemCodes.length > 0 ? (
+                        filteredItemCodes.map((product) => (
+                          <div
+                            key={product.id}
+                            className="p-2 hover:bg-slate-500 cursor-pointer border-b border-slate-500 last:border-b-0"
+                            onClick={() => selectItemByCode(product)}
+                            onDoubleClick={() => selectItemByCode(product)}
+                          >
+                            <div className="text-white text-right text-sm font-medium">
+                              {product.item_code}
+                            </div>
+                            <div className="text-slate-300 text-right text-xs">
+                              {product.name} - {product.brand} {product.model}
+                            </div>
+                            <div className="text-slate-400 text-right text-xs">
+                              متوفر: {product.stock} قطعة
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-2 text-slate-400 text-right text-sm">
+                          لا توجد منتجات تطابق البحث
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               
               <div>

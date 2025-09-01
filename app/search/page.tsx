@@ -73,7 +73,8 @@ export default function SearchPage() {
               p.name.toLowerCase().includes(s) ||
               p.brand.toLowerCase().includes(s) ||
               p.model.toLowerCase().includes(s) ||
-              p.category.toLowerCase().includes(s),
+              p.category.toLowerCase().includes(s) ||
+              (p.item_code && p.item_code.toLowerCase().includes(s)),
           )
         }
 

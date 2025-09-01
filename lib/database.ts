@@ -586,11 +586,28 @@ export async function getFilteredIssuances(filters: {
       )
     }
 
-    // Apply item code filter (client-side)
+    // Apply item code filter (both database and client-side)
     if (filters.itemCode) {
-      results = results.filter(item => 
-        item.products?.item_code?.toLowerCase().includes(filters.itemCode.toLowerCase())
-      )
+      // First try database-level filtering for better performance
+      const itemCodeQuery = supabase
+        .from("products")
+        .select("id")
+        .ilike("item_code", `%${filters.itemCode}%`)
+      
+      const { data: productIds } = await itemCodeQuery
+      
+      if (productIds && productIds.length > 0) {
+        const ids = productIds.map(p => p.id)
+        results = results.filter(item => 
+          ids.includes(item.product_id) ||
+          item.products?.item_code?.toLowerCase().includes(filters.itemCode.toLowerCase())
+        )
+      } else {
+        // Fallback to client-side filtering
+        results = results.filter(item => 
+          item.products?.item_code?.toLowerCase().includes(filters.itemCode.toLowerCase())
+        )
+      }
     }
 
     // Map to enhanced format with product details
