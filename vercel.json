@@ -5,5 +5,11 @@
     "app/**/*.{js,ts,tsx}": {
       "maxDuration": 30
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/backup?secret=s3cuRe_t0k3n_12345",
+      "schedule": "0 2 * * *"
+    }
+  ]
 }
