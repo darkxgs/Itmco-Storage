@@ -23,6 +23,7 @@ import {
   X,
   Building2,
   UserCheck,
+  BarChart3,
 } from "lucide-react"
 
 const navigation = [
@@ -69,9 +70,21 @@ const navigation = [
     roles: ["admin"],
   },
   {
+    name: "صلاحيات المخازن",
+    href: "/warehouse-permissions",
+    icon: UserCheck,
+    roles: ["admin"],
+  },
+  {
     name: "التقارير",
     href: "/reports",
     icon: FileText,
+    roles: ["admin", "inventory_manager"],
+  },
+  {
+    name: "تقارير هامش الربح",
+    href: "/reports/profit-margin",
+    icon: BarChart3,
     roles: ["admin", "inventory_manager"],
   },
   {

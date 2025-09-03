@@ -81,17 +81,22 @@ export default function InventoryPage() {
     category: "",
     item_code: "",
     warehouse_id: "",
-    price: "",
+    purchase_price: "",
+    selling_price: "",
     stock: 0,
     minStock: 5,
     description: "",
   })
-  const [formErrors, setFormErrors] = useState<string[]>([])
+  const [formErrors, setFormErrors] = useState<string[]>([])  
   const [submitting, setSubmitting] = useState(false)
   const { toast } = useToast()
 
+  // Simple role-based access check
   useEffect(() => {
-    if (user && !["admin", "inventory_manager"].includes(user.role)) {
+    if (!user) return
+    
+    // Only allow admin, inventory_manager, and engineer roles
+    if (!["admin", "inventory_manager", "engineer"].includes(user.role)) {
       toast({
         title: "غير مصرح لك",
         description: "ليس لديك صلاحية للوصول إلى هذه الصفحة",
@@ -107,6 +112,8 @@ export default function InventoryPage() {
 
       try {
         setLoading(true)
+        
+        // Load all products and warehouses for all authorized users
         const [productsData, warehousesData] = await Promise.all([
           getProducts(),
           getWarehouses()
@@ -177,6 +184,18 @@ export default function InventoryPage() {
     setFormErrors([])
     return true
   }
+  
+  // Helper function to check if user can edit a product
+  const canEditProduct = (product: any) => {
+    if (!user) return false
+    return ["admin", "inventory_manager"].includes(user.role)
+  }
+
+  // Helper function to check if user can add products
+  const canAddProduct = () => {
+    if (!user) return false
+    return ["admin", "inventory_manager"].includes(user.role)
+  }
 
   const handleGenerateItemCode = async () => {
     try {
@@ -207,7 +226,7 @@ export default function InventoryPage() {
 
     setSubmitting(true)
     try {
-      const product = await createProduct(newProduct)
+      const product = await createProduct(newProduct, user.id)
       setProducts([product, ...products])
 
       // Log activity
@@ -270,7 +289,7 @@ export default function InventoryPage() {
 
     setSubmitting(true)
     try {
-      const updatedProduct = await updateProduct(editingProduct.id, editingProduct)
+      const updatedProduct = await updateProduct(editingProduct.id, editingProduct, user.id)
       setProducts(products.map((p) => (p.id === editingProduct.id ? updatedProduct : p)))
 
       // Log activity
@@ -285,9 +304,18 @@ export default function InventoryPage() {
       })
     } catch (error: any) {
       console.error("Error updating product:", error)
+      
+      let errorMessage = "حدث خطأ أثناء تحديث المنتج. يرجى المحاولة مرة أخرى"
+      
+      if (error.message && error.message.includes("Access denied: You don't have edit permission for this warehouse")) {
+        errorMessage = "ليس لديك صلاحية تعديل المنتجات في هذا المخزن. يرجى التواصل مع المدير لمنحك الصلاحيات المطلوبة."
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+      
       toast({
         title: "فشل في تحديث المنتج",
-        description: error.message || "حدث خطأ أثناء تحديث المنتج. يرجى المحاولة مرة أخرى",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
@@ -301,7 +329,7 @@ export default function InventoryPage() {
     }
 
     try {
-      await deleteProduct(id)
+      await deleteProduct(id, user.id)
       setProducts(products.filter((p) => p.id !== id))
       setSelectedProducts(selectedProducts.filter((pid) => pid !== id))
 
@@ -319,6 +347,8 @@ export default function InventoryPage() {
       
       if (error.message && error.message.includes("Cannot delete product with existing issuances")) {
         errorMessage = "لا يمكن حذف هذا المنتج لأنه مرتبط بعمليات إصدار موجودة. يرجى حذف عمليات الإصدار أولاً أو تحويلها لمنتج آخر."
+      } else if (error.message && error.message.includes("Access denied: You don't have delete permission for this warehouse")) {
+        errorMessage = "ليس لديك صلاحية حذف المنتجات من هذا المخزن. يرجى التواصل مع المدير لمنحك الصلاحيات المطلوبة."
       } else if (error.message) {
         errorMessage = error.message
       }
@@ -340,7 +370,7 @@ export default function InventoryPage() {
     try {
       const deletedNames = selectedProducts.map((id) => products.find((p) => p.id === id)?.name).filter(Boolean)
 
-      await Promise.all(selectedProducts.map((id) => deleteProduct(id)))
+      await Promise.all(selectedProducts.map((id) => deleteProduct(id, user.id)))
       setProducts(products.filter((p) => !selectedProducts.includes(p.id)))
 
       // Log activity
@@ -563,13 +593,14 @@ export default function InventoryPage() {
                     <Download className="w-4 h-4 ml-2" />
                     تصدير CSV
                   </Button>
-                  <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button size="sm">
-                        <Plus className="w-4 h-4 ml-2" />
-                        إضافة منتج
-                      </Button>
-                    </DialogTrigger>
+                  {canAddProduct() && (
+                    <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Plus className="w-4 h-4 ml-2" />
+                          إضافة منتج
+                        </Button>
+                      </DialogTrigger>
                     <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl" dir="rtl">
                       <DialogHeader>
                         <DialogTitle className="text-right">إضافة منتج جديد</DialogTitle>
@@ -692,18 +723,33 @@ export default function InventoryPage() {
                             </Select>
                           </div>
                         </div>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-4 gap-4">
                           <div className="grid gap-2">
-                            <Label htmlFor="price" className="text-right">
-                              السعر (اختياري)
+                            <Label htmlFor="purchase_price" className="text-right">
+                              سعر الشراء
                             </Label>
                             <Input
-                              id="price"
+                              id="purchase_price"
                               type="number"
                               min="0"
                               step="0.01"
-                              value={newProduct.price}
-                              onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                              value={newProduct.purchase_price}
+                              onChange={(e) => setNewProduct({ ...newProduct, purchase_price: e.target.value })}
+                              className="bg-slate-700 border-slate-600 text-center"
+                              placeholder="0.00"
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="selling_price" className="text-right">
+                              سعر البيع
+                            </Label>
+                            <Input
+                              id="selling_price"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={newProduct.selling_price}
+                              onChange={(e) => setNewProduct({ ...newProduct, selling_price: e.target.value })}
                               className="bg-slate-700 border-slate-600 text-center"
                               placeholder="0.00"
                             />
@@ -770,6 +816,7 @@ export default function InventoryPage() {
                       </div>
                     </DialogContent>
                   </Dialog>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -863,7 +910,8 @@ export default function InventoryPage() {
                       <TableHead className="text-slate-300 text-right min-w-[80px]">الموديل</TableHead>
                       <TableHead className="text-slate-300 text-right min-w-[120px]">الفئة</TableHead>
                       <TableHead className="text-slate-300 text-right min-w-[100px]">المخزن</TableHead>
-                      <TableHead className="text-slate-300 text-center min-w-[80px]">السعر</TableHead>
+                      <TableHead className="text-slate-300 text-center min-w-[80px]">سعر الشراء</TableHead>
+                      <TableHead className="text-slate-300 text-center min-w-[80px]">سعر البيع</TableHead>
                       <TableHead className="text-slate-300 text-center min-w-[80px]">المخزون</TableHead>
                       <TableHead className="text-slate-300 text-center min-w-[100px]">الحالة</TableHead>
                       <TableHead className="text-slate-300 text-center min-w-[120px]">الإجراءات</TableHead>
@@ -935,8 +983,13 @@ export default function InventoryPage() {
                               {warehouse ? `${warehouse.name} - ${warehouse.warehouse_number}` : '-'}
                             </TableCell>
                             <TableCell className="text-center py-4">
+                              <span className="text-blue-400 font-medium">
+                                {product.purchase_price ? `${Number(product.purchase_price).toLocaleString()} ج.م` : '-'}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-center py-4">
                               <span className="text-green-400 font-medium">
-                                {product.price ? `${Number(product.price).toLocaleString()} ج.م` : '-'}
+                                {product.selling_price ? `${Number(product.selling_price).toLocaleString()} ج.م` : '-'}
                               </span>
                             </TableCell>
                             <TableCell className="text-center py-4">
@@ -955,23 +1008,24 @@ export default function InventoryPage() {
                             </TableCell>
                             <TableCell className="text-center py-4">
                               <div className="flex gap-2 justify-center">
-                                <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                                  <DialogTrigger asChild>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setEditingProduct({
-                                          ...product,
-                                          minStock: product.minStock || product.min_stock || 5,
-                                          description: product.description || ""
-                                        })
-                                        setIsEditDialogOpen(true)
-                                      }}
-                                    >
-                                      <Edit className="w-4 h-4" />
-                                    </Button>
-                                  </DialogTrigger>
+                                {canEditProduct(product) && (
+                                  <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                                    <DialogTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          setEditingProduct({
+                                            ...product,
+                                            minStock: product.minStock || product.min_stock || 5,
+                                            description: product.description || ""
+                                          })
+                                          setIsEditDialogOpen(true)
+                                        }}
+                                      >
+                                        <Edit className="w-4 h-4" />
+                                      </Button>
+                                    </DialogTrigger>
                                   <DialogContent
                                     className="bg-slate-800 border-slate-700 text-white max-w-2xl"
                                     dir="rtl"
@@ -1096,21 +1150,39 @@ export default function InventoryPage() {
                                             </Select>
                                           </div>
                                         </div>
-                                        <div className="grid gap-2">
-                                          <Label htmlFor="edit-price" className="text-right">
-                                            السعر (اختياري)
-                                          </Label>
-                                          <Input
-                                            id="edit-price"
-                                            type="number"
-                                            step="0.01"
-                                            value={editingProduct.price || ''}
-                                            onChange={(e) =>
-                                              setEditingProduct({ ...editingProduct, price: e.target.value ? parseFloat(e.target.value) : null })
-                                            }
-                                            className="bg-slate-700 border-slate-600 text-right"
-                                            placeholder="أدخل السعر"
-                                          />
+                                        <div className="grid grid-cols-2 gap-4">
+                                          <div className="grid gap-2">
+                                            <Label htmlFor="edit-purchase-price" className="text-right">
+                                              سعر الشراء
+                                            </Label>
+                                            <Input
+                                              id="edit-purchase-price"
+                                              type="number"
+                                              step="0.01"
+                                              value={editingProduct.purchase_price || ''}
+                                              onChange={(e) =>
+                                                setEditingProduct({ ...editingProduct, purchase_price: e.target.value ? parseFloat(e.target.value) : null })
+                                              }
+                                              className="bg-slate-700 border-slate-600 text-center"
+                                              placeholder="0.00"
+                                            />
+                                          </div>
+                                          <div className="grid gap-2">
+                                            <Label htmlFor="edit-selling-price" className="text-right">
+                                              سعر البيع
+                                            </Label>
+                                            <Input
+                                              id="edit-selling-price"
+                                              type="number"
+                                              step="0.01"
+                                              value={editingProduct.selling_price || ''}
+                                              onChange={(e) =>
+                                                setEditingProduct({ ...editingProduct, selling_price: e.target.value ? parseFloat(e.target.value) : null })
+                                              }
+                                              className="bg-slate-700 border-slate-600 text-center"
+                                              placeholder="0.00"
+                                            />
+                                          </div>
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
                                           <div className="grid gap-2">
@@ -1188,14 +1260,20 @@ export default function InventoryPage() {
                                     </div>
                                   </DialogContent>
                                 </Dialog>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleDeleteProduct(product.id, product.name)}
-                                  className="text-red-400 hover:text-red-300 hover:border-red-400"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
+                                )}
+                                {canEditProduct(product) && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteProduct(product.id, product.name)}
+                                    className="text-red-400 hover:text-red-300 hover:border-red-400"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                )}
+                                {!canEditProduct(product) && (
+                                  <span className="text-slate-500 text-sm">عرض فقط</span>
+                                )}
                               </div>
                             </TableCell>
                           </TableRow>

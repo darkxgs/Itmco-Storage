@@ -8,6 +8,13 @@ import type {
   ReleaseItem, ReleaseItemInsert, ReleaseItemUpdate
 } from "./supabase"
 import { validateInput, validateObject, createSecureQuery, SecurityError } from "./security"
+import { 
+  getCurrentUserId, 
+  getUserAccessibleWarehouses, 
+  hasWarehousePermission, 
+  checkWarehousePermission,
+  filterByUserWarehouses 
+} from "./warehouse-permissions"
 
 // Enhanced error handling wrapper
 async function withErrorHandling<T>(operation: () => Promise<T>, errorMessage: string): Promise<T> {
@@ -19,13 +26,19 @@ async function withErrorHandling<T>(operation: () => Promise<T>, errorMessage: s
   }
 }
 
-// Products with enhanced functionality
+// Products with warehouse permission filtering
 export async function getProducts() {
   return withErrorHandling(async () => {
-    const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false })
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("created_at", { ascending: false })
 
     if (error) throw error
-    return data || []
+    
+    // Filter products by user's warehouse permissions
+    const filteredData = await filterByUserWarehouses(data || [], 'view')
+    return filteredData
   }, "Failed to fetch products")
 }
 
@@ -64,9 +77,22 @@ export async function createProduct(product: ProductInsert & { minStock?: number
       throw new SecurityError("Missing required fields", "INVALID_INPUT")
     }
 
+    // Check warehouse permission if warehouse_id is provided
+    if (sanitizedProduct.warehouse_id) {
+      await checkWarehousePermission(sanitizedProduct.warehouse_id, 'add')
+    }
+
     // Additional validation for product data
     if (sanitizedProduct.stock < 0 || sanitizedProduct.minStock < 0) {
       throw new SecurityError("Stock values cannot be negative", "INVALID_INPUT")
+    }
+
+    // Validate price fields
+    if (sanitizedProduct.purchase_price && sanitizedProduct.purchase_price < 0) {
+      throw new SecurityError("Purchase price cannot be negative", "INVALID_INPUT")
+    }
+    if (sanitizedProduct.selling_price && sanitizedProduct.selling_price < 0) {
+      throw new SecurityError("Selling price cannot be negative", "INVALID_INPUT")
     }
 
     // Generate item code if not provided
@@ -83,7 +109,8 @@ export async function createProduct(product: ProductInsert & { minStock?: number
       category: validateInput(sanitizedProduct.category),
       item_code: itemCode,
       warehouse_id: sanitizedProduct.warehouse_id ? Number(sanitizedProduct.warehouse_id) : null,
-      price: sanitizedProduct.price ? Number(sanitizedProduct.price) : null,
+      purchase_price: sanitizedProduct.purchase_price ? Number(sanitizedProduct.purchase_price) : null,
+      selling_price: sanitizedProduct.selling_price ? Number(sanitizedProduct.selling_price) : null,
       stock: Math.max(0, Number(sanitizedProduct.stock) || 0),
       min_stock: Math.max(0, Number(sanitizedProduct.minStock) || 0),
       description: sanitizedProduct.description ? validateInput(sanitizedProduct.description) : null,
@@ -111,9 +138,34 @@ export async function updateProduct(id: number, updates: ProductUpdate & { minSt
       throw new SecurityError("Invalid product ID", "INVALID_INPUT")
     }
 
+    // Get current product to check warehouse permission
+    const { data: currentProduct, error: fetchError } = await supabase
+      .from('products')
+      .select('warehouse_id')
+      .eq('id', productId)
+      .single()
+    
+    if (fetchError) throw fetchError
+    
+    // Check warehouse permission for current product's warehouse
+    if (currentProduct?.warehouse_id) {
+      await checkWarehousePermission(currentProduct.warehouse_id, 'edit')
+    }
+    
+    // If updating warehouse_id, check permission for new warehouse too
+    if (sanitizedUpdates.warehouse_id && sanitizedUpdates.warehouse_id !== currentProduct?.warehouse_id) {
+      await checkWarehousePermission(sanitizedUpdates.warehouse_id, 'edit')
+    }
+
     // Additional validation
     if (sanitizedUpdates.stock !== undefined && sanitizedUpdates.stock < 0) {
       throw new SecurityError("Stock cannot be negative", "INVALID_INPUT")
+    }
+    if (sanitizedUpdates.purchase_price !== undefined && sanitizedUpdates.purchase_price < 0) {
+      throw new SecurityError("Purchase price cannot be negative", "INVALID_INPUT")
+    }
+    if (sanitizedUpdates.selling_price !== undefined && sanitizedUpdates.selling_price < 0) {
+      throw new SecurityError("Selling price cannot be negative", "INVALID_INPUT")
     }
 
     // Map minStock to min_stock for database
@@ -133,6 +185,12 @@ export async function updateProduct(id: number, updates: ProductUpdate & { minSt
     if (sanitizedUpdates.minStock !== undefined) {
       dbUpdates.min_stock = Math.max(0, Number(sanitizedUpdates.minStock))
     }
+    if (sanitizedUpdates.purchase_price !== undefined) {
+      dbUpdates.purchase_price = sanitizedUpdates.purchase_price ? Number(sanitizedUpdates.purchase_price) : null
+    }
+    if (sanitizedUpdates.selling_price !== undefined) {
+      dbUpdates.selling_price = sanitizedUpdates.selling_price ? Number(sanitizedUpdates.selling_price) : null
+    }
 
     const { data, error } = await createSecureQuery("products", "update").update(dbUpdates).eq("id", productId).select().single()
 
@@ -150,6 +208,24 @@ export async function deleteProduct(id: number) {
   return withErrorHandling(async () => {
     const productId = Number(id)
     
+    if (!productId || productId <= 0) {
+      throw new SecurityError("Invalid product ID", "INVALID_INPUT")
+    }
+
+    // Get current product to check warehouse permission
+    const { data: currentProduct, error: fetchError } = await supabase
+      .from('products')
+      .select('warehouse_id')
+      .eq('id', productId)
+      .single()
+    
+    if (fetchError) throw fetchError
+    
+    // Check warehouse permission for deletion
+    if (currentProduct?.warehouse_id) {
+      await checkWarehousePermission(currentProduct.warehouse_id, 'delete')
+    }
+
     if (!productId || productId <= 0) {
       throw new SecurityError("Invalid product ID", "INVALID_INPUT")
     }
@@ -1255,4 +1331,32 @@ export async function searchIssuancesByFilters(filters: {
     if (error) throw error
     return data || []
   }, "Failed to search issuances")
+}
+
+
+
+// Users management functions
+export async function getUsers() {
+  return withErrorHandling(async () => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, email, name, role")
+      .order("created_at", { ascending: false })
+
+    if (error) throw error
+    return data || []
+  }, "Failed to fetch users")
+}
+
+export async function getUserById(userId: string) {
+  return withErrorHandling(async () => {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, email, name, role")
+      .eq("id", userId)
+      .single()
+
+    if (error) throw error
+    return data
+  }, "Failed to fetch user")
 }

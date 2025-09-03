@@ -98,10 +98,11 @@ export default function UsersPage() {
       return false
     }
 
-    if (!validateEmail(userData.email)) {
+    const emailError = validateEmail(userData.email)
+    if (emailError) {
       toast({
         title: "خطأ في البيانات",
-        description: "يرجى إدخال بريد إلكتروني صحيح",
+        description: emailError,
         variant: "destructive",
       })
       return false
@@ -117,11 +118,11 @@ export default function UsersPage() {
     }
 
     if (!isEdit && userData.password) {
-      const passwordValidation = validatePassword(userData.password)
-      if (!passwordValidation.isValid) {
+      const passwordError = validatePassword(userData.password)
+      if (passwordError) {
         toast({
           title: "خطأ في كلمة المرور",
-          description: passwordValidation.message,
+          description: passwordError,
           variant: "destructive",
         })
         return false

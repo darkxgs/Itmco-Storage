@@ -156,7 +156,8 @@ export type Database = {
           min_stock: number
           item_code: string | null
           warehouse_id: number | null
-          price: number | null
+          purchase_price: number | null
+          selling_price: number | null
           description: string | null
           created_at: string
           updated_at: string
@@ -171,7 +172,8 @@ export type Database = {
           min_stock?: number
           item_code?: string | null
           warehouse_id?: number | null
-          price?: number | null
+          purchase_price?: number | null
+          selling_price?: number | null
           description?: string | null
           created_at?: string
           updated_at?: string
@@ -186,7 +188,8 @@ export type Database = {
           min_stock?: number
           item_code?: string | null
           warehouse_id?: number | null
-          price?: number | null
+          purchase_price?: number | null
+          selling_price?: number | null
           description?: string | null
           created_at?: string
           updated_at?: string
@@ -330,6 +333,44 @@ export type Database = {
           created_at?: string
         }
       }
+      user_warehouse_permissions: {
+        Row: {
+          id: number
+          user_id: string
+          warehouse_id: number
+          permission_level: "view" | "edit" | "admin"
+          can_view: boolean
+          can_add: boolean
+          can_edit: boolean
+          can_delete: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          user_id: string
+          warehouse_id: number
+          permission_level?: "view" | "edit" | "admin"
+          can_view?: boolean
+          can_add?: boolean
+          can_edit?: boolean
+          can_delete?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          user_id?: string
+          warehouse_id?: number
+          permission_level?: "view" | "edit" | "admin"
+          can_view?: boolean
+          can_add?: boolean
+          can_edit?: boolean
+          can_delete?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 }
@@ -361,3 +402,7 @@ export type ReleaseItemUpdate = Database['public']['Tables']['release_items']['U
 
 export type User = Database['public']['Tables']['users']['Row']
 export type ActivityLog = Database['public']['Tables']['activity_logs']['Row']
+
+export type UserWarehousePermission = Database['public']['Tables']['user_warehouse_permissions']['Row']
+export type UserWarehousePermissionInsert = Database['public']['Tables']['user_warehouse_permissions']['Insert']
+export type UserWarehousePermissionUpdate = Database['public']['Tables']['user_warehouse_permissions']['Update']
