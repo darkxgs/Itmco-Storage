@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, TrendingUp, AlertTriangle, Users, RefreshCw } from "lucide-react"
+import { Package, TrendingUp, AlertTriangle, Users, RefreshCw, BarChart3 as BarChartIcon } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts"
@@ -131,33 +131,35 @@ export default function DashboardPage() {
 
   return (
     <ErrorBoundary>
-      <div className="flex min-h-screen bg-slate-900">
+      <div className="flex min-h-screen bg-slate-950 relative overflow-hidden">
+        {/* Decorative background */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.12),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.1),transparent_60%)]" />
         <Sidebar />
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-3 sm:p-4 lg:p-6 relative">
           {/* Header */}
-          <div className="mb-8 flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-white mb-2">لوحة التحكم</h1>
-              <p className="text-slate-300">مرحباً {user.name} - نظرة عامة على النظام</p>
+          <div className="mb-4 sm:mb-6 lg:mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+            <div className="flex-1">
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 sm:mb-2">لوحة التحكم</h1>
+              <p className="text-sm sm:text-base text-slate-300">مرحباً {user.name} - نظرة عامة على النظام</p>
             </div>
             <Button
               onClick={handleRefresh}
               disabled={refreshing}
               variant="outline"
-              className="bg-slate-800 border-slate-600 text-white hover:bg-slate-700"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white border-transparent hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-2.5 w-full sm:w-auto"
             >
-              <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
               تحديث
             </Button>
           </div>
 
           {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6 lg:mb-8">
               {[...Array(4)].map((_, i) => (
                 <Card key={i} className="bg-slate-800 border-slate-700 animate-pulse">
-                  <CardContent className="p-6">
-                    <div className="h-4 bg-slate-700 rounded mb-2"></div>
-                    <div className="h-8 bg-slate-700 rounded"></div>
+                  <CardContent className="p-3 sm:p-4 lg:p-6">
+                    <div className="h-3 sm:h-4 bg-slate-700 rounded mb-2"></div>
+                    <div className="h-6 sm:h-8 bg-slate-700 rounded"></div>
                   </CardContent>
                 </Card>
               ))}
@@ -165,59 +167,59 @@ export default function DashboardPage() {
           ) : (
             <>
               {/* Stats Cards with improved styling */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-blue-500/20 hover:border-blue-500/40 transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-300">إجمالي المخزون</CardTitle>
-                    <Package className="h-4 w-4 text-blue-400" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6 lg:mb-8">
+                <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-blue-500/20 hover:border-blue-500/40 rounded-xl shadow-md hover:shadow-xl transition-all hover:-translate-y-0.5">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-4 lg:p-6">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-slate-300">إجمالي المخزون</CardTitle>
+                    <Package className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-white">{stats.totalStock.toLocaleString()}</div>
+                  <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+                    <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{stats.totalStock.toLocaleString()}</div>
                     <p className="text-xs text-slate-400">المنتجات المتوفرة</p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-green-500/10 to-green-600/10 border-green-500/20 hover:border-green-500/40 transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-300">المنتجات المصدرة اليوم</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-green-400" />
+                <Card className="bg-gradient-to-br from-green-500/10 to-green-600/10 border-green-500/20 hover:border-green-500/40 rounded-xl shadow-md hover:shadow-xl transition-all hover:-translate-y-0.5">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-4 lg:p-6">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-slate-300">المنتجات المصدرة اليوم</CardTitle>
+                    <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-white">{stats.todayIssuances}</div>
+                  <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+                    <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{stats.todayIssuances}</div>
                     <p className="text-xs text-slate-400">إصدارات اليوم</p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/10 border-orange-500/20 hover:border-orange-500/40 transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-300">تنبيهات المخزون المنخفض</CardTitle>
-                    <AlertTriangle className="h-4 w-4 text-orange-400" />
+                <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/10 border-orange-500/20 hover:border-orange-500/40 rounded-xl shadow-md hover:shadow-xl transition-all hover:-translate-y-0.5">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-4 lg:p-6">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-slate-300">تنبيهات المخزون المنخفض</CardTitle>
+                    <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-orange-400" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-orange-400">{stats.lowStockCount}</div>
+                  <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+                    <div className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-400">{stats.lowStockCount}</div>
                     <p className="text-xs text-slate-400">يتطلب إعادة تموين</p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 border-purple-500/20 hover:border-purple-500/40 transition-colors">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-300">إجمالي المنتجات</CardTitle>
-                    <Users className="h-4 w-4 text-purple-400" />
+                <Card className="bg-gradient-to-br from-purple-500/10 to-purple-600/10 border-purple-500/20 hover:border-purple-500/40 rounded-xl shadow-md hover:shadow-xl transition-all hover:-translate-y-0.5">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-4 lg:p-6">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-slate-300">إجمالي المنتجات</CardTitle>
+                    <Users className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-white">{stats.totalProducts}</div>
+                  <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+                    <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{stats.totalProducts}</div>
                     <p className="text-xs text-slate-400">أنواع المنتجات</p>
                   </CardContent>
                 </Card>
               </div>
 
               {/* Charts with improved empty states */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <Card className="bg-slate-800 border-slate-700">
-                  <CardHeader>
-                    <CardTitle className="text-white">حركة المخزون الشهرية</CardTitle>
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6 lg:mb-8">
+                <Card className="bg-slate-800/70 backdrop-blur border-slate-700 rounded-xl shadow-md">
+                  <CardHeader className="p-3 sm:p-4 lg:p-6">
+                    <CardTitle className="text-white text-sm sm:text-base lg:text-lg">حركة المخزون الشهرية</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
                     {monthlyStockData.length > 0 ? (
                       <ChartContainer
                         config={{
@@ -226,7 +228,7 @@ export default function DashboardPage() {
                             color: "#8884d8",
                           },
                         }}
-                        className="h-[300px]"
+                        className="h-[200px] sm:h-[250px] lg:h-[300px]"
                       >
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={monthlyStockData}>
@@ -238,20 +240,20 @@ export default function DashboardPage() {
                         </ResponsiveContainer>
                       </ChartContainer>
                     ) : (
-                      <div className="h-[300px] flex flex-col items-center justify-center text-slate-400">
-                        <Package className="w-12 h-12 mb-4 opacity-50" />
-                        <p className="text-lg font-medium mb-2">لا توجد بيانات للعرض</p>
-                        <p className="text-sm">ابدأ بإضافة منتجات لرؤية الإحصائيات</p>
+                      <div className="h-[200px] sm:h-[250px] lg:h-[300px] flex flex-col items-center justify-center text-slate-400">
+                        <Package className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 mb-3 sm:mb-4 opacity-50" />
+                        <p className="text-sm sm:text-base lg:text-lg font-medium mb-1 sm:mb-2">لا توجد بيانات للعرض</p>
+                        <p className="text-xs sm:text-sm text-center px-4">ابدأ بإضافة منتجات لرؤية الإحصائيات</p>
                       </div>
                     )}
                   </CardContent>
                 </Card>
 
-                <Card className="bg-slate-800 border-slate-700">
-                  <CardHeader>
-                    <CardTitle className="text-white">توزيع المنتجات</CardTitle>
+                <Card className="bg-slate-800/70 backdrop-blur border-slate-700 rounded-xl shadow-md">
+                  <CardHeader className="p-3 sm:p-4 lg:p-6">
+                    <CardTitle className="text-white text-sm sm:text-base lg:text-lg">توزيع المنتجات</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
                     {productData.length > 0 ? (
                       <ChartContainer
                         config={{
@@ -259,7 +261,7 @@ export default function DashboardPage() {
                             label: "النسبة",
                           },
                         }}
-                        className="h-[300px]"
+                        className="h-[200px] sm:h-[250px] lg:h-[300px]"
                       >
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
@@ -273,10 +275,10 @@ export default function DashboardPage() {
                         </ResponsiveContainer>
                       </ChartContainer>
                     ) : (
-                      <div className="h-[300px] flex flex-col items-center justify-center text-slate-400">
-                        <TrendingUp className="w-12 h-12 mb-4 opacity-50" />
-                        <p className="text-lg font-medium mb-2">لا توجد بيانات للعرض</p>
-                        <p className="text-sm">ابدأ بإصدار منتجات لرؤية التوزيع</p>
+                      <div className="h-[200px] sm:h-[250px] lg:h-[300px] flex flex-col items-center justify-center text-slate-400">
+                        <TrendingUp className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 mb-3 sm:mb-4 opacity-50" />
+                        <p className="text-sm sm:text-base lg:text-lg font-medium mb-1 sm:mb-2">لا توجد بيانات للعرض</p>
+                        <p className="text-xs sm:text-sm text-center px-4">ابدأ بإصدار منتجات لرؤية التوزيع</p>
                       </div>
                     )}
                   </CardContent>
@@ -284,12 +286,12 @@ export default function DashboardPage() {
               </div>
 
               {/* Recent Activity & Weekly Issuances */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <Card className="bg-slate-800 border-slate-700 lg:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="text-white">الإصدارات الأسبوعية</CardTitle>
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+                <Card className="bg-slate-800/70 backdrop-blur border-slate-700 rounded-xl shadow-md xl:col-span-2">
+                  <CardHeader className="p-3 sm:p-4 lg:p-6">
+                    <CardTitle className="text-white text-sm sm:text-base lg:text-lg">الإصدارات الأسبوعية</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
                     {weeklyIssuanceData.length > 0 ? (
                       <ChartContainer
                         config={{
@@ -298,7 +300,7 @@ export default function DashboardPage() {
                             color: "#82ca9d",
                           },
                         }}
-                        className="h-[300px]"
+                        className="h-[200px] sm:h-[250px] lg:h-[300px]"
                       >
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={weeklyIssuanceData}>
@@ -310,30 +312,30 @@ export default function DashboardPage() {
                         </ResponsiveContainer>
                       </ChartContainer>
                     ) : (
-                      <div className="h-[300px] flex flex-col items-center justify-center text-slate-400">
-                        <BarChart className="w-12 h-12 mb-4 opacity-50" />
-                        <p className="text-lg font-medium mb-2">لا توجد إصدارات هذا الأسبوع</p>
-                        <p className="text-sm">ابدأ بإصدار منتجات لرؤية الإحصائيات</p>
+                      <div className="h-[200px] sm:h-[250px] lg:h-[300px] flex flex-col items-center justify-center text-slate-400">
+                        <BarChartIcon className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 mb-3 sm:mb-4 opacity-50" />
+                        <p className="text-sm sm:text-base lg:text-lg font-medium mb-1 sm:mb-2">لا توجد إصدارات هذا الأسبوع</p>
+                        <p className="text-xs sm:text-sm text-center px-4">ابدأ بإصدار منتجات لرؤية الإحصائيات</p>
                       </div>
                     )}
                   </CardContent>
                 </Card>
 
-                <Card className="bg-slate-800 border-slate-700">
-                  <CardHeader>
-                    <CardTitle className="text-white">النشاط الأخير</CardTitle>
+                <Card className="bg-slate-800/70 backdrop-blur border-slate-700 rounded-xl shadow-md">
+                  <CardHeader className="p-3 sm:p-4 lg:p-6">
+                    <CardTitle className="text-white text-sm sm:text-base lg:text-lg">النشاط الأخير</CardTitle>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4 max-h-[300px] overflow-y-auto">
+                  <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+                    <div className="space-y-3 sm:space-y-4 max-h-[200px] sm:max-h-[250px] lg:max-h-[300px] overflow-y-auto">
                       {recentActivity.length > 0 ? (
                         recentActivity.map((activity) => (
                           <div
                             key={activity.id}
-                            className="flex items-start space-x-4 space-x-reverse p-3 bg-slate-700/30 rounded-lg"
+                            className="flex items-start space-x-3 sm:space-x-4 space-x-reverse p-2.5 sm:p-3.5 bg-slate-700/30 hover:bg-slate-700/40 transition-colors rounded-lg"
                           >
-                            <div className="w-2 h-2 bg-green-400 rounded-full mt-2 flex-shrink-0"></div>
+                            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full mt-1.5 sm:mt-2 flex-shrink-0"></div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm text-white font-medium truncate">{activity.action}</p>
+                              <p className="text-xs sm:text-sm text-white font-medium truncate">{activity.action}</p>
                               <p className="text-xs text-slate-400 mt-1">
                                 {activity.user_name} • {new Date(activity.created_at).toLocaleString("ar-SA")}
                               </p>
@@ -341,9 +343,9 @@ export default function DashboardPage() {
                           </div>
                         ))
                       ) : (
-                        <div className="text-center text-slate-400 py-8">
-                          <Users className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">لا توجد أنشطة حديثة</p>
+                        <div className="text-center text-slate-400 py-6 sm:py-8">
+                          <Users className="w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-xs sm:text-sm">لا توجد أنشطة حديثة</p>
                         </div>
                       )}
                     </div>

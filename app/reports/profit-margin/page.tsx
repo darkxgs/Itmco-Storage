@@ -233,25 +233,32 @@ export default function ProfitMarginReportPage() {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen bg-slate-900">
+      <div className="flex h-screen bg-slate-950 relative overflow-hidden">
+        {/* Decorative background */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.20),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.20),transparent_60%),radial-gradient(500px_circle_at_50%_50%,rgba(34,197,94,0.10),transparent_60%)]" />
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-green-500/10 rounded-full blur-3xl" />
+        </div>
         <Sidebar />
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto relative">
           <div className="p-6">
-            <div className="mb-8">
-              <div className="bg-slate-800 rounded-lg shadow-sm border border-slate-700 p-6">
-                <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg">
-                    <BarChart3 className="h-6 w-6 text-white" />
-                  </div>
-                  تقرير هامش الربح
-                </h1>
-                <p className="text-slate-300">تحليل هوامش الربح للمنتجات بناءً على أسعار الشراء والبيع</p>
+            <div className="mb-8 relative">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl border border-blue-500/30 backdrop-blur-sm">
+                  <BarChart3 className="w-8 h-8 text-blue-400" />
+                </div>
+                <div>
+                  <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">تقرير هامش الربح</h1>
+                  <p className="text-slate-400">تحليل هوامش الربح للمنتجات بناءً على أسعار الشراء والبيع</p>
+                </div>
               </div>
             </div>
 
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
-              <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <Card className="bg-gradient-to-r from-blue-500/20 to-blue-600/20 text-white border border-blue-500/30 backdrop-blur-sm shadow-xl hover:shadow-blue-500/25 transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -265,7 +272,7 @@ export default function ProfitMarginReportPage() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+              <Card className="bg-gradient-to-r from-emerald-500/20 to-emerald-600/20 text-white border border-emerald-500/30 backdrop-blur-sm shadow-xl hover:shadow-emerald-500/25 transition-all duration-300">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
@@ -323,27 +330,27 @@ export default function ProfitMarginReportPage() {
             </div>
 
             {/* Filters */}
-            <Card className="mb-8 shadow-lg border-slate-700 bg-slate-800">
-              <CardHeader className="bg-slate-700 border-b border-slate-600">
-                <CardTitle className="flex items-center gap-3 text-white">
-                  <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg">
-                    <Filter className="h-5 w-5 text-white" />
+            <Card className="mb-8 bg-slate-900/50 border-slate-700/50 backdrop-blur-sm shadow-2xl hover:shadow-blue-500/10 transition-all duration-300">
+              <CardHeader className="border-b border-slate-700/50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-500/20 rounded-lg">
+                    <Filter className="w-5 h-5 text-purple-400" />
                   </div>
-                  فلاتر التقرير
-                </CardTitle>
+                  <CardTitle className="text-white">فلاتر التقرير</CardTitle>
+                </div>
               </CardHeader>
-              <CardContent className="bg-slate-800">
+              <CardContent className="pt-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
                   <div>
                     <Label htmlFor="warehouse-filter" className="text-white">المخزن</Label>
                     <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
-                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectTrigger className="bg-slate-800/50 border-slate-600/50 text-white backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200">
                         <SelectValue placeholder="اختر المخزن" />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-700 border-slate-600">
-                        <SelectItem value="all" className="text-white hover:bg-slate-600">جميع المخازن</SelectItem>
+                      <SelectContent className="bg-slate-800/90 border-slate-600/50 backdrop-blur-sm">
+                        <SelectItem value="all" className="text-white hover:bg-slate-700/50">جميع المخازن</SelectItem>
                         {warehouses.map((warehouse) => (
-                          <SelectItem key={warehouse.id} value={warehouse.name} className="text-white hover:bg-slate-600">
+                          <SelectItem key={warehouse.id} value={warehouse.name} className="text-white hover:bg-slate-700/50">
                             {warehouse.name}
                           </SelectItem>
                         ))}
@@ -354,13 +361,13 @@ export default function ProfitMarginReportPage() {
                   <div>
                     <Label htmlFor="category-filter" className="text-white">الفئة</Label>
                     <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectTrigger className="bg-slate-800/50 border-slate-600/50 text-white backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200">
                         <SelectValue placeholder="اختر الفئة" />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-700 border-slate-600">
-                        <SelectItem value="all" className="text-white hover:bg-slate-600">جميع الفئات</SelectItem>
+                      <SelectContent className="bg-slate-800/90 border-slate-600/50 backdrop-blur-sm">
+                        <SelectItem value="all" className="text-white hover:bg-slate-700/50">جميع الفئات</SelectItem>
                         {categories.map((category) => (
-                          <SelectItem key={category} value={category} className="text-white hover:bg-slate-600">
+                          <SelectItem key={category} value={category} className="text-white hover:bg-slate-700/50">
                             {category}
                           </SelectItem>
                         ))}
@@ -376,7 +383,7 @@ export default function ProfitMarginReportPage() {
                       placeholder="0"
                       value={minMarginFilter}
                       onChange={(e) => setMinMarginFilter(e.target.value)}
-                      className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                      className="bg-slate-800/50 border-slate-600/50 text-white placeholder:text-slate-400 backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
                     />
                   </div>
 
@@ -388,23 +395,23 @@ export default function ProfitMarginReportPage() {
                       placeholder="100"
                       value={maxMarginFilter}
                       onChange={(e) => setMaxMarginFilter(e.target.value)}
-                      className="bg-slate-700 border-slate-600 text-white placeholder:text-slate-400"
+                      className="bg-slate-800/50 border-slate-600/50 text-white placeholder:text-slate-400 backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200"
                     />
                   </div>
 
                   <div>
                     <Label htmlFor="sort-by" className="text-white">ترتيب حسب</Label>
                     <Select value={sortBy} onValueChange={setSortBy}>
-                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectTrigger className="bg-slate-800/50 border-slate-600/50 text-white backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-700 border-slate-600">
-                        <SelectItem value="profit_margin_percentage" className="text-white hover:bg-slate-600">نسبة هامش الربح</SelectItem>
-                        <SelectItem value="profit_margin" className="text-white hover:bg-slate-600">هامش الربح</SelectItem>
-                        <SelectItem value="total_profit_potential" className="text-white hover:bg-slate-600">إجمالي الربح المحتمل</SelectItem>
-                        <SelectItem value="name" className="text-white hover:bg-slate-600">اسم المنتج</SelectItem>
-                        <SelectItem value="purchase_price" className="text-white hover:bg-slate-600">سعر الشراء</SelectItem>
-                        <SelectItem value="selling_price" className="text-white hover:bg-slate-600">سعر البيع</SelectItem>
+                      <SelectContent className="bg-slate-800/90 border-slate-600/50 backdrop-blur-sm">
+                        <SelectItem value="profit_margin_percentage" className="text-white hover:bg-slate-700/50">نسبة هامش الربح</SelectItem>
+                        <SelectItem value="profit_margin" className="text-white hover:bg-slate-700/50">هامش الربح</SelectItem>
+                        <SelectItem value="total_profit_potential" className="text-white hover:bg-slate-700/50">إجمالي الربح المحتمل</SelectItem>
+                        <SelectItem value="name" className="text-white hover:bg-slate-700/50">اسم المنتج</SelectItem>
+                        <SelectItem value="purchase_price" className="text-white hover:bg-slate-700/50">سعر الشراء</SelectItem>
+                        <SelectItem value="selling_price" className="text-white hover:bg-slate-700/50">سعر البيع</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -412,19 +419,19 @@ export default function ProfitMarginReportPage() {
                   <div>
                     <Label htmlFor="sort-order" className="text-white">نوع الترتيب</Label>
                     <Select value={sortOrder} onValueChange={(value: "asc" | "desc") => setSortOrder(value)}>
-                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectTrigger className="bg-slate-800/50 border-slate-600/50 text-white backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent className="bg-slate-700 border-slate-600">
-                        <SelectItem value="desc" className="text-white hover:bg-slate-600">تنازلي</SelectItem>
-                        <SelectItem value="asc" className="text-white hover:bg-slate-600">تصاعدي</SelectItem>
+                      <SelectContent className="bg-slate-800/90 border-slate-600/50 backdrop-blur-sm">
+                        <SelectItem value="desc" className="text-white hover:bg-slate-700/50">تنازلي</SelectItem>
+                        <SelectItem value="asc" className="text-white hover:bg-slate-700/50">تصاعدي</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
                 <div className="flex gap-3 mt-6">
-                  <Button onClick={exportToCSV} className="bg-green-600 hover:bg-green-700 text-white border-0 shadow-md">
+                  <Button onClick={exportToCSV} className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white border-0 shadow-lg hover:shadow-green-500/25 transition-all duration-200">
                     <Download className="h-4 w-4 mr-2" />
                     تصدير CSV
                   </Button>
@@ -437,7 +444,7 @@ export default function ProfitMarginReportPage() {
                       setSortBy("profit_margin_percentage")
                       setSortOrder("desc")
                     }}
-                    className="bg-slate-600 hover:bg-slate-700 text-white border-0 shadow-md"
+                    className="bg-slate-700/50 hover:bg-slate-600/50 text-white border border-slate-600/50 shadow-lg hover:shadow-slate-500/25 transition-all duration-200 backdrop-blur-sm"
                   >
                     إعادة تعيين الفلاتر
                   </Button>
@@ -446,8 +453,8 @@ export default function ProfitMarginReportPage() {
             </Card>
 
             {/* Data Table */}
-            <Card className="shadow-lg border-slate-700 bg-slate-800">
-              <CardHeader className="bg-slate-700 border-b border-slate-600">
+            <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm shadow-2xl hover:shadow-blue-500/10 transition-all duration-300">
+              <CardHeader className="border-b border-slate-700/50">
                 <CardTitle className="flex items-center gap-3 text-white">
                   <div className="p-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-lg">
                     <Package className="h-5 w-5 text-white" />
@@ -455,41 +462,41 @@ export default function ProfitMarginReportPage() {
                   تفاصيل هامش الربح ({sortedData.length} منتج)
                 </CardTitle>
               </CardHeader>
-              <CardContent className="bg-slate-800">
+              <CardContent className="pt-6">
                 {sortedData.length === 0 ? (
-                  <Alert className="bg-slate-700 border-slate-600">
+                  <Alert className="bg-slate-700/50 border-slate-600/50 backdrop-blur-sm">
                     <AlertDescription className="text-slate-300">
                       لا توجد منتجات تحتوي على أسعار شراء وبيع محددة أو لا تطابق معايير الفلترة.
                     </AlertDescription>
                   </Alert>
                 ) : (
-                  <div className="overflow-x-auto">
+                  <div className="rounded-lg overflow-hidden border border-slate-700/50">
                     <Table>
                       <TableHeader>
-                        <TableRow className="border-slate-600">
-                          <TableHead className="text-slate-300">اسم المنتج</TableHead>
-                          <TableHead className="text-slate-300">العلامة التجارية</TableHead>
-                          <TableHead className="text-slate-300">الفئة</TableHead>
-                          <TableHead className="text-slate-300">المخزن</TableHead>
-                          <TableHead className="text-slate-300">سعر الشراء</TableHead>
-                          <TableHead className="text-slate-300">سعر البيع</TableHead>
-                          <TableHead className="text-slate-300">هامش الربح</TableHead>
-                          <TableHead className="text-slate-300">نسبة هامش الربح</TableHead>
-                          <TableHead className="text-slate-300">الكمية</TableHead>
-                          <TableHead className="text-slate-300">إجمالي الربح المحتمل</TableHead>
+                        <TableRow className="border-slate-600/50 bg-slate-700/30">
+                          <TableHead className="text-slate-200 font-semibold">اسم المنتج</TableHead>
+                          <TableHead className="text-slate-200 font-semibold">العلامة التجارية</TableHead>
+                          <TableHead className="text-slate-200 font-semibold">الفئة</TableHead>
+                          <TableHead className="text-slate-200 font-semibold">المخزن</TableHead>
+                          <TableHead className="text-slate-200 font-semibold">سعر الشراء</TableHead>
+                          <TableHead className="text-slate-200 font-semibold">سعر البيع</TableHead>
+                          <TableHead className="text-slate-200 font-semibold">هامش الربح</TableHead>
+                          <TableHead className="text-slate-200 font-semibold">نسبة هامش الربح</TableHead>
+                          <TableHead className="text-slate-200 font-semibold">الكمية</TableHead>
+                          <TableHead className="text-slate-200 font-semibold">إجمالي الربح المحتمل</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {sortedData.map((item) => (
-                          <TableRow key={item.id} className="border-slate-600 hover:bg-slate-700">
+                          <TableRow key={item.id} className="border-slate-600/50 hover:bg-slate-700/30 transition-colors duration-200">
                             <TableCell className="font-medium text-white">{item.name}</TableCell>
                             <TableCell className="text-slate-300">{item.brand}</TableCell>
                             <TableCell className="text-slate-300">{item.category}</TableCell>
                             <TableCell className="text-slate-300">{item.warehouse_name}</TableCell>
-                            <TableCell className="text-slate-300">{item.purchase_price.toFixed(2)}</TableCell>
-                            <TableCell className="text-slate-300">{item.selling_price.toFixed(2)}</TableCell>
+                            <TableCell className="text-slate-300 font-mono">{item.purchase_price.toFixed(2)}</TableCell>
+                            <TableCell className="text-slate-300 font-mono">{item.selling_price.toFixed(2)}</TableCell>
                             <TableCell>
-                              <span className={item.profit_margin >= 0 ? "text-green-400" : "text-red-400"}>
+                              <span className={item.profit_margin >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
                                 {item.profit_margin.toFixed(2)}
                               </span>
                             </TableCell>
@@ -500,7 +507,7 @@ export default function ProfitMarginReportPage() {
                             </TableCell>
                             <TableCell className="text-slate-300">{item.stock}</TableCell>
                             <TableCell>
-                              <span className={item.total_profit_potential >= 0 ? "text-green-400 font-medium" : "text-red-400 font-medium"}>
+                              <span className={item.total_profit_potential >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
                                 {item.total_profit_potential.toFixed(2)}
                               </span>
                             </TableCell>

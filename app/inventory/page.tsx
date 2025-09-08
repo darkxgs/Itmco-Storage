@@ -69,6 +69,7 @@ export default function InventoryPage() {
   const [stockFilter, setStockFilter] = useState("all")
   const [warehouseFilter, setWarehouseFilter] = useState("all")
   const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(ITEMS_PER_PAGE)
   const [selectedProducts, setSelectedProducts] = useState<number[]>([])
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -164,11 +165,11 @@ export default function InventoryPage() {
   }, [products, searchTerm, categoryFilter, warehouseFilter, stockFilter])
 
   const paginatedProducts = useMemo(() => {
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-    return filteredProducts.slice(startIndex, startIndex + ITEMS_PER_PAGE)
-  }, [filteredProducts, currentPage])
+    const startIndex = (currentPage - 1) * itemsPerPage
+    return filteredProducts.slice(startIndex, startIndex + itemsPerPage)
+  }, [filteredProducts, currentPage, itemsPerPage])
 
-  const totalPages = Math.ceil(filteredProducts.length / ITEMS_PER_PAGE)
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage)
 
   const validateForm = (productData: any) => {
     if (!productData) {
@@ -490,87 +491,82 @@ export default function InventoryPage() {
 
   return (
     <ErrorBoundary>
-      <div className="flex min-h-screen bg-slate-900" dir="rtl">
+      <div className="flex min-h-screen bg-slate-950 relative overflow-hidden" dir="rtl">
+        {/* Decorative background */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.12),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.1),transparent_60%)]" />
         <Sidebar />
-        <div className="flex-1 p-6">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">إدارة المخزون</h1>
-            <p className="text-slate-300">إضافة وتعديل وحذف المنتجات</p>
+        <div className="flex-1 p-3 sm:p-4 lg:p-6 relative">
+          <div className="mb-4 sm:mb-6 lg:mb-8">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 sm:mb-2">إدارة المخزون</h1>
+            <p className="text-slate-300 text-sm sm:text-base">إضافة وتعديل وحذف المنتجات</p>
           </div>
 
           {/* Enhanced Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-blue-500/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-300 text-right flex items-center gap-2">
-                  <Package className="w-4 h-4" />
-                  إجمالي المنتجات
-                </CardTitle>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-4 sm:mb-6 lg:mb-8">
+            <Card className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 border-blue-500/20 hover:border-blue-500/40 rounded-xl shadow-md hover:shadow-xl transition-all hover:-translate-y-0.5">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-4 lg:p-6">
+                <CardTitle className="text-xs sm:text-sm font-medium text-slate-300">إجمالي المنتجات</CardTitle>
+                <Package className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-white text-right">{products.length}</div>
-                <p className="text-xs text-slate-400 text-right">منتج مسجل</p>
+              <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+                <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{products.length}</div>
+                <p className="text-xs text-slate-400">منتج مسجل</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-green-500/10 to-green-600/10 border-green-500/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-300 text-right flex items-center gap-2">
-                  <TrendingUp className="w-4 h-4" />
-                  المنتجات المتوفرة
-                </CardTitle>
+            <Card className="bg-gradient-to-br from-green-500/10 to-green-600/10 border-green-500/20 hover:border-green-500/40 rounded-xl shadow-md hover:shadow-xl transition-all hover:-translate-y-0.5">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-4 lg:p-6">
+                <CardTitle className="text-xs sm:text-sm font-medium text-slate-300">المنتجات المتوفرة</CardTitle>
+                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-400 text-right">
+              <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+                <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
                   {products.filter((p) => p.stock > (p.min_stock || p.minStock)).length}
                 </div>
-                <p className="text-xs text-slate-400 text-right">في المخزون</p>
+                <p className="text-xs text-slate-400">في المخزون</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/10 border-orange-500/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-300 text-right flex items-center gap-2">
-                  <TrendingDown className="w-4 h-4" />
-                  مخزون منخفض
-                </CardTitle>
+            <Card className="bg-gradient-to-br from-orange-500/10 to-orange-600/10 border-orange-500/20 hover:border-orange-500/40 rounded-xl shadow-md hover:shadow-xl transition-all hover:-translate-y-0.5">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-4 lg:p-6">
+                <CardTitle className="text-xs sm:text-sm font-medium text-slate-300">مخزون منخفض</CardTitle>
+                <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4 text-orange-400" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-400 text-right">
+              <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+                <div className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-400">
                   {products.filter((p) => p.stock <= (p.min_stock || p.minStock) && p.stock > 0).length}
                 </div>
-                <p className="text-xs text-slate-400 text-right">يحتاج تجديد</p>
+                <p className="text-xs text-slate-400">يحتاج تجديد</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-gradient-to-br from-red-500/10 to-red-600/10 border-red-500/20">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-slate-300 text-right flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  نفد المخزون
-                </CardTitle>
+            <Card className="bg-gradient-to-br from-red-500/10 to-red-600/10 border-red-500/20 hover:border-red-500/40 rounded-xl shadow-md hover:shadow-xl transition-all hover:-translate-y-0.5">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2 p-3 sm:p-4 lg:p-6">
+                <CardTitle className="text-xs sm:text-sm font-medium text-slate-300">نفد المخزون</CardTitle>
+                <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-red-400" />
               </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-red-400 text-right">
+              <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
+                <div className="text-lg sm:text-xl lg:text-2xl font-bold text-red-400">
                   {products.filter((p) => p.stock === 0).length}
                 </div>
-                <p className="text-xs text-slate-400 text-right">غير متوفر</p>
+                <p className="text-xs text-slate-400">غير متوفر</p>
               </CardContent>
             </Card>
           </div>
 
           {/* Enhanced Controls */}
-          <Card className="bg-slate-800 border-slate-700 mb-6">
-            <CardHeader>
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <CardTitle className="text-white text-right">قائمة المنتجات ({filteredProducts.length})</CardTitle>
-                <div className="flex flex-wrap gap-2">
+          <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm mb-3 sm:mb-4 lg:mb-6 rounded-xl shadow-lg">
+            <CardHeader className="p-3 sm:p-4 lg:p-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
+                <CardTitle className="text-white text-right text-sm sm:text-base lg:text-lg">قائمة المنتجات ({filteredProducts.length})</CardTitle>
+                <div className="flex flex-wrap gap-1.5 sm:gap-2">
                   {selectedProducts.length > 0 && (
                     <AlertDialog open={isBulkDeleteDialogOpen} onOpenChange={setIsBulkDeleteDialogOpen}>
                       <AlertDialogTrigger asChild>
-                        <Button onClick={handleBulkDelete} variant="destructive" size="sm">
-                          <Trash2 className="w-4 h-4 ml-2" />
-                          حذف المحدد ({selectedProducts.length})
+                        <Button onClick={handleBulkDelete} variant="destructive" size="sm" className="text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2">
+                          <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2" />
+                          <span className="hidden sm:inline">حذف المحدد ({selectedProducts.length})</span>
+                          <span className="sm:hidden">حذف ({selectedProducts.length})</span>
                         </Button>
                       </AlertDialogTrigger>
                       <AlertDialogContent>
@@ -589,19 +585,21 @@ export default function InventoryPage() {
                       </AlertDialogContent>
                     </AlertDialog>
                   )}
-                  <Button onClick={handleExportProducts} variant="outline" size="sm" className="bg-transparent">
-                    <Download className="w-4 h-4 ml-2" />
-                    تصدير CSV
+                  <Button onClick={handleExportProducts} variant="outline" size="sm" className="bg-slate-700/50 border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50 transition-colors text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2">
+                    <Download className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2" />
+                    <span className="hidden sm:inline">تصدير CSV</span>
+                    <span className="sm:hidden">تصدير</span>
                   </Button>
                   {canAddProduct() && (
                     <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button size="sm">
-                          <Plus className="w-4 h-4 ml-2" />
-                          إضافة منتج
+                        <Button size="sm" className="bg-blue-600/80 hover:bg-blue-600 border-blue-500/50 hover:border-blue-500 transition-colors shadow-lg text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2">
+                          <Plus className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2" />
+                          <span className="hidden sm:inline">إضافة منتج</span>
+                          <span className="sm:hidden">إضافة</span>
                         </Button>
                       </DialogTrigger>
-                    <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl" dir="rtl">
+                    <DialogContent className="bg-slate-800/95 border-slate-700/50 text-white max-w-2xl backdrop-blur-sm shadow-2xl" dir="rtl">
                       <DialogHeader>
                         <DialogTitle className="text-right">إضافة منتج جديد</DialogTitle>
                       </DialogHeader>
@@ -629,7 +627,7 @@ export default function InventoryPage() {
                             id="name"
                             value={newProduct.name}
                             onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
-                            className="bg-slate-700 border-slate-600 text-right"
+                            className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-right transition-colors"
                             placeholder="أدخل اسم المنتج"
                           />
                         </div>
@@ -642,7 +640,7 @@ export default function InventoryPage() {
                               id="brand"
                               value={newProduct.brand}
                               onChange={(e) => setNewProduct({ ...newProduct, brand: e.target.value })}
-                              className="bg-slate-700 border-slate-600 text-right"
+                              className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-right transition-colors"
                               placeholder="مثل: Canon"
                             />
                           </div>
@@ -654,7 +652,7 @@ export default function InventoryPage() {
                               id="model"
                               value={newProduct.model}
                               onChange={(e) => setNewProduct({ ...newProduct, model: e.target.value })}
-                              className="bg-slate-700 border-slate-600 text-right"
+                              className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-right transition-colors"
                               placeholder="مثل: CC-2000"
                             />
                           </div>
@@ -667,10 +665,10 @@ export default function InventoryPage() {
                             value={newProduct.category}
                             onValueChange={(value) => setNewProduct({ ...newProduct, category: value })}
                           >
-                            <SelectTrigger className="bg-slate-700 border-slate-600 text-right">
+                            <SelectTrigger className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 text-right transition-colors">
                               <SelectValue placeholder="اختر الفئة" />
                             </SelectTrigger>
-                            <SelectContent className="bg-slate-700 border-slate-600">
+                            <SelectContent className="bg-slate-800 border-slate-700">
                               {categories.map((category) => (
                                 <SelectItem key={category} value={category} className="text-right">
                                   {category}
@@ -689,13 +687,13 @@ export default function InventoryPage() {
                                 id="item_code"
                                 value={newProduct.item_code}
                                 onChange={(e) => setNewProduct({ ...newProduct, item_code: e.target.value })}
-                                className="bg-slate-700 border-slate-600 text-right font-mono flex-1"
+                                className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-right font-mono flex-1 transition-colors"
                                 placeholder="مثل: ITM-01"
                               />
                               <Button
                                 type="button"
                                 onClick={handleGenerateItemCode}
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-3"
+                                className="bg-blue-600/80 hover:bg-blue-600 border-blue-500/50 hover:border-blue-500 text-white px-3 transition-colors"
                                 size="sm"
                               >
                                 إنشاء تلقائي
@@ -704,16 +702,16 @@ export default function InventoryPage() {
                           </div>
                           <div className="grid gap-2">
                             <Label htmlFor="warehouse" className="text-right">
-                              المخزن *
+                              المخزون *
                             </Label>
                             <Select
                               value={newProduct.warehouse_id}
                               onValueChange={(value) => setNewProduct({ ...newProduct, warehouse_id: value })}
                             >
-                              <SelectTrigger className="bg-slate-700 border-slate-600 text-right">
-                                <SelectValue placeholder="اختر المخزن" />
+                              <SelectTrigger className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 text-right transition-colors">
+                                <SelectValue placeholder="اختر المخزون" />
                               </SelectTrigger>
-                              <SelectContent className="bg-slate-700 border-slate-600">
+                              <SelectContent className="bg-slate-800 border-slate-700">
                                 {warehouses.map((warehouse) => (
                                   <SelectItem key={warehouse.id} value={warehouse.id} className="text-right">
                                     {warehouse.name} - {warehouse.warehouse_number}
@@ -735,7 +733,7 @@ export default function InventoryPage() {
                               step="0.01"
                               value={newProduct.purchase_price}
                               onChange={(e) => setNewProduct({ ...newProduct, purchase_price: e.target.value })}
-                              className="bg-slate-700 border-slate-600 text-center"
+                              className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-center transition-colors"
                               placeholder="0.00"
                             />
                           </div>
@@ -750,7 +748,7 @@ export default function InventoryPage() {
                               step="0.01"
                               value={newProduct.selling_price}
                               onChange={(e) => setNewProduct({ ...newProduct, selling_price: e.target.value })}
-                              className="bg-slate-700 border-slate-600 text-center"
+                              className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-center transition-colors"
                               placeholder="0.00"
                             />
                           </div>
@@ -766,7 +764,7 @@ export default function InventoryPage() {
                               onChange={(e) =>
                                 setNewProduct({ ...newProduct, stock: Number.parseInt(e.target.value) || 0 })
                               }
-                              className="bg-slate-700 border-slate-600 text-center"
+                              className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-center transition-colors"
                             />
                           </div>
                           <div className="grid gap-2">
@@ -793,17 +791,17 @@ export default function InventoryPage() {
                             id="description"
                             value={newProduct.description}
                             onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
-                            className="bg-slate-700 border-slate-600 text-right"
+                            className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-right transition-colors"
                             rows={3}
                             placeholder="وصف اختياري للمنتج"
                           />
                         </div>
                       </div>
                       <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={submitting}>
+                        <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} disabled={submitting} className="bg-slate-700/50 border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50 transition-colors">
                           إلغاء
                         </Button>
-                        <Button onClick={handleAddProduct} disabled={submitting}>
+                        <Button onClick={handleAddProduct} disabled={submitting} className="bg-blue-600/80 hover:bg-blue-600 border-blue-500/50 hover:border-blue-500 transition-colors shadow-lg">
                           {submitting ? (
                             <>
                               <Loader2 className="w-4 h-4 ml-2 animate-spin" />
@@ -822,77 +820,78 @@ export default function InventoryPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Search and Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3 lg:gap-4 p-2 sm:p-3 lg:p-4 bg-slate-900/50 rounded-lg border border-slate-700/50">
+                <div className="relative sm:col-span-2 lg:col-span-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-3 w-3 sm:h-4 sm:w-4" />
                   <Input
                     placeholder="البحث بالاسم أو كود الصنف..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-slate-700 border-slate-600 text-white text-right"
+                    className="pl-8 sm:pl-10 bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 transition-colors text-sm sm:text-base h-8 sm:h-9 lg:h-10"
                   />
                 </div>
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
+                  <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 transition-colors text-sm sm:text-base h-8 sm:h-9 lg:h-10">
                     <SelectValue placeholder="جميع الفئات" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
-                    <SelectItem value="all" className="text-right">
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    <SelectItem value="all" className="text-right text-sm sm:text-base">
                       جميع الفئات
                     </SelectItem>
                     {categories.map((category) => (
-                      <SelectItem key={category} value={category} className="text-right">
+                      <SelectItem key={category} value={category} className="text-right text-sm sm:text-base">
                         {category}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <Select value={warehouseFilter} onValueChange={setWarehouseFilter}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
+                  <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 transition-colors text-sm sm:text-base h-8 sm:h-9 lg:h-10">
                     <SelectValue placeholder="جميع المخازن" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
-                    <SelectItem value="all" className="text-right">
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    <SelectItem value="all" className="text-right text-sm sm:text-base">
                       جميع المخازن
                     </SelectItem>
                     {warehouses.map((warehouse) => (
-                      <SelectItem key={warehouse.id} value={warehouse.id} className="text-right">
+                      <SelectItem key={warehouse.id} value={warehouse.id} className="text-right text-sm sm:text-base">
                         {warehouse.name} - {warehouse.warehouse_number}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <Select value={stockFilter} onValueChange={setStockFilter}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
+                  <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 transition-colors text-sm sm:text-base h-8 sm:h-9 lg:h-10">
                     <SelectValue placeholder="جميع الحالات" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
-                    <SelectItem value="all" className="text-right">
+                  <SelectContent className="bg-slate-800 border-slate-700">
+                    <SelectItem value="all" className="text-right text-sm sm:text-base">
                       جميع الحالات
                     </SelectItem>
-                    <SelectItem value="available" className="text-right">
+                    <SelectItem value="available" className="text-right text-sm sm:text-base">
                       متوفر
                     </SelectItem>
-                    <SelectItem value="low" className="text-right">
+                    <SelectItem value="low" className="text-right text-sm sm:text-base">
                       مخزون منخفض
                     </SelectItem>
-                    <SelectItem value="out" className="text-right">
+                    <SelectItem value="out" className="text-right text-sm sm:text-base">
                       نفد المخزون
                     </SelectItem>
                   </SelectContent>
                 </Select>
-                <Button onClick={clearFilters} variant="outline" className="bg-transparent">
-                  <Filter className="w-4 h-4 ml-2" />
-                  مسح الفلاتر
+                <Button onClick={clearFilters} variant="outline" className="bg-slate-700/50 border-slate-600/50 hover:bg-slate-600/50 transition-colors text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 h-8 sm:h-9 lg:h-10">
+                  <Filter className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2" />
+                  <span className="hidden sm:inline">مسح الفلاتر</span>
+                  <span className="sm:hidden">مسح</span>
                 </Button>
               </div>
 
               {/* Products Table */}
-              <div className="overflow-x-auto rounded-lg border border-slate-700">
+              <div className="overflow-x-auto rounded-xl border border-slate-700/50 bg-slate-900/30 backdrop-blur-sm">
                 <Table>
                   <TableHeader>
-                    <TableRow className="border-slate-700 bg-slate-800/50">
-                      <TableHead className="w-12 text-center">
+                    <TableRow className="border-slate-700/50 bg-slate-800/70 hover:bg-slate-800/90 transition-colors">
+                      <TableHead className="w-8 sm:w-12 text-center">
                         <Checkbox
                           checked={selectedProducts.length === paginatedProducts.length && paginatedProducts.length > 0}
                           onCheckedChange={(checked) => {
@@ -902,44 +901,45 @@ export default function InventoryPage() {
                               setSelectedProducts([])
                             }
                           }}
+                          className="h-3 w-3 sm:h-4 sm:w-4"
                         />
                       </TableHead>
-                      <TableHead className="text-slate-300 text-right min-w-[180px]">اسم المنتج</TableHead>
-                      <TableHead className="text-slate-300 text-right min-w-[100px]">كود الصنف</TableHead>
-                      <TableHead className="text-slate-300 text-right min-w-[100px]">العلامة التجارية</TableHead>
-                      <TableHead className="text-slate-300 text-right min-w-[80px]">الموديل</TableHead>
-                      <TableHead className="text-slate-300 text-right min-w-[120px]">الفئة</TableHead>
-                      <TableHead className="text-slate-300 text-right min-w-[100px]">المخزن</TableHead>
-                      <TableHead className="text-slate-300 text-center min-w-[80px]">سعر الشراء</TableHead>
-                      <TableHead className="text-slate-300 text-center min-w-[80px]">سعر البيع</TableHead>
-                      <TableHead className="text-slate-300 text-center min-w-[80px]">المخزون</TableHead>
-                      <TableHead className="text-slate-300 text-center min-w-[100px]">الحالة</TableHead>
-                      <TableHead className="text-slate-300 text-center min-w-[120px]">الإجراءات</TableHead>
+                      <TableHead className="text-slate-300 text-right min-w-[120px] sm:min-w-[180px] text-xs sm:text-sm">اسم المنتج</TableHead>
+                      <TableHead className="text-slate-300 text-right min-w-[80px] sm:min-w-[100px] text-xs sm:text-sm hidden sm:table-cell">كود الصنف</TableHead>
+                      <TableHead className="text-slate-300 text-right min-w-[80px] sm:min-w-[100px] text-xs sm:text-sm hidden md:table-cell">العلامة التجارية</TableHead>
+                      <TableHead className="text-slate-300 text-right min-w-[60px] sm:min-w-[80px] text-xs sm:text-sm hidden lg:table-cell">الموديل</TableHead>
+                      <TableHead className="text-slate-300 text-right min-w-[80px] sm:min-w-[120px] text-xs sm:text-sm hidden md:table-cell">الفئة</TableHead>
+                      <TableHead className="text-slate-300 text-right min-w-[80px] sm:min-w-[100px] text-xs sm:text-sm hidden lg:table-cell">المخزن</TableHead>
+                      <TableHead className="text-slate-300 text-center min-w-[60px] sm:min-w-[80px] text-xs sm:text-sm hidden lg:table-cell">سعر الشراء</TableHead>
+                      <TableHead className="text-slate-300 text-center min-w-[60px] sm:min-w-[80px] text-xs sm:text-sm hidden lg:table-cell">سعر البيع</TableHead>
+                      <TableHead className="text-slate-300 text-center min-w-[60px] sm:min-w-[80px] text-xs sm:text-sm">المخزون</TableHead>
+                      <TableHead className="text-slate-300 text-center min-w-[80px] sm:min-w-[100px] text-xs sm:text-sm">الحالة</TableHead>
+                      <TableHead className="text-slate-300 text-center min-w-[80px] sm:min-w-[120px] text-xs sm:text-sm">الإجراءات</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loading ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-12">
+                        <TableCell colSpan={12} className="text-center py-8 sm:py-12">
                           <div className="flex items-center justify-center gap-2 text-slate-400">
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                            <span>جاري تحميل المنتجات...</span>
+                            <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                            <span className="text-sm sm:text-base">جاري تحميل المنتجات...</span>
                           </div>
                         </TableCell>
                       </TableRow>
                     ) : paginatedProducts.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-12">
+                        <TableCell colSpan={12} className="text-center py-8 sm:py-12">
                           <div className="text-center">
-                            <Package className="w-12 h-12 text-slate-400 mx-auto mb-4" />
-                            <h3 className="text-lg font-medium text-white mb-2">لا توجد منتجات</h3>
-                            <p className="text-slate-400 mb-4">
+                            <Package className="w-8 h-8 sm:w-12 sm:h-12 text-slate-400 mx-auto mb-3 sm:mb-4" />
+                            <h3 className="text-base sm:text-lg font-medium text-white mb-2">لا توجد منتجات</h3>
+                            <p className="text-slate-400 mb-3 sm:mb-4 text-sm sm:text-base">
                               {searchTerm || categoryFilter !== "all" || stockFilter !== "all"
                                 ? "لا توجد منتجات تطابق معايير البحث"
                                 : "ابدأ بإضافة منتجات جديدة"}
                             </p>
                             {(searchTerm || categoryFilter !== "all" || stockFilter !== "all") && (
-                              <Button onClick={clearFilters} variant="outline" className="bg-transparent">
+                              <Button onClick={clearFilters} variant="outline" className="bg-slate-700/50 border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50 transition-colors text-xs sm:text-sm">
                                 مسح الفلاتر
                               </Button>
                             )}
@@ -952,7 +952,7 @@ export default function InventoryPage() {
                         const StatusIcon = status.icon
                         const warehouse = warehouses.find(w => w.id === product.warehouse_id)
                         return (
-                          <TableRow key={product.id} className="border-slate-700 hover:bg-slate-800/30">
+                          <TableRow key={product.id} className={`border-slate-700/50 hover:bg-slate-800/50 transition-colors ${status.label === 'نفد المخزون' ? 'bg-red-500/10' : status.label === 'مخزون منخفض' ? 'bg-orange-500/10' : 'bg-slate-900/20'}`}>
                             <TableCell className="text-center">
                               <Checkbox
                                 checked={selectedProducts.includes(product.id)}
@@ -963,57 +963,65 @@ export default function InventoryPage() {
                                     setSelectedProducts(selectedProducts.filter((id) => id !== product.id))
                                   }
                                 }}
+                                className="h-3 w-3 sm:h-4 sm:w-4"
                               />
                             </TableCell>
-                            <TableCell className="text-white font-medium text-right py-4">
+                            <TableCell className="text-white font-medium text-right py-2 sm:py-4">
                               <div>
-                                <div className="font-medium">{product.name}</div>
+                                <div className="font-medium text-xs sm:text-sm lg:text-base">{product.name}</div>
                                 {product.description && (
-                                  <div className="text-sm text-slate-400 mt-1">{product.description}</div>
+                                  <div className="text-xs sm:text-sm text-slate-400 mt-1">{product.description}</div>
                                 )}
+                                {/* Show hidden info on mobile */}
+                                <div className="sm:hidden mt-1 space-y-1">
+                                  <div className="text-xs text-blue-400 font-mono">{product.item_code || '-'}</div>
+                                  <div className="text-xs text-slate-400">{product.category}</div>
+                                </div>
                               </div>
                             </TableCell>
-                            <TableCell className="text-slate-300 text-right py-4">
-                              <span className="font-mono text-blue-400">{product.item_code || '-'}</span>
+                            <TableCell className="text-slate-300 text-right py-2 sm:py-4 hidden sm:table-cell">
+                              <span className="font-mono text-blue-400 text-xs sm:text-sm">{product.item_code || '-'}</span>
                             </TableCell>
-                            <TableCell className="text-slate-300 text-right py-4">{product.brand}</TableCell>
-                            <TableCell className="text-slate-300 text-right py-4">{product.model}</TableCell>
-                            <TableCell className="text-slate-300 text-right py-4">{product.category}</TableCell>
-                            <TableCell className="text-slate-300 text-right py-4">
+                            <TableCell className="text-slate-300 text-right py-2 sm:py-4 hidden md:table-cell text-xs sm:text-sm">{product.brand}</TableCell>
+                            <TableCell className="text-slate-300 text-right py-2 sm:py-4 hidden lg:table-cell text-xs sm:text-sm">{product.model}</TableCell>
+                            <TableCell className="text-slate-300 text-right py-2 sm:py-4 hidden md:table-cell text-xs sm:text-sm">{product.category}</TableCell>
+                            <TableCell className="text-slate-300 text-right py-2 sm:py-4 hidden lg:table-cell text-xs sm:text-sm">
                               {warehouse ? `${warehouse.name} - ${warehouse.warehouse_number}` : '-'}
                             </TableCell>
-                            <TableCell className="text-center py-4">
-                              <span className="text-blue-400 font-medium">
+                            <TableCell className="text-center py-2 sm:py-4 hidden lg:table-cell">
+                              <span className="text-blue-400 font-medium text-xs sm:text-sm">
                                 {product.purchase_price ? `${Number(product.purchase_price).toLocaleString()} ج.م` : '-'}
                               </span>
                             </TableCell>
-                            <TableCell className="text-center py-4">
-                              <span className="text-green-400 font-medium">
+                            <TableCell className="text-center py-2 sm:py-4 hidden lg:table-cell">
+                              <span className="text-green-400 font-medium text-xs sm:text-sm">
                                 {product.selling_price ? `${Number(product.selling_price).toLocaleString()} ج.م` : '-'}
                               </span>
                             </TableCell>
-                            <TableCell className="text-center py-4">
-                              <div className="flex items-center justify-center gap-2">
-                                <span className={`${status.color} font-medium`}>{product.stock.toLocaleString()}</span>
+                            <TableCell className="text-center py-2 sm:py-4">
+                              <div className="flex items-center justify-center gap-1 sm:gap-2">
+                                <span className={`${status.color} font-medium text-xs sm:text-sm`}>{product.stock.toLocaleString()}</span>
                                 {product.stock <= (product.min_stock || product.minStock) && product.stock > 0 && (
-                                  <AlertTriangle className="w-4 h-4 text-orange-400" />
+                                  <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4 text-orange-400" />
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="text-center py-4">
-                              <Badge variant={status.variant} className="flex items-center gap-1 w-fit mx-auto">
-                                <StatusIcon className="w-3 h-3" />
-                                {status.label}
+                            <TableCell className="text-center py-2 sm:py-4">
+                              <Badge variant={status.variant} className="flex items-center gap-1 w-fit mx-auto text-xs">
+                                <StatusIcon className="w-2 h-2 sm:w-3 sm:h-3" />
+                                <span className="hidden sm:inline">{status.label}</span>
+                                <span className="sm:hidden">{status.label === 'متوفر' ? 'متوفر' : status.label === 'مخزون منخفض' ? 'منخفض' : 'نفد'}</span>
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-center py-4">
-                              <div className="flex gap-2 justify-center">
+                            <TableCell className="text-center py-2 sm:py-4">
+                              <div className="flex gap-1 sm:gap-2 justify-center">
                                 {canEditProduct(product) && (
                                   <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
                                     <DialogTrigger asChild>
                                       <Button
                                         variant="outline"
                                         size="sm"
+                                        className="bg-slate-700/50 border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50 transition-colors h-6 w-6 sm:h-8 sm:w-8 p-0"
                                         onClick={() => {
                                           setEditingProduct({
                                             ...product,
@@ -1023,11 +1031,11 @@ export default function InventoryPage() {
                                           setIsEditDialogOpen(true)
                                         }}
                                       >
-                                        <Edit className="w-4 h-4" />
+                                        <Edit className="w-3 h-3 sm:w-4 sm:h-4" />
                                       </Button>
                                     </DialogTrigger>
                                   <DialogContent
-                                    className="bg-slate-800 border-slate-700 text-white max-w-2xl"
+                                    className="bg-slate-800/95 border-slate-700/50 text-white max-w-2xl backdrop-blur-sm shadow-2xl"
                                     dir="rtl"
                                   >
                                     <DialogHeader>
@@ -1060,7 +1068,7 @@ export default function InventoryPage() {
                                             onChange={(e) =>
                                               setEditingProduct({ ...editingProduct, name: e.target.value })
                                             }
-                                            className="bg-slate-700 border-slate-600 text-right"
+                                            className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-right transition-colors"
                                           />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
@@ -1074,7 +1082,7 @@ export default function InventoryPage() {
                                               onChange={(e) =>
                                                 setEditingProduct({ ...editingProduct, brand: e.target.value })
                                               }
-                                              className="bg-slate-700 border-slate-600 text-right"
+                                              className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-right transition-colors"
                                             />
                                           </div>
                                           <div className="grid gap-2">
@@ -1087,7 +1095,7 @@ export default function InventoryPage() {
                                               onChange={(e) =>
                                                 setEditingProduct({ ...editingProduct, model: e.target.value })
                                               }
-                                              className="bg-slate-700 border-slate-600 text-right"
+                                              className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-right transition-colors"
                                             />
                                           </div>
                                         </div>
@@ -1101,10 +1109,10 @@ export default function InventoryPage() {
                                               setEditingProduct({ ...editingProduct, category: value })
                                             }
                                           >
-                                            <SelectTrigger className="bg-slate-700 border-slate-600 text-right">
+                                            <SelectTrigger className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 text-right transition-colors">
                                               <SelectValue />
                                             </SelectTrigger>
-                                            <SelectContent className="bg-slate-700 border-slate-600">
+                                            <SelectContent className="bg-slate-800 border-slate-700">
                                               {categories.map((category) => (
                                                 <SelectItem key={category} value={category} className="text-right">
                                                   {category}
@@ -1124,12 +1132,12 @@ export default function InventoryPage() {
                                               onChange={(e) =>
                                                 setEditingProduct({ ...editingProduct, item_code: e.target.value })
                                               }
-                                              className="bg-slate-700 border-slate-600 text-right font-mono"
+                                              className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-right font-mono transition-colors"
                                             />
                                           </div>
                                           <div className="grid gap-2">
                                             <Label htmlFor="edit-warehouse" className="text-right">
-                                              المخزن
+                                              المخزون
                                             </Label>
                                             <Select
                                               value={editingProduct.warehouse_id || ''}
@@ -1137,10 +1145,10 @@ export default function InventoryPage() {
                                                 setEditingProduct({ ...editingProduct, warehouse_id: value })
                                               }
                                             >
-                                              <SelectTrigger className="bg-slate-700 border-slate-600 text-right">
+                                              <SelectTrigger className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 text-right transition-colors">
                                                 <SelectValue />
                                               </SelectTrigger>
-                                              <SelectContent className="bg-slate-700 border-slate-600">
+                                              <SelectContent className="bg-slate-800 border-slate-700">
                                                 {warehouses.map((warehouse) => (
                                                   <SelectItem key={warehouse.id} value={warehouse.id} className="text-right">
                                                     {warehouse.name} - {warehouse.warehouse_number}
@@ -1163,7 +1171,7 @@ export default function InventoryPage() {
                                               onChange={(e) =>
                                                 setEditingProduct({ ...editingProduct, purchase_price: e.target.value ? parseFloat(e.target.value) : null })
                                               }
-                                              className="bg-slate-700 border-slate-600 text-center"
+                                              className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-center transition-colors"
                                               placeholder="0.00"
                                             />
                                           </div>
@@ -1179,7 +1187,7 @@ export default function InventoryPage() {
                                               onChange={(e) =>
                                                 setEditingProduct({ ...editingProduct, selling_price: e.target.value ? parseFloat(e.target.value) : null })
                                               }
-                                              className="bg-slate-700 border-slate-600 text-center"
+                                              className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-center transition-colors"
                                               placeholder="0.00"
                                             />
                                           </div>
@@ -1200,7 +1208,7 @@ export default function InventoryPage() {
                                                   stock: Number.parseInt(e.target.value) || 0,
                                                 })
                                               }
-                                              className="bg-slate-700 border-slate-600 text-center"
+                                              className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-center transition-colors"
                                             />
                                           </div>
                                           <div className="grid gap-2">
@@ -1219,7 +1227,7 @@ export default function InventoryPage() {
                                                   min_stock: Number.parseInt(e.target.value) || 0,
                                                 })
                                               }
-                                              className="bg-slate-700 border-slate-600 text-center"
+                                              className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-center transition-colors"
                                             />
                                           </div>
                                         </div>
@@ -1233,7 +1241,7 @@ export default function InventoryPage() {
                                             onChange={(e) =>
                                               setEditingProduct({ ...editingProduct, description: e.target.value })
                                             }
-                                            className="bg-slate-700 border-slate-600 text-right"
+                                            className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-right transition-colors"
                                             rows={3}
                                           />
                                         </div>
@@ -1244,10 +1252,11 @@ export default function InventoryPage() {
                                         variant="outline"
                                         onClick={() => setEditingProduct(null)}
                                         disabled={submitting}
+                                        className="bg-slate-700/50 border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50 transition-colors"
                                       >
                                         إلغاء
                                       </Button>
-                                      <Button onClick={handleEditProduct} disabled={submitting}>
+                                      <Button onClick={handleEditProduct} disabled={submitting} className="bg-blue-600/80 hover:bg-blue-600 border-blue-500/50 hover:border-blue-500 transition-colors shadow-lg">
                                         {submitting ? (
                                           <>
                                             <Loader2 className="w-4 h-4 ml-2 animate-spin" />
@@ -1266,13 +1275,13 @@ export default function InventoryPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => handleDeleteProduct(product.id, product.name)}
-                                    className="text-red-400 hover:text-red-300 hover:border-red-400"
+                                    className="bg-red-900/20 border-red-700/50 text-red-400 hover:bg-red-900/30 hover:text-red-300 hover:border-red-600/50 transition-colors h-6 w-6 sm:h-8 sm:w-8 p-0"
                                   >
-                                    <Trash2 className="w-4 h-4" />
+                                    <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
                                   </Button>
                                 )}
                                 {!canEditProduct(product) && (
-                                  <span className="text-slate-500 text-sm">عرض فقط</span>
+                                  <span className="text-slate-500 text-xs sm:text-sm">عرض فقط</span>
                                 )}
                               </div>
                             </TableCell>
@@ -1284,19 +1293,33 @@ export default function InventoryPage() {
                 </Table>
               </div>
 
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex justify-center mt-6">
+              {/* Page size + Pagination */}
+              <div className="flex flex-col sm:flex-row items-center justify-between mt-4 sm:mt-6 gap-3">
+                <div className="flex items-center gap-2 text-slate-300">
+                  <span className="text-xs sm:text-sm">عدد العناصر في الصفحة:</span>
+                  <Select value={String(itemsPerPage)} onValueChange={(v) => setItemsPerPage(Number(v))}>
+                    <SelectTrigger className="w-[80px] sm:w-[110px] bg-slate-700/50 border-slate-600/50 hover:bg-slate-700/70 transition-colors text-xs sm:text-sm h-8 sm:h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-700">
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="25">25</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                      <SelectItem value="100">100</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="w-full sm:w-auto">
                   <Pagination
                     currentPage={currentPage}
                     totalPages={totalPages}
                     onPageChange={setCurrentPage}
                     showInfo={true}
                     totalItems={filteredProducts.length}
-                    itemsPerPage={ITEMS_PER_PAGE}
+                    itemsPerPage={itemsPerPage}
                   />
                 </div>
-              )}
+              </div>
             </CardContent>
           </Card>
         </div>

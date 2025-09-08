@@ -60,30 +60,30 @@ export function Pagination({
   const endItem = Math.min(currentPage * itemsPerPage, totalItems)
 
   return (
-    <div className={cn("flex flex-col items-center gap-4", className)}>
+    <div className={cn("flex flex-col items-center gap-2 sm:gap-4", className)}>
       {showInfo && totalItems > 0 && (
-        <div className="text-sm text-slate-400 text-center">
+        <div className="text-xs sm:text-sm text-slate-400 text-center">
           عرض {startItem} إلى {endItem} من أصل {totalItems} عنصر
         </div>
       )}
 
-      <div className="flex items-center justify-center space-x-2 space-x-reverse">
+      <div className="flex items-center justify-center space-x-1 sm:space-x-2 space-x-reverse">
         <Button
           variant="outline"
           size="sm"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600 disabled:opacity-50"
+          className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600 disabled:opacity-50 h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm"
         >
-          <ChevronRight className="h-4 w-4" />
-          السابق
+          <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+          <span className="hidden sm:inline">السابق</span>
         </Button>
 
         {pages.map((page, index) => {
           if (page === "ellipsis-start" || page === "ellipsis-end") {
             return (
-              <Button key={index} variant="ghost" size="sm" disabled className="text-slate-400">
-                <MoreHorizontal className="h-4 w-4" />
+              <Button key={index} variant="ghost" size="sm" disabled className="text-slate-400 h-7 sm:h-8 w-7 sm:w-8 p-0">
+                <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             )
           }
@@ -95,7 +95,7 @@ export function Pagination({
               size="sm"
               onClick={() => onPageChange(page as number)}
               className={cn(
-                "min-w-[40px]",
+                "min-w-[28px] sm:min-w-[40px] h-7 sm:h-8 text-xs sm:text-sm",
                 currentPage === page
                   ? "bg-primary text-primary-foreground hover:bg-primary/90"
                   : "bg-slate-700 border-slate-600 text-white hover:bg-slate-600",
@@ -111,10 +111,10 @@ export function Pagination({
           size="sm"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600 disabled:opacity-50"
+          className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600 disabled:opacity-50 h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm"
         >
-          التالي
-          <ChevronLeft className="h-4 w-4" />
+          <span className="hidden sm:inline">التالي</span>
+          <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
         </Button>
       </div>
     </div>

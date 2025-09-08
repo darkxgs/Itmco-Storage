@@ -2,6 +2,166 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Responsive Design Utilities */
+@layer utilities {
+  /* Container utilities for responsive layouts */
+  .container-responsive {
+    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  /* Responsive grid utilities */
+  .grid-responsive {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6;
+  }
+  
+  .grid-responsive-2 {
+    @apply grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6;
+  }
+  
+  .grid-responsive-cards {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+  }
+  
+  /* Responsive text utilities */
+  .text-responsive-sm {
+    @apply text-xs sm:text-sm;
+  }
+  
+  .text-responsive-base {
+    @apply text-sm sm:text-base;
+  }
+  
+  .text-responsive-lg {
+    @apply text-base sm:text-lg lg:text-xl;
+  }
+  
+  .text-responsive-xl {
+    @apply text-lg sm:text-xl lg:text-2xl xl:text-3xl;
+  }
+  
+  /* Responsive spacing utilities */
+  .spacing-responsive {
+    @apply p-4 sm:p-6 lg:p-8;
+  }
+  
+  .spacing-responsive-sm {
+    @apply p-2 sm:p-4 lg:p-6;
+  }
+  
+  /* Auto zoom-out for content overflow */
+  .auto-zoom-container {
+    @apply min-w-0 overflow-x-auto;
+    transform-origin: top left;
+  }
+  
+  /* Ensure content fits by allowing horizontal scroll and zoom */
+  .fit-content {
+    @apply min-w-fit;
+  }
+  
+  /* Responsive table utilities */
+  .table-responsive {
+    @apply w-full overflow-x-auto;
+  }
+  
+  .table-responsive table {
+    @apply min-w-full;
+  }
+  
+  /* Mobile-first responsive utilities */
+  .mobile-stack {
+    @apply flex flex-col sm:flex-row;
+  }
+  
+  .mobile-full {
+    @apply w-full sm:w-auto;
+  }
+  
+  /* Responsive sidebar utilities */
+  .sidebar-responsive {
+    @apply w-full sm:w-64 lg:w-72;
+  }
+  
+  /* Responsive card utilities */
+  .card-responsive {
+    @apply w-full max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-xl;
+  }
+  
+  /* Responsive form utilities */
+  .form-responsive {
+    @apply w-full max-w-md mx-auto;
+  }
+  
+  .form-group-responsive {
+    @apply flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4;
+  }
+  
+  /* Responsive button utilities */
+  .btn-responsive {
+    @apply w-full sm:w-auto px-4 py-2 text-sm sm:text-base;
+  }
+  
+  /* Responsive chart utilities */
+  .chart-responsive {
+    @apply w-full h-64 sm:h-80 lg:h-96;
+  }
+  
+  /* Responsive modal utilities */
+  .modal-responsive {
+    @apply w-full max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-2xl mx-4;
+  }
+}
+
+/* Custom media queries for specific device targeting */
+@media (max-width: 480px) {
+  /* iPhone and small mobile devices */
+  .mobile-compact {
+    padding: 0.5rem !important;
+  }
+  
+  .mobile-text-sm {
+    font-size: 0.75rem !important;
+  }
+  
+  .mobile-hide {
+    display: none !important;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  /* iPad portrait and large mobile devices */
+  .tablet-compact {
+    padding: 1rem !important;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* iPad landscape and small laptops */
+  .laptop-compact {
+    padding: 1.5rem !important;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1440px) {
+  /* Standard laptops - fix zoom issues */
+  .laptop-standard {
+    zoom: 1 !important;
+    transform: scale(1) !important;
+  }
+  
+  body {
+    zoom: 1 !important;
+  }
+}
+
+@media (min-width: 1441px) {
+  /* Desktop and large screens */
+  .desktop-expanded {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+}
+
 @layer base {
   :root {
     --background: 222.2 84% 4.9%;
@@ -115,6 +275,95 @@
 
 [dir="rtl"] .switch-thumb {
   transform: translateX(-2px);
+}
+
+.switch-root[data-state="checked"] .switch-thumb {
+  transform: translateX(18px);
+}
+
+[dir="rtl"] .switch-root[data-state="checked"] .switch-thumb {
+  transform: translateX(-18px);
+}
+
+/* Auto zoom-out for pages that don't fit */
+@media screen and (max-width: 1200px) {
+  body {
+    zoom: 0.9;
+    transform-origin: top left;
+  }
+}
+
+@media screen and (max-width: 1024px) {
+  body {
+    zoom: 0.85;
+    transform-origin: top left;
+  }
+}
+
+@media screen and (max-width: 768px) {
+  body {
+    zoom: 0.8;
+    transform-origin: top left;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  body {
+    zoom: 0.75;
+  }
+}
+
+@media screen and (max-width: 360px) {
+  body {
+    zoom: 0.65;
+  }
+}
+
+/* Ensure minimum content width for zoom calculations */
+body {
+  min-width: 320px;
+  overflow-x: auto;
+}
+
+/* Alternative approach using CSS transform for better browser support */
+@media screen and (max-width: 1200px) {
+  .page-container {
+    transform: scale(0.9);
+    transform-origin: top left;
+    width: 111.11%; /* 100% / 0.9 */
+  }
+}
+
+@media screen and (max-width: 1024px) {
+  .page-container {
+    transform: scale(0.85);
+    transform-origin: top left;
+    width: 117.65%; /* 100% / 0.85 */
+  }
+}
+
+@media screen and (max-width: 768px) {
+  .page-container {
+    transform: scale(0.8);
+    transform-origin: top left;
+    width: 125%; /* 100% / 0.8 */
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .page-container {
+    transform: scale(0.75);
+    transform-origin: top left;
+    width: 133.33%; /* 100% / 0.75 */
+  }
+}
+
+@media screen and (max-width: 360px) {
+  .page-container {
+    transform: scale(0.65);
+    transform-origin: top left;
+    width: 153.85%; /* 100% / 0.65 */
+  }
 }
 
 .switch-root[data-state="checked"] .switch-thumb {

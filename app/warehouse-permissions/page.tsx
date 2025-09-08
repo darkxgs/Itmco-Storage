@@ -185,7 +185,9 @@ export default function WarehousePermissionsPage() {
   if (!isAdmin) {
     return (
       <ErrorBoundary>
-        <div className="flex min-h-screen bg-slate-900 items-center justify-center">
+        <div className="flex min-h-screen bg-slate-950 relative overflow-hidden items-center justify-center">
+          {/* Decorative background */}
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.12),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.1),transparent_60%)]" />
           <Card className="w-full max-w-md bg-slate-800 border-slate-700">
             <CardHeader className="text-center">
               <Shield className="h-12 w-12 text-red-500 mx-auto mb-4" />
@@ -202,9 +204,11 @@ export default function WarehousePermissionsPage() {
 
   return (
     <ErrorBoundary>
-      <div className="flex min-h-screen bg-slate-900" dir="rtl">
+      <div className="flex min-h-screen bg-slate-950 relative overflow-hidden" dir="rtl">
+        {/* Decorative background */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.12),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.1),transparent_60%)]" />
         <Sidebar />
-        <div className="flex-1 p-6">
+        <div className="flex-1 p-6 relative">
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-2">
               <Shield className="h-8 w-8 text-blue-400" />

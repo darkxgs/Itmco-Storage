@@ -579,9 +579,11 @@ export default function IssuancePage() {
 
   if (!user || !["admin", "engineer"].includes(user.role)) {
     return (
-      <div className="flex min-h-screen bg-slate-900" dir="rtl">
+      <div className="flex min-h-screen bg-slate-950 relative overflow-hidden" dir="rtl">
+        {/* Decorative background */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.12),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.1),transparent_60%)]" />
         <Sidebar />
-        <div className="flex-1 p-6 flex items-center justify-center">
+        <div className="flex-1 p-6 flex items-center justify-center relative">
           <div className="text-center text-white">
             <h1 className="text-2xl font-bold mb-4">غير مخول للوصول</h1>
             <p>ليس لديك صلاحية للوصول إلى هذه الصفحة</p>
@@ -592,9 +594,11 @@ export default function IssuancePage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-900" dir="rtl">
+    <div className="flex min-h-screen bg-slate-950 relative overflow-hidden" dir="rtl">
+      {/* Decorative background */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.12),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.1),transparent_60%)]" />
       <Sidebar />
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 relative">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">إصدار المنتجات</h1>
           <p className="text-slate-300">إصدار المنتجات للعملاء والفروع</p>
@@ -745,13 +749,13 @@ export default function IssuancePage() {
                       max={selectedProduct ? getAvailableStock(selectedProduct) : 1}
                       value={quantity}
                       onChange={(e) => setQuantity(Number.parseInt(e.target.value) || 1)}
-                      className="bg-slate-700 border-slate-600 text-white text-center flex-1"
+                      className="bg-slate-700/50 border-slate-600/50 text-white text-center flex-1 focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                     />
                     <Button
                       type="button"
                       onClick={addProductToList}
                       disabled={!selectedProduct || quantity <= 0}
-                      className="bg-green-600 hover:bg-green-700 px-4"
+                      className="bg-green-900/20 border border-green-700/50 text-green-400 hover:bg-green-900/30 hover:border-green-600/50 hover:text-green-300 transition-all duration-200 px-4"
                     >
                       <Plus className="w-4 h-4 ml-1" />
                       إضافة
@@ -788,7 +792,7 @@ export default function IssuancePage() {
                               max={product.stock}
                               value={product.quantity}
                               onChange={(e) => updateProductQuantity(product.id, Number.parseInt(e.target.value) || 1)}
-                              className="bg-slate-600 border-slate-500 text-white text-center w-16"
+                              className="bg-slate-700/50 border-slate-600/50 text-white text-center w-16 focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                             />
                             <Button
                               type="button"
@@ -810,10 +814,10 @@ export default function IssuancePage() {
                     العميل
                   </Label>
                   <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
+                    <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
                       <SelectValue placeholder="اختر العميل" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-700 border-slate-600">
+                    <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
                       {customers.map((customer) => (
                         <SelectItem key={customer.id} value={customer.id.toString()}>
                           {customer.name}
@@ -832,7 +836,7 @@ export default function IssuancePage() {
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
                     placeholder="أدخل اسم العميل يدوياً"
-                    className="bg-slate-700 border-slate-600 text-white text-right"
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                     disabled={!!selectedCustomer}
                   />
                 </div>
@@ -842,10 +846,10 @@ export default function IssuancePage() {
                     الفرع
                   </Label>
                   <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
+                    <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
                       <SelectValue placeholder="اختر الفرع" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-700 border-slate-600">
+                    <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
                       {branches.map((branch) => (
                         <SelectItem key={branch.id} value={branch.id.toString()}>
                           {branch.name}
@@ -860,10 +864,10 @@ export default function IssuancePage() {
                     المخزن (اختياري)
                   </Label>
                   <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
+                    <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
                       <SelectValue placeholder="اختر المخزن" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-700 border-slate-600">
+                    <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
                       <SelectItem value="none">بدون مخزن</SelectItem>
                       {warehouses.map((warehouse) => (
                         <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
@@ -883,7 +887,7 @@ export default function IssuancePage() {
                     value={engineer}
                     onChange={(e) => setEngineer(e.target.value)}
                     placeholder="أدخل اسم المهندس"
-                    className="bg-slate-700 border-slate-600 text-white text-right"
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                   />
                 </div>
 
@@ -896,7 +900,7 @@ export default function IssuancePage() {
                     value={serialNumber}
                     onChange={(e) => setSerialNumber(e.target.value)}
                     placeholder="أدخل الرقم التسلسلي"
-                    className="bg-slate-700 border-slate-600 text-white text-right"
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                   />
                 </div>
 
@@ -909,7 +913,7 @@ export default function IssuancePage() {
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="أدخل أي ملاحظات إضافية"
-                    className="bg-slate-700 border-slate-600 text-white text-right"
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                     rows={3}
                   />
                 </div>
@@ -941,7 +945,7 @@ export default function IssuancePage() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="البحث في العميل، المهندس، أو الرقم التسلسلي"
-                  className="bg-slate-700 border-slate-600 text-white text-right"
+                  className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                 />
               </div>
               
@@ -953,7 +957,7 @@ export default function IssuancePage() {
                     value={itemCodeSearch}
                     onChange={(e) => setItemCodeSearch(e.target.value)}
                     placeholder="أدخل كود المنتج للبحث (مثل: ITM-06)"
-                    className="bg-slate-700 border-slate-600 text-white text-right"
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                     onKeyPress={(e) => {
                       if (e.key === 'Enter' && filteredItemCodes.length === 1) {
                         selectItemByCode(filteredItemCodes[0])
@@ -994,10 +998,10 @@ export default function IssuancePage() {
               <div>
                 <Label className="text-slate-300 text-right">فلترة بالفرع</Label>
                 <Select value={filterBranch} onValueChange={setFilterBranch}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
+                  <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
                     <SelectValue placeholder="جميع الفروع" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
                     <SelectItem value="all">جميع الفروع</SelectItem>
                     {branches.map((branch) => (
                       <SelectItem key={branch.id} value={branch.id.toString()}>
@@ -1011,10 +1015,10 @@ export default function IssuancePage() {
               <div>
                 <Label className="text-slate-300 text-right">فلترة بالعميل</Label>
                 <Select value={filterCustomer} onValueChange={setFilterCustomer}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
+                  <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
                     <SelectValue placeholder="جميع العملاء" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
                     <SelectItem value="all">جميع العملاء</SelectItem>
                     {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id.toString()}>
@@ -1028,10 +1032,10 @@ export default function IssuancePage() {
               <div>
                 <Label className="text-slate-300 text-right">فلترة بالمخزن</Label>
                 <Select value={filterWarehouse} onValueChange={setFilterWarehouse}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
+                  <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
                     <SelectValue placeholder="جميع المخازن" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
+                  <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
                     <SelectItem value="all">جميع المخازن</SelectItem>
                     {warehouses.map((warehouse) => (
                       <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
@@ -1098,7 +1102,7 @@ export default function IssuancePage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleEditIssuance(issuance)}
-                                className="bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+                                className="bg-blue-900/20 border-blue-700/50 text-blue-400 hover:bg-blue-900/30 hover:border-blue-600/50 hover:text-blue-300 transition-all duration-200"
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
@@ -1107,12 +1111,12 @@ export default function IssuancePage() {
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="bg-red-600 hover:bg-red-700 text-white border-red-600"
+                                    className="bg-red-900/20 border-red-700/50 text-red-400 hover:bg-red-900/30 hover:border-red-600/50 hover:text-red-300 transition-all duration-200"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
                                 </AlertDialogTrigger>
-                                <AlertDialogContent className="bg-slate-800 border-slate-700">
+                                <AlertDialogContent className="bg-slate-800/95 border-slate-700/50 backdrop-blur-sm shadow-2xl">
                                   <AlertDialogHeader>
                                     <AlertDialogTitle className="text-white text-right">تأكيد الحذف</AlertDialogTitle>
                                     <AlertDialogDescription className="text-slate-300 text-right">
@@ -1120,15 +1124,15 @@ export default function IssuancePage() {
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
-                                    <AlertDialogCancel className="bg-slate-700 text-white border-slate-600">
-                                      إلغاء
-                                    </AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => handleDeleteIssuance(issuance)}
-                                      className="bg-red-600 hover:bg-red-700"
-                                    >
-                                      حذف
-                                    </AlertDialogAction>
+                                    <AlertDialogCancel className="bg-slate-700/50 text-white border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50 transition-colors">
+                                    إلغاء
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteIssuance(issuance)}
+                                    className="bg-red-900/20 border border-red-700/50 text-red-400 hover:bg-red-900/30 hover:border-red-600/50 hover:text-red-300 transition-all duration-200"
+                                  >
+                                    حذف
+                                  </AlertDialogAction>
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
@@ -1146,7 +1150,7 @@ export default function IssuancePage() {
 
         {/* Edit Dialog */}
         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-2xl" dir="rtl">
+          <DialogContent className="bg-slate-800/95 border-slate-700/50 text-white max-w-2xl backdrop-blur-sm shadow-2xl" dir="rtl">
             <DialogHeader>
               <DialogTitle className="text-right">تعديل الإصدار</DialogTitle>
             </DialogHeader>
@@ -1156,10 +1160,10 @@ export default function IssuancePage() {
                   المنتج
                 </Label>
                 <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
-                    <SelectValue placeholder="اختر المنتج" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
+                    <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
+                      <SelectValue placeholder="اختر المنتج" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
                     {products.map((product) => (
                       <SelectItem key={product.id} value={product.id.toString()}>
                         <div className="flex justify-between items-center w-full">
@@ -1181,13 +1185,13 @@ export default function IssuancePage() {
                   الكمية
                 </Label>
                 <Input
-                  id="edit-quantity"
-                  type="number"
-                  min="1"
-                  value={quantity}
-                  onChange={(e) => setQuantity(Number.parseInt(e.target.value) || 1)}
-                  className="bg-slate-700 border-slate-600 text-white text-right"
-                />
+                    id="edit-quantity"
+                    type="number"
+                    min="1"
+                    value={quantity}
+                    onChange={(e) => setQuantity(Number.parseInt(e.target.value) || 1)}
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                  />
               </div>
 
               <div className="grid gap-2">
@@ -1195,10 +1199,10 @@ export default function IssuancePage() {
                   العميل
                 </Label>
                 <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
-                    <SelectValue placeholder="اختر العميل" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
+                    <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
+                      <SelectValue placeholder="اختر العميل" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
                     {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id.toString()}>
                         {customer.name}
@@ -1213,13 +1217,13 @@ export default function IssuancePage() {
                   اسم العميل (يدوي)
                 </Label>
                 <Input
-                  id="edit-customer"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  placeholder="أدخل اسم العميل يدوياً"
-                  className="bg-slate-700 border-slate-600 text-white text-right"
-                  disabled={!!selectedCustomer}
-                />
+                    id="edit-customer"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    placeholder="أدخل اسم العميل يدوياً"
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                    disabled={!!selectedCustomer}
+                  />
               </div>
 
               <div className="grid gap-2">
@@ -1227,10 +1231,10 @@ export default function IssuancePage() {
                   الفرع
                 </Label>
                 <Select value={selectedBranch} onValueChange={setSelectedBranch}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
-                    <SelectValue placeholder="اختر الفرع" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
+                    <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
+                      <SelectValue placeholder="اختر الفرع" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
                     {branches.map((branch) => (
                       <SelectItem key={branch.id} value={branch.id.toString()}>
                         {branch.name}
@@ -1245,10 +1249,10 @@ export default function IssuancePage() {
                   المخزن
                 </Label>
                 <Select value={selectedWarehouse} onValueChange={setSelectedWarehouse}>
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-right">
-                    <SelectValue placeholder="اختر المخزن" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-700 border-slate-600">
+                    <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
+                      <SelectValue placeholder="اختر المخزن" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
                     {warehouses.map((warehouse) => (
                       <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
                         {warehouse.name} - {warehouse.warehouse_number}
@@ -1263,12 +1267,12 @@ export default function IssuancePage() {
                   المهندس المستلم
                 </Label>
                 <Input
-                  id="edit-engineer"
-                  value={engineer}
-                  onChange={(e) => setEngineer(e.target.value)}
-                  placeholder="أدخل اسم المهندس"
-                  className="bg-slate-700 border-slate-600 text-white text-right"
-                />
+                    id="edit-engineer"
+                    value={engineer}
+                    onChange={(e) => setEngineer(e.target.value)}
+                    placeholder="أدخل اسم المهندس"
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                  />
               </div>
 
               <div className="grid gap-2">
@@ -1276,12 +1280,12 @@ export default function IssuancePage() {
                   الرقم التسلسلي
                 </Label>
                 <Input
-                  id="edit-serial"
-                  value={serialNumber}
-                  onChange={(e) => setSerialNumber(e.target.value)}
-                  placeholder="أدخل الرقم التسلسلي"
-                  className="bg-slate-700 border-slate-600 text-white text-right"
-                />
+                    id="edit-serial"
+                    value={serialNumber}
+                    onChange={(e) => setSerialNumber(e.target.value)}
+                    placeholder="أدخل الرقم التسلسلي"
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                  />
               </div>
 
               <div className="grid gap-2">
@@ -1289,13 +1293,13 @@ export default function IssuancePage() {
                   ملاحظات (اختياري)
                 </Label>
                 <Textarea
-                  id="edit-notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="أدخل أي ملاحظات إضافية"
-                  className="bg-slate-700 border-slate-600 text-white text-right"
-                  rows={3}
-                />
+                    id="edit-notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="أدخل أي ملاحظات إضافية"
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                    rows={3}
+                  />
               </div>
 
               <div className="flex justify-end gap-2 pt-4">
@@ -1304,7 +1308,7 @@ export default function IssuancePage() {
                   variant="outline"
                   onClick={() => setIsEditDialogOpen(false)}
                   disabled={submitting}
-                  className="bg-transparent"
+                  className="bg-slate-700/50 border-slate-600/50 text-slate-300 hover:bg-slate-600/50 hover:border-slate-500/50 hover:text-white transition-all duration-200"
                 >
                   إلغاء
                 </Button>

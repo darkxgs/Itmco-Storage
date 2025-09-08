@@ -369,9 +369,11 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-900" dir="rtl">
+    <div className="flex min-h-screen bg-slate-950 relative overflow-hidden" dir="rtl">
+      {/* Decorative background */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.12),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.1),transparent_60%)]" />
       <Sidebar />
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 relative">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">إدارة المستخدمين</h1>
           <p className="text-slate-300">إضافة وتعديل وحذف حسابات المستخدمين في النظام</p>
@@ -379,60 +381,80 @@ export default function UsersPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-slate-800 border-slate-700">
+          <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/70 transition-all duration-300 group">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <Users className="w-4 h-4" />
+                <div className="p-2 bg-blue-500/20 rounded-lg border border-blue-500/30 group-hover:bg-blue-500/30 transition-colors">
+                  <Users className="w-4 h-4 text-blue-400" />
+                </div>
                 إجمالي المستخدمين
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-white">{users.length}</div>
+              <div className="text-xs text-slate-400 mt-1">جميع المستخدمين المسجلين</div>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-800 border-slate-700">
+          <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/70 transition-all duration-300 group">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <UserCheck className="w-4 h-4" />
+                <div className="p-2 bg-green-500/20 rounded-lg border border-green-500/30 group-hover:bg-green-500/30 transition-colors">
+                  <UserCheck className="w-4 h-4 text-green-400" />
+                </div>
                 المستخدمين النشطين
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-400">{users.filter((u) => u.is_active).length}</div>
+              <div className="text-xs text-slate-400 mt-1">الحسابات المفعلة</div>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-800 border-slate-700">
+          <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/70 transition-all duration-300 group">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <UserX className="w-4 h-4" />
+                <div className="p-2 bg-red-500/20 rounded-lg border border-red-500/30 group-hover:bg-red-500/30 transition-colors">
+                  <UserX className="w-4 h-4 text-red-400" />
+                </div>
                 المستخدمين المعطلين
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-400">{users.filter((u) => !u.is_active).length}</div>
+              <div className="text-xs text-slate-400 mt-1">الحسابات المعطلة</div>
             </CardContent>
           </Card>
 
-          <Card className="bg-slate-800 border-slate-700">
+          <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/70 transition-all duration-300 group">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <Shield className="w-4 h-4" />
+                <div className="p-2 bg-purple-500/20 rounded-lg border border-purple-500/30 group-hover:bg-purple-500/30 transition-colors">
+                  <Shield className="w-4 h-4 text-purple-400" />
+                </div>
                 المديرين
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-purple-400">{users.filter((u) => u.role === "admin").length}</div>
+              <div className="text-xs text-slate-400 mt-1">حسابات الإدارة</div>
             </CardContent>
           </Card>
         </div>
 
         {/* Controls */}
-        <Card className="bg-slate-800 border-slate-700 mb-6">
+        <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm mb-6">
           <CardHeader>
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-              <CardTitle className="text-white text-xl">قائمة المستخدمين ({filteredUsers.length})</CardTitle>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500/20 rounded-lg border border-blue-500/30">
+                  <Users className="h-5 w-5 text-blue-400" />
+                </div>
+                <div>
+                  <CardTitle className="text-white text-xl">قائمة المستخدمين</CardTitle>
+                  <p className="text-slate-400 text-sm mt-1">{filteredUsers.length} مستخدم</p>
+                </div>
+              </div>
               <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                 <div className="relative flex-1 sm:flex-none">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
@@ -440,12 +462,12 @@ export default function UsersPage() {
                     placeholder="البحث في المستخدمين..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 bg-slate-700 border-slate-600 text-white w-full sm:w-64 text-right"
+                    className="pl-10 bg-slate-700/50 border-slate-600/50 text-white w-full sm:w-64 text-right focus:bg-slate-700 focus:border-slate-500 transition-colors"
                   />
                 </div>
                 <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button className="w-full sm:w-auto whitespace-nowrap bg-blue-600 hover:bg-blue-700 text-white">
+                    <Button className="w-full sm:w-auto whitespace-nowrap bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg transition-all duration-200 hover:shadow-blue-500/25">
                       <Plus className="w-4 h-4 ml-2" />
                       إضافة مستخدم جديد
                     </Button>
@@ -552,13 +574,13 @@ export default function UsersPage() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-slate-700 bg-slate-800/50">
-                    <TableHead className="text-slate-300 text-right min-w-[150px] py-4 px-6">الاسم</TableHead>
-                    <TableHead className="text-slate-300 text-right min-w-[200px] py-4 px-6">البريد الإلكتروني</TableHead>
-                    <TableHead className="text-slate-300 text-center min-w-[120px] py-4 px-6">الدور</TableHead>
-                    <TableHead className="text-slate-300 text-center min-w-[100px] py-4 px-6">الحالة</TableHead>
-                    <TableHead className="text-slate-300 text-center min-w-[120px] py-4 px-6">تاريخ الإنشاء</TableHead>
-                    <TableHead className="text-slate-300 text-center min-w-[120px] py-4 px-6">الإجراءات</TableHead>
+                  <TableRow className="border-slate-700/50 bg-slate-800/30">
+                    <TableHead className="text-slate-300 text-right min-w-[150px] py-4 px-6 font-semibold">الاسم</TableHead>
+                    <TableHead className="text-slate-300 text-right min-w-[200px] py-4 px-6 font-semibold">البريد الإلكتروني</TableHead>
+                    <TableHead className="text-slate-300 text-center min-w-[120px] py-4 px-6 font-semibold">الدور</TableHead>
+                    <TableHead className="text-slate-300 text-center min-w-[100px] py-4 px-6 font-semibold">الحالة</TableHead>
+                    <TableHead className="text-slate-300 text-center min-w-[120px] py-4 px-6 font-semibold">تاريخ الإنشاء</TableHead>
+                    <TableHead className="text-slate-300 text-center min-w-[120px] py-4 px-6 font-semibold">الإجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -591,11 +613,11 @@ export default function UsersPage() {
                     filteredUsers.map((u) => {
                       const roleInfo = getRoleInfo(u.role)
                       return (
-                        <TableRow key={u.id} className="border-slate-700 hover:bg-slate-700/30 transition-colors">
-                          <TableCell className="text-white font-medium text-right py-4 px-6">{u.name}</TableCell>
-                          <TableCell className="text-slate-300 text-right py-4 px-6">{u.email}</TableCell>
+                        <TableRow key={u.id} className="border-slate-700/50 hover:bg-slate-700/20 transition-all duration-200 group">
+                          <TableCell className="text-white font-medium text-right py-4 px-6 group-hover:text-blue-100">{u.name}</TableCell>
+                          <TableCell className="text-slate-300 text-right py-4 px-6 group-hover:text-slate-200">{u.email}</TableCell>
                           <TableCell className="text-center py-4 px-6">
-                            <Badge className={`${roleInfo.color} text-white px-3 py-1 rounded-full text-xs`}>{roleInfo.label}</Badge>
+                            <Badge className={`${roleInfo.color} text-white px-3 py-1 rounded-full text-xs shadow-sm`}>{roleInfo.label}</Badge>
                           </TableCell>
                           <TableCell className="text-center py-4 px-6">
                             <div className="status-indicator">
@@ -619,12 +641,12 @@ export default function UsersPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setEditingUser({ ...u, password: "" })}
-                                    className="hover:bg-blue-600 hover:text-white border-slate-600 text-slate-300"
+                                    className="hover:bg-blue-600 hover:text-white border-slate-600/50 text-slate-300 hover:border-blue-500 transition-all duration-200 hover:shadow-lg hover:shadow-blue-500/25"
                                   >
                                     <Edit className="w-4 h-4" />
                                   </Button>
                                 </DialogTrigger>
-                                <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md" dir="rtl">
+                                <DialogContent className="bg-slate-800/95 border-slate-700/50 text-white max-w-md backdrop-blur-sm" dir="rtl">
                                   <DialogHeader>
                                     <DialogTitle>تعديل المستخدم</DialogTitle>
                                   </DialogHeader>
@@ -636,7 +658,7 @@ export default function UsersPage() {
                                           id="edit-name"
                                           value={editingUser.name}
                                           onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                                          className="bg-slate-700 border-slate-600 text-right"
+                                          className="bg-slate-700/50 border-slate-600/50 text-right focus:bg-slate-700 focus:border-slate-500 transition-colors"
                                         />
                                       </div>
                                       <div className="grid gap-2 form-field">
@@ -646,7 +668,7 @@ export default function UsersPage() {
                                           type="email"
                                           value={editingUser.email}
                                           onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                                          className="bg-slate-700 border-slate-600 text-right"
+                                          className="bg-slate-700/50 border-slate-600/50 text-right focus:bg-slate-700 focus:border-slate-500 transition-colors"
                                         />
                                       </div>
                                       <div className="grid gap-2 form-field">
@@ -655,7 +677,7 @@ export default function UsersPage() {
                                           value={editingUser.role}
                                           onValueChange={(value) => setEditingUser({ ...editingUser, role: value })}
                                         >
-                                          <SelectTrigger className="bg-slate-700 border-slate-600">
+                                          <SelectTrigger className="bg-slate-700/50 border-slate-600/50 focus:bg-slate-700 focus:border-slate-500 transition-colors">
                                             <SelectValue />
                                           </SelectTrigger>
                                           <SelectContent className="bg-slate-700 border-slate-600">
@@ -674,7 +696,7 @@ export default function UsersPage() {
                                           type="password"
                                           value={editingUser.password}
                                           onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
-                                          className="bg-slate-700 border-slate-600 text-right"
+                                          className="bg-slate-700/50 border-slate-600/50 text-right focus:bg-slate-700 focus:border-slate-500 transition-colors"
                                           placeholder="اتركه فارغاً للاحتفاظ بكلمة المرور الحالية"
                                         />
                                       </div>
@@ -692,15 +714,20 @@ export default function UsersPage() {
                                       </div>
                                     </div>
                                   )}
-                                  <div className="flex justify-end gap-2">
+                                  <div className="flex justify-end gap-3 pt-4">
                                     <Button
                                       variant="outline"
                                       onClick={() => setEditingUser(null)}
                                       disabled={submitting}
+                                      className="border-slate-600/50 hover:border-slate-500 hover:bg-slate-700/50 transition-all duration-200"
                                     >
                                       إلغاء
                                     </Button>
-                                    <Button onClick={handleEditUser} disabled={submitting} className="btn-primary">
+                                    <Button 
+                                      onClick={handleEditUser} 
+                                      disabled={submitting} 
+                                      className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+                                    >
                                       {submitting ? (
                                         <>
                                           <Loader2 className="w-4 h-4 ml-2 animate-spin" />

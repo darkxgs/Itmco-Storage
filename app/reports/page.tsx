@@ -266,44 +266,63 @@ export default function ReportsPage() {
 
   return (
     <ErrorBoundary>
-      <div className="flex min-h-screen bg-slate-900">
+      <div className="page-container flex min-h-screen bg-slate-950 relative overflow-hidden">
+        {/* Decorative background */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.20),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.20),transparent_60%),radial-gradient(500px_circle_at_50%_50%,rgba(34,197,94,0.10),transparent_60%)]" />
+        <div className="absolute inset-0">
+          <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-green-500/10 rounded-full blur-3xl" />
+        </div>
         <Sidebar />
-        <div className="flex-1 p-6">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">التقارير والتحليلات</h1>
-            <p className="text-slate-300">تقارير شاملة وتحليلات متقدمة للمخزون</p>
+        <div className="flex-1 p-3 sm:p-4 md:p-6 relative">
+          <div className="mb-6 sm:mb-8 relative">
+            <div className="flex items-center gap-3 sm:gap-4 mb-4">
+              <div className="p-2 sm:p-3 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-xl border border-blue-500/30 backdrop-blur-sm">
+                <TrendingUp className="w-6 h-6 sm:w-8 sm:h-8 text-blue-400" />
+              </div>
+              <div>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">التقارير والتحليلات</h1>
+                <p className="text-sm sm:text-base text-slate-300">تقارير شاملة وتحليلات متقدمة للمخزون</p>
+              </div>
+            </div>
           </div>
 
           {/* Controls */}
-          <Card className="bg-slate-800 border-slate-700 mb-6">
-            <CardHeader>
-              <CardTitle className="text-white">فلاتر التقارير</CardTitle>
+          <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm mb-4 sm:mb-6 shadow-2xl hover:shadow-blue-500/10 transition-all duration-300">
+            <CardHeader className="border-b border-slate-700/50 p-4 sm:p-6">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-blue-500/20 rounded-lg">
+                  <Calendar className="w-4 h-4 sm:w-5 sm:h-5 text-blue-400" />
+                </div>
+                <CardTitle className="text-white text-sm sm:text-base">فلاتر التقارير</CardTitle>
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4 sm:p-6">
               {/* Enhanced Filtering Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4 sm:mb-6">
                 <div>
-                  <label className="text-sm text-slate-300">تاريخ البداية</label>
+                  <label className="text-xs sm:text-sm text-slate-300">تاريخ البداية</label>
                   <input
                     type="date"
-                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-sm"
                     value={filters.startDate}
                     onChange={(e) => setFilters(prev => ({ ...prev, startDate: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-300">تاريخ النهاية</label>
+                  <label className="text-xs sm:text-sm text-slate-300">تاريخ النهاية</label>
                   <input
                     type="date"
-                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-2 sm:px-3 py-1.5 sm:py-2 text-sm"
                     value={filters.endDate}
                     onChange={(e) => setFilters(prev => ({ ...prev, endDate: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-300">الفرع</label>
+                  <label className="text-xs sm:text-sm text-slate-300">الفرع</label>
                   <Select value={filters.branch} onValueChange={(value) => setFilters(prev => ({ ...prev, branch: value }))}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-8 sm:h-10 text-sm">
                       <SelectValue placeholder="اختر الفرع" />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-700 border-slate-600">
@@ -315,9 +334,9 @@ export default function ReportsPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm text-slate-300">الفئة</label>
+                  <label className="text-xs sm:text-sm text-slate-300">الفئة</label>
                   <Select value={filters.category} onValueChange={(value) => setFilters(prev => ({ ...prev, category: value }))}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-8 sm:h-10 text-sm">
                       <SelectValue placeholder="اختر الفئة" />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-700 border-slate-600">
@@ -331,32 +350,32 @@ export default function ReportsPage() {
               </div>
               
               {/* Additional Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
                 <div>
-                  <label className="text-sm text-slate-300">اسم المنتج</label>
+                  <label className="text-xs sm:text-sm text-slate-300">اسم المنتج</label>
                   <input
                     type="text"
-                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    className="w-full bg-slate-800/50 border-slate-600/50 text-white rounded-md px-2 sm:px-3 py-1.5 sm:py-2 backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 text-sm"
                     placeholder="البحث بالاسم أو رقم القطعة"
                     value={filters.productName}
                     onChange={(e) => setFilters(prev => ({ ...prev, productName: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-300">كود الصنف</label>
+                  <label className="text-xs sm:text-sm text-slate-300">كود الصنف</label>
                   <input
                     type="text"
-                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    className="w-full bg-slate-800/50 border-slate-600/50 text-white rounded-md px-2 sm:px-3 py-1.5 sm:py-2 backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 text-sm"
                     placeholder="أدخل كود الصنف"
                     value={filters.itemCode}
                     onChange={(e) => setFilters(prev => ({ ...prev, itemCode: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-300">الرقم التسلسلي</label>
+                  <label className="text-xs sm:text-sm text-slate-300">الرقم التسلسلي</label>
                   <input
                     type="text"
-                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    className="w-full bg-slate-800/50 border-slate-600/50 text-white rounded-md px-2 sm:px-3 py-1.5 sm:py-2 backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 text-sm"
                     placeholder="أدخل الرقم التسلسلي"
                     value={filters.serialNumber}
                     onChange={(e) => setFilters(prev => ({ ...prev, serialNumber: e.target.value }))}
@@ -365,21 +384,21 @@ export default function ReportsPage() {
               </div>
               
               {/* More Filters */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6">
                 <div>
-                  <label className="text-sm text-slate-300">المهندس</label>
+                  <label className="text-xs sm:text-sm text-slate-300">المهندس</label>
                   <input
                     type="text"
-                    className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
+                    className="w-full bg-slate-800/50 border-slate-600/50 text-white rounded-md px-2 sm:px-3 py-1.5 sm:py-2 backdrop-blur-sm focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 transition-all duration-200 text-sm"
                     placeholder="اسم المهندس"
                     value={filters.engineer}
                     onChange={(e) => setFilters(prev => ({ ...prev, engineer: e.target.value }))}
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-300">العميل</label>
+                  <label className="text-xs sm:text-sm text-slate-300">العميل</label>
                   <Select value={filters.customer} onValueChange={(value) => setFilters(prev => ({ ...prev, customer: value }))}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-8 sm:h-10 text-sm">
                       <SelectValue placeholder="اختر العميل" />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-700 border-slate-600">
@@ -391,9 +410,9 @@ export default function ReportsPage() {
                   </Select>
                 </div>
                 <div>
-                  <label className="text-sm text-slate-300">المخزن</label>
+                  <label className="text-xs sm:text-sm text-slate-300">المخزن</label>
                   <Select value={filters.warehouse} onValueChange={(value) => setFilters(prev => ({ ...prev, warehouse: value }))}>
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white h-8 sm:h-10 text-sm">
                       <SelectValue placeholder="اختر المخزن" />
                     </SelectTrigger>
                     <SelectContent className="bg-slate-700 border-slate-600">
@@ -407,11 +426,11 @@ export default function ReportsPage() {
               </div>
               
               {/* Filter Actions */}
-              <div className="flex gap-2 items-center justify-between">
-                <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center justify-between">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 items-start sm:items-center">
                   <Button 
                     variant="outline" 
-                    className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                    className="border-slate-600/50 text-slate-300 hover:bg-slate-700/50 hover:border-slate-500 transition-all duration-200 backdrop-blur-sm h-8 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm"
                     onClick={() => setFilters({
                       startDate: "",
                       endDate: "",
@@ -427,33 +446,33 @@ export default function ReportsPage() {
                   >
                     مسح الفلاتر
                   </Button>
-                  <div className="text-sm text-slate-400 flex items-center">
+                  <div className="text-xs sm:text-sm text-slate-400 flex items-center">
                     عدد النتائج: {allTransactions.length}
                   </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 sm:gap-3">
                   <Button 
                     onClick={handleExportCSV} 
-                    className="bg-green-600 hover:bg-green-700"
+                    className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 shadow-lg hover:shadow-green-500/25 transition-all duration-200 h-8 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm"
                     disabled={exporting}
                   >
-                    <Download className="w-4 h-4 ml-2" />
+                    <Download className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2" />
                     {exporting ? "جاري التصدير..." : "CSV"}
                   </Button>
                   <Button 
                     onClick={handleExportExcel} 
-                    className="bg-blue-600 hover:bg-blue-700"
+                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-blue-500/25 transition-all duration-200 h-8 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm"
                     disabled={exporting}
                   >
-                    <Download className="w-4 h-4 ml-2" />
+                    <Download className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2" />
                     {exporting ? "جاري التصدير..." : "Excel"}
                   </Button>
                   <Button 
                     onClick={handleExportPDF} 
-                    className="bg-red-600 hover:bg-red-700"
+                    className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg hover:shadow-red-500/25 transition-all duration-200 h-8 sm:h-10 px-3 sm:px-4 text-xs sm:text-sm"
                     disabled={exporting}
                   >
-                    <FileText className="w-4 h-4 ml-2" />
+                    <FileText className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2" />
                     {exporting ? "جاري التصدير..." : "PDF"}
                   </Button>
                 </div>
@@ -475,25 +494,25 @@ export default function ReportsPage() {
           ) : (
             <>
               {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                <Card className="bg-slate-800 border-slate-700">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-300">إجمالي الإصدارات</CardTitle>
-                    <Package className="h-4 w-4 text-blue-400" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+                <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm shadow-xl hover:shadow-blue-500/10 transition-all duration-300">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-slate-300">إجمالي الإصدارات</CardTitle>
+                    <Package className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-white">{recentTransactions.length}</div>
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="text-xl sm:text-2xl font-bold text-white">{recentTransactions.length}</div>
                     <p className="text-xs text-slate-400">هذا الشهر</p>
                   </CardContent>
                 </Card>
 
-                <Card className="bg-slate-800 border-slate-700">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-300">أكثر المنتجات طلباً</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-green-400" />
+                <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm shadow-xl hover:shadow-green-500/10 transition-all duration-300">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-slate-300">أكثر المنتجات طلباً</CardTitle>
+                    <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-lg font-bold text-white">
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="text-sm sm:text-lg font-bold text-white">
                       {productFrequency.length > 0 ? productFrequency[0].name : "لا توجد بيانات"}
                     </div>
                     <p className="text-xs text-slate-400">
@@ -502,13 +521,13 @@ export default function ReportsPage() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-slate-800 border-slate-700">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-300">أكثر الفروع نشاطاً</CardTitle>
-                    <Calendar className="h-4 w-4 text-purple-400" />
+                <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm shadow-xl hover:shadow-purple-500/10 transition-all duration-300">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-slate-300">أكثر الفروع نشاطاً</CardTitle>
+                    <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-lg font-bold text-white">
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="text-sm sm:text-lg font-bold text-white">
                       {branchData.length > 0 ? branchData[0].branch : "لا توجد بيانات"}
                     </div>
                     <p className="text-xs text-slate-400">
@@ -517,25 +536,25 @@ export default function ReportsPage() {
                   </CardContent>
                 </Card>
 
-                <Card className="bg-slate-800 border-slate-700">
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium text-slate-300">معدل النمو</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-orange-400" />
+                <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm shadow-xl hover:shadow-orange-500/10 transition-all duration-300">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-slate-300">معدل النمو</CardTitle>
+                    <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-orange-400" />
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold text-green-400">--</div>
+                  <CardContent className="p-3 sm:p-4">
+                    <div className="text-xl sm:text-2xl font-bold text-green-400">--</div>
                     <p className="text-xs text-slate-400">يتطلب بيانات تاريخية</p>
                   </CardContent>
                 </Card>
               </div>
 
               {/* Charts */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                <Card className="bg-slate-800 border-slate-700">
-                  <CardHeader>
-                    <CardTitle className="text-white">الإصدارات الشهرية</CardTitle>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
+                <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm shadow-xl hover:shadow-blue-500/10 transition-all duration-300">
+                  <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="text-sm sm:text-base text-white">الإصدارات الشهرية</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-4 sm:p-6">
                     {monthlyData.length > 0 ? (
                       <ChartContainer
                         config={{
@@ -544,7 +563,7 @@ export default function ReportsPage() {
                             color: "#8884d8",
                           },
                         }}
-                        className="h-[300px]"
+                        className="h-[250px] sm:h-[300px]"
                       >
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={monthlyData}>
@@ -556,18 +575,18 @@ export default function ReportsPage() {
                         </ResponsiveContainer>
                       </ChartContainer>
                     ) : (
-                      <div className="h-[300px] flex items-center justify-center text-slate-400">
+                      <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-slate-400 text-sm">
                         لا توجد بيانات للعرض
                       </div>
                     )}
                   </CardContent>
                 </Card>
 
-                <Card className="bg-slate-800 border-slate-700">
-                  <CardHeader>
-                    <CardTitle className="text-white">أكثر المنتجات طلباً</CardTitle>
+                <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm shadow-xl hover:shadow-green-500/10 transition-all duration-300">
+                  <CardHeader className="p-4 sm:p-6">
+                    <CardTitle className="text-sm sm:text-base text-white">أكثر المنتجات طلباً</CardTitle>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="p-4 sm:p-6">
                     {productFrequency.length > 0 ? (
                       <ChartContainer
                         config={{
@@ -575,7 +594,7 @@ export default function ReportsPage() {
                             label: "العدد",
                           },
                         }}
-                        className="h-[300px]"
+                        className="h-[250px] sm:h-[300px]"
                       >
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
@@ -589,7 +608,7 @@ export default function ReportsPage() {
                         </ResponsiveContainer>
                       </ChartContainer>
                     ) : (
-                      <div className="h-[300px] flex items-center justify-center text-slate-400">
+                      <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-slate-400 text-sm">
                         لا توجد بيانات للعرض
                       </div>
                     )}
@@ -598,11 +617,11 @@ export default function ReportsPage() {
               </div>
 
               {/* Branch Performance */}
-              <Card className="bg-slate-800 border-slate-700 mb-6">
-                <CardHeader>
-                  <CardTitle className="text-white">أداء الفروع</CardTitle>
+              <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm mb-4 sm:mb-6 shadow-xl hover:shadow-purple-500/10 transition-all duration-300">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-sm sm:text-base text-white">أداء الفروع</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 sm:p-6">
                   {branchData.length > 0 ? (
                     <ChartContainer
                       config={{
@@ -611,19 +630,19 @@ export default function ReportsPage() {
                           color: "#8884d8",
                         },
                       }}
-                      className="h-[300px]"
+                      className="h-[250px] sm:h-[300px]"
                     >
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={branchData} layout="horizontal">
                           <XAxis type="number" stroke="#64748b" />
-                          <YAxis dataKey="branch" type="category" stroke="#64748b" width={150} />
+                          <YAxis dataKey="branch" type="category" stroke="#64748b" width={100} className="text-xs sm:text-sm" />
                           <ChartTooltip content={<ChartTooltipContent />} />
                           <Bar dataKey="count" fill="#8884d8" />
                         </BarChart>
                       </ResponsiveContainer>
                     </ChartContainer>
                   ) : (
-                    <div className="h-[300px] flex items-center justify-center text-slate-400">
+                    <div className="h-[250px] sm:h-[300px] flex items-center justify-center text-slate-400 text-sm">
                       لا توجد بيانات للعرض
                     </div>
                   )}
@@ -631,48 +650,52 @@ export default function ReportsPage() {
               </Card>
 
               {/* Recent Transactions */}
-              <Card className="bg-slate-800 border-slate-700">
-                <CardHeader>
-                  <CardTitle className="text-white">المعاملات الأخيرة</CardTitle>
+              <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm shadow-xl hover:shadow-blue-500/10 transition-all duration-300">
+                <CardHeader className="p-4 sm:p-6">
+                  <CardTitle className="text-sm sm:text-base text-white">المعاملات الأخيرة</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 sm:p-6">
                   {recentTransactions.length > 0 ? (
                     <div className="overflow-x-auto">
                       <Table>
                         <TableHeader>
-                          <TableRow className="border-slate-700">
-                            <TableHead className="text-slate-300">التاريخ</TableHead>
-                            <TableHead className="text-slate-300">المنتج</TableHead>
-                            <TableHead className="text-slate-300">العميل</TableHead>
-                            <TableHead className="text-slate-300">الفرع</TableHead>
-                            <TableHead className="text-slate-300">الكمية</TableHead>
-                            <TableHead className="text-slate-300">المهندس</TableHead>
+                          <TableRow className="border-slate-700/50 bg-slate-800/30">
+                            <TableHead className="text-slate-300 font-semibold text-xs sm:text-sm">التاريخ</TableHead>
+                            <TableHead className="text-slate-300 font-semibold text-xs sm:text-sm">المنتج</TableHead>
+                            <TableHead className="text-slate-300 font-semibold text-xs sm:text-sm hidden sm:table-cell">العميل</TableHead>
+                            <TableHead className="text-slate-300 font-semibold text-xs sm:text-sm">الفرع</TableHead>
+                            <TableHead className="text-slate-300 font-semibold text-xs sm:text-sm">الكمية</TableHead>
+                            <TableHead className="text-slate-300 font-semibold text-xs sm:text-sm hidden md:table-cell">المهندس</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
                           {recentTransactions.map((transaction) => (
-                            <TableRow key={transaction.id} className="border-slate-700">
-                              <TableCell className="text-slate-300">
+                            <TableRow key={transaction.id} className="border-slate-700/50 hover:bg-slate-800/30 transition-colors duration-200">
+                              <TableCell className="text-slate-300 text-xs sm:text-sm">
                                 {new Date(transaction.created_at).toLocaleDateString("en-US")}
                               </TableCell>
-                              <TableCell className="text-white font-medium">
+                              <TableCell className="text-white font-medium text-xs sm:text-sm">
                                 {transaction.product_name || transaction.productName}
                               </TableCell>
-                              <TableCell className="text-slate-300">
+                              <TableCell className="text-slate-300 text-xs sm:text-sm hidden sm:table-cell">
                                 {transaction.customer_name || transaction.customerName}
                               </TableCell>
-                              <TableCell className="text-slate-300">{transaction.branch}</TableCell>
+                              <TableCell className="text-slate-300 text-xs sm:text-sm">{transaction.branch}</TableCell>
                               <TableCell className="text-white">
-                                <Badge variant="secondary">{transaction.quantity}</Badge>
+                                <Badge variant="secondary" className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs">{transaction.quantity}</Badge>
                               </TableCell>
-                              <TableCell className="text-slate-300">{transaction.engineer}</TableCell>
+                              <TableCell className="text-slate-300 text-xs sm:text-sm hidden md:table-cell">{transaction.engineer}</TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
                       </Table>
                     </div>
                   ) : (
-                    <div className="text-center py-8 text-slate-400">لا توجد معاملات للعرض</div>
+                    <div className="text-center py-8 sm:py-12 text-slate-400">
+                      <Package className="w-8 h-8 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 text-slate-500" />
+                      <p className="text-base sm:text-lg font-medium mb-2">لا توجد معاملات للعرض</p>
+                      <p className="text-xs sm:text-sm">قم بتعديل الفلاتر لعرض البيانات المطلوبة</p>
+                    </div>
                   )}
                 </CardContent>
               </Card>

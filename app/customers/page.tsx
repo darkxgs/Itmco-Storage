@@ -149,9 +149,11 @@ export default function CustomersPage() {
 
   if (error && !loading) {
     return (
-      <div className="flex min-h-screen bg-slate-900">
+      <div className="flex min-h-screen bg-slate-950 relative overflow-hidden">
+        {/* Decorative background */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.12),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.1),transparent_60%)]" />
         <Sidebar />
-        <div className="flex-1 flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center relative">
           <Card className="bg-slate-800 border-slate-700 max-w-md">
             <CardContent className="p-6 text-center">
               <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
@@ -170,9 +172,11 @@ export default function CustomersPage() {
 
   return (
     <ErrorBoundary>
-      <div className="flex min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="flex min-h-screen bg-slate-950 relative overflow-hidden">
+        {/* Decorative background */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.12),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.1),transparent_60%)]" />
         <Sidebar />
-        <div className="flex-1 p-8">
+        <div className="flex-1 p-8 relative">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-10 gap-6">
             <div className="flex items-center gap-4">
               <div className="p-3 bg-blue-500/20 rounded-xl border border-blue-500/30">

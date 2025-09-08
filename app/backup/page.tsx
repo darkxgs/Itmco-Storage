@@ -225,9 +225,11 @@ export default function BackupPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-slate-900">
+    <div className="flex min-h-screen bg-slate-950 relative overflow-hidden">
+      {/* Decorative background */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.12),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.1),transparent_60%)]" />
       <Sidebar />
-      <div className="flex-1 p-6">
+      <div className="flex-1 p-6 relative">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">إدارة النسخ الاحتياطية</h1>
           <p className="text-slate-300">إنشاء واستعادة النسخ الاحتياطية لحماية بيانات النظام</p>
