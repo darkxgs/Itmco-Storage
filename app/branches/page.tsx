@@ -186,12 +186,12 @@ export default function BranchesPage() {
             </div>
             <div className="flex items-center gap-3">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
+                <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 h-4 w-4" />
                 <Input
                   placeholder="البحث في الفروع..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 w-64 bg-slate-800/50 border-slate-600/50 text-white placeholder:text-slate-400 focus:border-blue-500/50 focus:ring-blue-500/20 transition-all duration-200"
+                  className="pr-10 w-64 bg-slate-800/50 border-slate-600/50 text-white placeholder:text-slate-400 focus:border-blue-500/50 focus:ring-blue-500/20 transition-all duration-200"
                 />
               </div>
             </div>
@@ -327,11 +327,11 @@ export default function BranchesPage() {
                   <Table className="w-full table-fixed">
                     <TableHeader>
                       <TableRow className="border-b border-slate-700/50 bg-slate-800/30">
-                        <TableHead className="text-slate-300 font-semibold py-4 px-6" style={{width: '180px'}}>اسم الفرع</TableHead>
-                        <TableHead className="text-slate-300 font-semibold py-4 px-6" style={{width: '120px'}}>الكود</TableHead>
-                        <TableHead className="text-slate-300 font-semibold py-4 px-6" style={{width: '240px'}}>العنوان</TableHead>
-                        <TableHead className="text-slate-300 font-semibold py-4 px-6" style={{width: '150px'}}>الهاتف</TableHead>
-                        <TableHead className="text-slate-300 font-semibold py-4 px-6" style={{width: '180px'}}>المدير</TableHead>
+                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-right" style={{width: '180px'}}>اسم الفرع</TableHead>
+                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-right" style={{width: '120px'}}>الكود</TableHead>
+                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-right" style={{width: '240px'}}>العنوان</TableHead>
+                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-right" style={{width: '150px'}}>الهاتف</TableHead>
+                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-right" style={{width: '180px'}}>المدير</TableHead>
                         <TableHead className="text-slate-300 font-semibold py-4 px-6 text-center" style={{width: '120px'}}>الحالة</TableHead>
                         <TableHead className="text-slate-300 font-semibold py-4 px-6 text-center" style={{width: '140px'}}>الإجراءات</TableHead>
                       </TableRow>
@@ -342,11 +342,11 @@ export default function BranchesPage() {
                         key={branch.id} 
                         className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors duration-200"
                       >
-                        <TableCell className="font-medium text-white py-4 px-6 truncate" style={{width: '180px'}}>{branch.name}</TableCell>
-                         <TableCell className="text-slate-300 py-4 px-6" style={{width: '120px'}}>{branch.code || "-"}</TableCell>
-                         <TableCell className="text-slate-300 py-4 px-6 truncate" style={{width: '240px'}}>{branch.address || "-"}</TableCell>
-                         <TableCell className="text-slate-300 py-4 px-6" style={{width: '150px'}}>{branch.phone || "-"}</TableCell>
-                         <TableCell className="text-slate-300 py-4 px-6 truncate" style={{width: '180px'}}>{branch.manager_name || "-"}</TableCell>
+                        <TableCell className="font-medium text-white py-4 px-6 truncate text-right" style={{width: '180px'}}>{branch.name}</TableCell>
+                         <TableCell className="text-slate-300 py-4 px-6 text-right" style={{width: '120px'}}>{branch.code || "-"}</TableCell>
+                         <TableCell className="text-slate-300 py-4 px-6 truncate text-right" style={{width: '240px'}}>{branch.address || "-"}</TableCell>
+                         <TableCell className="text-slate-300 py-4 px-6 text-right" style={{width: '150px'}}>{branch.phone || "-"}</TableCell>
+                         <TableCell className="text-slate-300 py-4 px-6 truncate text-right" style={{width: '180px'}}>{branch.manager_name || "-"}</TableCell>
                          <TableCell className="py-4 px-6 text-center" style={{width: '120px'}}>
                            <Badge 
                              variant={branch.is_active ? "default" : "secondary"}

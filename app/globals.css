@@ -285,39 +285,8 @@
   transform: translateX(-18px);
 }
 
-/* Auto zoom-out for pages that don't fit */
-@media screen and (max-width: 1200px) {
-  body {
-    zoom: 0.9;
-    transform-origin: top left;
-  }
-}
-
-@media screen and (max-width: 1024px) {
-  body {
-    zoom: 0.85;
-    transform-origin: top left;
-  }
-}
-
-@media screen and (max-width: 768px) {
-  body {
-    zoom: 0.8;
-    transform-origin: top left;
-  }
-}
-
-@media screen and (max-width: 480px) {
-  body {
-    zoom: 0.75;
-  }
-}
-
-@media screen and (max-width: 360px) {
-  body {
-    zoom: 0.65;
-  }
-}
+/* Auto zoom-out for pages that don't fit (use transform scaling on .page-container only to prevent double-scaling) */
+/* Removed body zoom rules to avoid compounding with .page-container scaling */
 
 /* Ensure minimum content width for zoom calculations */
 body {
@@ -325,7 +294,15 @@ body {
   overflow-x: auto;
 }
 
-/* Alternative approach using CSS transform for better browser support */
+/* Transform-based scaling on .page-container for better browser support */
+@media screen and (max-width: 1366px) {
+  .page-container {
+    transform: scale(0.95);
+    transform-origin: top left;
+    width: 105.26%; /* 100% / 0.95 */
+  }
+}
+
 @media screen and (max-width: 1200px) {
   .page-container {
     transform: scale(0.9);
@@ -336,9 +313,9 @@ body {
 
 @media screen and (max-width: 1024px) {
   .page-container {
-    transform: scale(0.85);
+    transform: scale(0.82);
     transform-origin: top left;
-    width: 117.65%; /* 100% / 0.85 */
+    width: 121.95%; /* 100% / 0.82 */
   }
 }
 
@@ -363,6 +340,21 @@ body {
     transform: scale(0.65);
     transform-origin: top left;
     width: 153.85%; /* 100% / 0.65 */
+  }
+}
+
+/* Height-based compact overrides for short screens (place after width rules to take precedence) */
+@media screen and (max-height: 720px) and (min-width: 1024px) {
+  .page-container {
+    transform: scale(0.8);
+    width: 125%;
+  }
+}
+
+@media screen and (max-height: 650px) and (min-width: 1024px) {
+  .page-container {
+    transform: scale(0.75);
+    width: 133.33%;
   }
 }
 

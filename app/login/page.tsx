@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast"
 import { loginUser } from "@/lib/auth"
 import { validateEmail, validateRequired } from "@/lib/validation"
 import { loadUserFromStorage, saveUserToStorage } from "@/lib/utils"
+import Link from "next/link"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")

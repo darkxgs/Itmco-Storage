@@ -113,6 +113,20 @@ export function Sidebar() {
     setNotifications(3)
   }, [])
 
+  // Auto-collapse on medium widths and short heights to maximize content area
+  useEffect(() => {
+    const handleResize = () => {
+      if (typeof window === "undefined") return
+      const w = window.innerWidth
+      const h = window.innerHeight
+      const shouldCollapse = (w >= 1024 && w < 1280) || h < 700
+      setCollapsed(shouldCollapse)
+    }
+    handleResize()
+    window.addEventListener("resize", handleResize)
+    return () => window.removeEventListener("resize", handleResize)
+  }, [])
+
   const handleLogout = () => {
     logout()
   }
