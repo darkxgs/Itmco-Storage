@@ -24,6 +24,13 @@ export interface ExportData {
   engineer: string
   serialNumber?: string
   notes?: string
+  warrantyType?: string
+  invoiceNumber?: string
+  itemCode?: string
+  warehouseId?: number
+  warehouseName?: string
+  purchasePrice?: number
+  sellingPrice?: number
 }
 
 export interface ExportOptions {
@@ -92,8 +99,8 @@ export function exportToCSV(options: ExportOptions): void {
 }
 
 // Enhanced PDF Export
-export function exportToPDF(options: ExportOptions & { chartData?: any }): void {
-  const { data, title = 'تقرير الإصدارات', filename, filters, summaryStats } = options
+export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?: 'category' | 'branch' | 'none'; includeCharts?: boolean; pageSize?: number }): void {
+  const { data, title = 'تقرير الإصدارات', filename, filters, summaryStats, groupBy = 'none', includeCharts = false, pageSize = 50 } = options
 
   // Build an offscreen HTML document to guarantee correct Arabic shaping
   const container = document.createElement('div')
@@ -101,26 +108,77 @@ export function exportToPDF(options: ExportOptions & { chartData?: any }): void 
   container.style.left = '-10000px'
   container.style.top = '0'
   container.style.width = '794px' // approximately A4 width in px at 96 DPI
-  container.style.padding = '16px'
+  container.style.padding = '20mm' // إضافة حدود للصفحة
   container.style.background = '#ffffff'
-  container.style.fontFamily = "'Tahoma','Segoe UI',Arial,sans-serif"
+  container.style.fontFamily = "'Cairo','Amiri','Tahoma','Segoe UI',Arial,sans-serif" // Enhanced Arabic fonts
   container.style.direction = 'rtl'
   container.style.textAlign = 'right'
-  container.style.color = '#111827' // ensure dark text color
-  container.style.lineHeight = '1.4'
+  container.style.color = '#1f2937' // Enhanced dark text color
+  container.style.lineHeight = '1.5' // زيادة المسافة بين الصفوف
 
   const safeFilters = filters || {}
 
-  // Header HTML
+  // Generate enhanced summary statistics
+  const stats = generateSummaryStats(data)
+  
+  // Generate simple charts if requested
+  let chartsHtml = ''
+  if (includeCharts && stats.topProducts.length > 0) {
+    const maxCount = Math.max(...stats.topProducts.slice(0, 5).map(p => p.count))
+    const productChartBars = stats.topProducts.slice(0, 5).map(product => {
+      const percentage = (product.count / maxCount) * 100
+      return `
+        <div style="margin:5px 0;">
+          <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
+            <span>${product.name}</span>
+            <span>${product.count}</span>
+          </div>
+          <div style="background:#e5e7eb;height:12px;border-radius:6px;overflow:hidden;">
+            <div style="background:linear-gradient(90deg, #3b82f6, #1d4ed8);height:100%;width:${percentage}%;transition:width 0.3s;"></div>
+          </div>
+        </div>
+      `
+    }).join('')
+    
+    chartsHtml = `
+      <div style="background:#f8fafc;padding:15px;margin:15px 0;border-radius:8px;border:1px solid #e2e8f0;">
+        <h3 style="margin:0 0 10px 0;font-size:14px;color:#1f2937;text-align:center;">أكثر المنتجات مبيعاً</h3>
+        ${productChartBars}
+      </div>
+    `
+  }
+  
+  // Header HTML with enhanced styling
   const headerHtml = `
-    <div style="text-align:center;margin-bottom:8px;">
-      <div style="font-size:20px;font-weight:700">ITMCO - نظام إدارة المخزون</div>
-      <div style="font-size:16px;margin-top:4px;">${title}</div>
+    <div style="text-align:center;margin-bottom:12px;background:linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);color:white;padding:16px;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
+      <div style="font-size:22px;font-weight:700;text-shadow:0 2px 4px rgba(0,0,0,0.3);">ITMCO - نظام إدارة المخزون</div>
+      <div style="font-size:16px;margin-top:6px;opacity:0.95;">${title}</div>
     </div>
-    <div style="font-size:12px;margin-bottom:8px;">
-      <div>تاريخ التصدير: ${new Date().toLocaleDateString('ar-SA')}</div>
-      <div>عدد السجلات: ${data.length}</div>
+    <div style="font-size:11px;margin-bottom:12px;background:#f8fafc;padding:8px;border-radius:4px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span><strong>تاريخ التصدير:</strong> ${new Date().toLocaleDateString('ar-SA')}</span>
+        <span><strong>عدد السجلات:</strong> ${stats.totalRecords}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span><strong>إجمالي الكمية:</strong> ${stats.totalQuantity}</span>
+        <span><strong>عدد المنتجات المختلفة:</strong> ${stats.uniqueProducts}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span><strong>عدد العملاء:</strong> ${stats.uniqueCustomers}</span>
+        <span><strong>عدد الفروع:</strong> ${stats.uniqueBranches}</span>
+      </div>
+      ${stats.topProducts.length > 0 ? `
+        <div style="margin-top:6px;">
+          <strong>أكثر منتج مبيعاً:</strong> ${stats.topProducts[0].name} (${stats.topProducts[0].count} قطعة)
+        </div>
+      ` : ''}
+      ${stats.topBranches.length > 0 ? `
+        <div style="margin-top:4px;">
+          <strong>أكثر فرع نشاطاً:</strong> ${stats.topBranches[0].name} (${stats.topBranches[0].count} قطعة)
+        </div>
+      ` : ''}
     </div>
+    ${chartsHtml}
   `
 
   // Filters HTML
@@ -143,45 +201,179 @@ export function exportToPDF(options: ExportOptions & { chartData?: any }): void 
     `
   }
 
-  // Table headers and rows
-  const tableHeaders = TABLE_HEADERS
-
+  // Group data if requested
+  let processedData = data
+  let groupedSections: { title: string; data: ExportData[] }[] = []
+  
+  if (groupBy === 'category') {
+    const grouped = data.reduce((acc, item) => {
+      const key = item.category || 'غير محدد'
+      if (!acc[key]) acc[key] = []
+      acc[key].push(item)
+      return acc
+    }, {} as Record<string, ExportData[]>)
+    
+    groupedSections = Object.entries(grouped)
+      .sort(([a], [b]) => a.localeCompare(b, 'ar'))
+      .map(([category, items]) => ({ title: `الفئة: ${category}`, data: items }))
+  } else if (groupBy === 'branch') {
+    const grouped = data.reduce((acc, item) => {
+      const key = item.branch || 'غير محدد'
+      if (!acc[key]) acc[key] = []
+      acc[key].push(item)
+      return acc
+    }, {} as Record<string, ExportData[]>)
+    
+    groupedSections = Object.entries(grouped)
+      .sort(([a], [b]) => a.localeCompare(b, 'ar'))
+      .map(([branch, items]) => ({ title: `الفرع: ${branch}`, data: items }))
+  }
+  
+  // Check if price columns have meaningful data
+  const hasPurchasePrices = data.some(item => item.purchasePrice && item.purchasePrice > 0)
+  const hasSellingPrices = data.some(item => item.sellingPrice && item.sellingPrice > 0)
+  
+  // Filter headers and create dynamic table structure
+  const filteredHeaders = TABLE_HEADERS.filter((header, index) => {
+    if (header === 'سعر الشراء' && !hasPurchasePrices) return false
+    if (header === 'سعر البيع' && !hasSellingPrices) return false
+    return true
+  })
+  
   const cellStyle = "style=\"border:1px solid #e5e7eb;padding:6px;color:#111827;vertical-align:middle;\""
 
-  const rowsHtml = data.map((item, idx) => `
-    <tr style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">
-      <td ${cellStyle}>${item.id ?? ''}</td>
-      <td ${cellStyle}>${new Date(item.date).toLocaleDateString('ar-SA')}</td>
-      <td ${cellStyle}>${item.productName ?? ''}</td>
-      <td ${cellStyle}>${item.category ?? ''}</td>
-      <td ${cellStyle}>${item.partNumber ?? ''}</td>
-      <td ${cellStyle}>${item.brand ?? ''}</td>
-      <td ${cellStyle}>${item.customerName ?? ''}</td>
-      <td ${cellStyle}>${item.branch ?? ''}</td>
-      <td ${cellStyle}>${item.quantity ?? ''}</td>
-      <td ${cellStyle}>${item.engineer ?? ''}</td>
-      <td ${cellStyle}>${item.serialNumber ?? ''}</td>
-      <td ${cellStyle}>${item.notes ?? ''}</td>
-    </tr>
-  `).join('')
+  // Generate table content (grouped or ungrouped) with pagination
+   let tableContent = ''
+   
+   if (groupedSections.length > 0) {
+     // Grouped table content with page breaks
+     tableContent = groupedSections.map((section, sectionIdx) => {
+       const sectionRows = section.data.map((item, idx) => {
+         const globalIdx = sectionIdx * pageSize + idx
+         const needsPageBreak = globalIdx > 0 && globalIdx % pageSize === 0
+         const cells = [
+           `<td ${cellStyle}>${item.id ?? ''}</td>`,
+           `<td ${cellStyle}>${new Date(item.date).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</td>`,
+           `<td ${cellStyle}>${item.productName ?? ''}</td>`,
+           `<td ${cellStyle}>${item.customerName ?? ''}</td>`,
+           `<td ${cellStyle}>${item.branch ?? ''}</td>`,
+           `<td ${cellStyle}>${item.quantity ?? ''}</td>`,
+           `<td ${cellStyle}>${item.engineer ?? ''}</td>`,
+           `<td ${cellStyle}>${item.category ?? ''}</td>`,
+           `<td ${cellStyle}>${item.itemCode ?? ''}</td>`,
+           `<td ${cellStyle}>${item.partNumber ?? ''}</td>`,
+           `<td ${cellStyle}>${item.brand ?? ''}</td>`,
+           `<td ${cellStyle}>${item.warehouseName ?? ''}</td>`,
+           `<td ${cellStyle}>${item.serialNumber ?? ''}</td>`,
+           `<td ${cellStyle}>${item.warrantyType ?? ''}</td>`,
+           `<td ${cellStyle}>${item.invoiceNumber ?? ''}</td>`
+         ]
+         
+         if (hasPurchasePrices) {
+           const formattedPurchase = item.purchasePrice ? `${Number(item.purchasePrice).toLocaleString('ar-SA')} ريال` : ''
+           cells.push(`<td ${cellStyle}>${formattedPurchase}</td>`)
+         }
+         if (hasSellingPrices) {
+           const formattedSelling = item.sellingPrice ? `${Number(item.sellingPrice).toLocaleString('ar-SA')} ريال` : ''
+           cells.push(`<td ${cellStyle}>${formattedSelling}</td>`)
+         }
+         
+         cells.push(`<td ${cellStyle}>${item.notes ?? ''}</td>`)
+         
+         const rowClass = needsPageBreak ? 'page-break avoid-break' : 'avoid-break'
+         return `<tr class="${rowClass}" style="background:${idx % 2 === 0 ? '#ffffff' : '#f1f5f9'};">${cells.join('')}</tr>`
+       }).join('')
+       
+       const sectionHeader = sectionIdx > 0 && sectionIdx % 3 === 0 ? 
+         `<tr class="page-break"><td colspan="${filteredHeaders.length}" style="background:#e0f2fe;padding:8px;font-weight:bold;text-align:center;border:1px solid #e5e7eb;">${section.title} (${section.data.length} عنصر)</td></tr>` :
+         `<tr><td colspan="${filteredHeaders.length}" style="background:#e0f2fe;padding:8px;font-weight:bold;text-align:center;border:1px solid #e5e7eb;">${section.title} (${section.data.length} عنصر)</td></tr>`
+       
+       return `
+         ${sectionHeader}
+         ${sectionRows}
+       `
+     }).join('')
+   } else {
+     // Regular ungrouped content with pagination
+      const chunks = []
+      for (let i = 0; i < data.length; i += pageSize) {
+        chunks.push(data.slice(i, i + pageSize))
+      }
+      
+      tableContent = chunks.map((chunk, chunkIdx) => {
+        const chunkRows = chunk.map((item, idx) => {
+          const globalIdx = chunkIdx * pageSize + idx
+       const cells = [
+         `<td ${cellStyle}>${item.id ?? ''}</td>`,
+         `<td ${cellStyle}>${new Date(item.date).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</td>`,
+         `<td ${cellStyle}>${item.productName ?? ''}</td>`,
+         `<td ${cellStyle}>${item.customerName ?? ''}</td>`,
+         `<td ${cellStyle}>${item.branch ?? ''}</td>`,
+         `<td ${cellStyle}>${item.quantity ?? ''}</td>`,
+         `<td ${cellStyle}>${item.engineer ?? ''}</td>`,
+         `<td ${cellStyle}>${item.category ?? ''}</td>`,
+         `<td ${cellStyle}>${item.itemCode ?? ''}</td>`,
+         `<td ${cellStyle}>${item.partNumber ?? ''}</td>`,
+         `<td ${cellStyle}>${item.brand ?? ''}</td>`,
+         `<td ${cellStyle}>${item.warehouseName ?? ''}</td>`,
+         `<td ${cellStyle}>${item.serialNumber ?? ''}</td>`,
+         `<td ${cellStyle}>${item.warrantyType ?? ''}</td>`,
+         `<td ${cellStyle}>${item.invoiceNumber ?? ''}</td>`
+       ]
+      
+      // Add price columns only if they have data (with Arabic formatting)
+       if (hasPurchasePrices) {
+         const formattedPurchase = item.purchasePrice ? `${Number(item.purchasePrice).toLocaleString('ar-SA')} ريال` : ''
+         cells.push(`<td ${cellStyle}>${formattedPurchase}</td>`)
+       }
+       if (hasSellingPrices) {
+         const formattedSelling = item.sellingPrice ? `${Number(item.sellingPrice).toLocaleString('ar-SA')} ريال` : ''
+         cells.push(`<td ${cellStyle}>${formattedSelling}</td>`)
+       }
+      
+      cells.push(`<td ${cellStyle}>${item.notes ?? ''}</td>`)
+      
+      const rowClass = chunkIdx > 0 && idx === 0 ? 'page-break avoid-break' : 'avoid-break'
+          return `<tr class="${rowClass}" style="background:${globalIdx % 2 === 0 ? '#ffffff' : '#f1f5f9'};">${cells.join('')}</tr>`
+        }).join('')
+        
+        return chunkRows
+      }).join('')
+    }
 
   const tableHtml = `
-    <table style="width:100%;border-collapse:collapse;font-size:11px;border:1px solid #e5e7eb;table-layout:fixed;">
-      <thead>
+    <style>
+      @media print {
+      thead { display: table-header-group; }
+      tbody { display: table-row-group; }
+      tr { page-break-inside: avoid; }
+      th { page-break-after: avoid; }
+      .page-break { page-break-before: always; }
+      .avoid-break { page-break-inside: avoid; }
+      table { page-break-inside: auto; }
+    }
+    </style>
+    <table style="width:100%;border-collapse:collapse;font-size:9px;border:1px solid #e5e7eb;table-layout:fixed;line-height:1.4;">
+      <thead style="display:table-header-group;">
         <tr>
-          ${tableHeaders.map(h => `<th style='border:1px solid #e5e7eb;background:#2563eb;color:#ffffff;padding:6px;text-align:center;'>${h}</th>`).join('')}
+          ${filteredHeaders.map(h => `<th style='border:1px solid #e5e7eb;background:linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);color:#ffffff;padding:10px;text-align:center;font-weight:bold;page-break-after:avoid;text-shadow:0 1px 2px rgba(0,0,0,0.2);'>${h}</th>`).join('')}
         </tr>
       </thead>
-      <tbody>
-        ${rowsHtml}
+      <tbody style="display:table-row-group;">
+        ${tableContent}
       </tbody>
     </table>
   `
 
-  const totalQuantity = data.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
-  const summaryHtml = `<div style="margin-top:8px;font-weight:700;">إجمالي الكمية: ${totalQuantity}</div>`
+  // Footer HTML
+  const footerHtml = `
+    <div style="margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#6b7280;text-align:center;">
+      <div>تم التصدير بواسطة نظام إدارة المخزون – ITMCO</div>
+      <div style="margin-top:4px;">تاريخ الإنشاء: ${new Date().toLocaleString('ar-SA')}</div>
+    </div>
+  `
 
-  container.innerHTML = headerHtml + filtersHtml + tableHtml + summaryHtml
+  container.innerHTML = headerHtml + filtersHtml + tableHtml + footerHtml
   document.body.appendChild(container)
 
   const runCapture = () => html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true }).then(canvas => {
@@ -233,33 +425,51 @@ export function exportToPDF(options: ExportOptions & { chartData?: any }): void 
 
 // Excel Export Function
 // Shared headers and row-mapping used by CSV, PDF and Excel exports
+// Enhanced table headers with priority ordering (most important first)
 const TABLE_HEADERS = [
   'رقم الإصدار',
   'التاريخ',
   'المنتج',
-  'الفئة',
-  'رقم القطعة',
-  'الماركة',
   'العميل',
   'الفرع',
   'الكمية',
   'المهندس',
+  'الفئة',
+  'كود المنتج',
+  'رقم القطعة',
+  'الماركة',
+  'المخزن',
   'الرقم التسلسلي',
+  'نوع الضمان',
+  'رقم الفاتورة',
+  'سعر الشراء',
+  'سعر البيع',
   'ملاحظات'
 ] as const
 
+// Enhanced mapping with priority ordering and Arabic formatting
 const mapRowForStrings = (item: ExportData): string[] => [
   `${item.id ?? ''}`,
-  new Date(item.date).toLocaleDateString('ar-SA'),
+  new Date(item.date).toLocaleDateString('ar-SA', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric'
+  }),
   item.productName ?? '',
-  item.category ?? '',
-  item.partNumber ?? '',
-  item.brand ?? '',
   item.customerName ?? '',
   item.branch ?? '',
   `${item.quantity ?? ''}`,
   item.engineer ?? '',
+  item.category ?? '',
+  item.itemCode ?? '',
+  item.partNumber ?? '',
+  item.brand ?? '',
+  item.warehouseName ?? '',
   item.serialNumber ?? '',
+  item.warrantyType ?? '',
+  item.invoiceNumber ?? '',
+  item.purchasePrice ? `${Number(item.purchasePrice).toLocaleString('ar-SA')} ريال` : '',
+  item.sellingPrice ? `${Number(item.sellingPrice).toLocaleString('ar-SA')} ريال` : '',
   item.notes ?? ''
 ]
 
@@ -300,13 +510,19 @@ export function exportToExcel(options: ExportOptions): void {
     new Date(item.date).toLocaleDateString('ar-SA'),
     item.productName || '',
     item.category || '',
+    item.itemCode || '',
     item.partNumber || '',
     item.brand || '',
     item.customerName || '',
     item.branch || '',
+    item.warehouseName || '',
     item.quantity,
     item.engineer || '',
     item.serialNumber || '',
+    item.warrantyType || '',
+    item.invoiceNumber || '',
+    item.purchasePrice || '',
+    item.sellingPrice || '',
     item.notes || ''
   ])
 
@@ -329,7 +545,8 @@ export function exportToExcel(options: ExportOptions): void {
   // Column widths (include margin col A)
   const columnWidths = [
     { wch: 3 }, { wch: 12 }, { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
-    { wch: 25 }, { wch: 20 }, { wch: 10 }, { wch: 20 }, { wch: 20 }, { wch: 30 }
+    { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 10 }, { wch: 20 }, { wch: 20 },
+    { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 30 }
   ]
   worksheet['!cols'] = columnWidths
 
@@ -400,7 +617,7 @@ export function exportToExcel(options: ExportOptions): void {
   }
 
   // Add summary row for total quantity (consider margin col)
-  const quantityColIndex = 9 // zero-based index including margin for 'الكمية'
+  const quantityColIndex = 11 // zero-based index including margin for 'الكمية'
   const summaryRowNumber = lastRowNumber + 1 // Excel 1-based row number
   const dataFirstRow = headerInfo.length + 2
   const quantityColLetter = XLSX.utils.encode_col(quantityColIndex)
@@ -473,14 +690,21 @@ export function validateExportData(data: any[]): { isValid: boolean; errors: str
     date: item.date || item.created_at || new Date().toISOString(),
     productName: item.productName || item.product_name || '',
     category: item.productDetails?.category || item.category || '',
+    itemCode: item.itemCode || item.item_code || '',
     partNumber: item.productDetails?.partNumber || item.part_number || '',
     brand: item.productDetails?.brand || item.brand || '',
     model: item.productDetails?.model || item.model || '',
     customerName: item.customerName || item.customer_name || '',
     branch: item.branch || '',
+    warehouseId: item.warehouseId || item.warehouse_id || 0,
+    warehouseName: item.warehouseName || item.warehouse_name || '',
     quantity: item.quantity || 0,
     engineer: item.engineer || '',
     serialNumber: item.serialNumber || item.serial_number || '',
+    warrantyType: item.warrantyType || item.warranty_type || '',
+    invoiceNumber: item.invoiceNumber || item.invoice_number || '',
+    purchasePrice: item.purchasePrice || item.purchase_price || 0,
+    sellingPrice: item.sellingPrice || item.selling_price || 0,
     notes: item.notes || ''
   }))
   

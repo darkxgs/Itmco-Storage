@@ -167,14 +167,41 @@ export default function SearchPage() {
       return
     }
 
-    const headers = Object.keys(results[0]).join(",")
+    // Define proper Arabic headers based on search type
+    const getHeaders = () => {
+      if (searchType === 'products') {
+        return ["الرقم", "التاريخ", "اسم المنتج", "الفئة", "كود المنتج", "رقم القطعة", "العلامة التجارية", "اسم العميل", "الفرع", "اسم المستودع", "الكمية", "المهندس", "الرقم التسلسلي", "نوع الضمان", "رقم الفاتورة", "سعر الشراء", "سعر البيع", "الملاحظات"]
+      } else {
+        return ["الرقم", "التاريخ", "اسم المنتج", "الفئة", "كود المنتج", "رقم القطعة", "العلامة التجارية", "اسم العميل", "الفرع", "اسم المستودع", "الكمية", "المهندس", "الرقم التسلسلي", "نوع الضمان", "رقم الفاتورة", "سعر الشراء", "سعر البيع", "الملاحظات"]
+      }
+    }
+
+    const headers = getHeaders().join(",")
     const csvContent = [
       headers,
-      ...results.map((row) =>
-        Object.values(row)
-          .map((value) => `"${value}"`)
-          .join(","),
-      ),
+      ...results.map((row) => {
+        const values = [
+          row.id || '',
+          row.date || row.created_at || '',
+          row.product_name || row.productName || '',
+          row.category || '',
+          row.item_code || '',
+          row.part_number || '',
+          row.brand || '',
+          row.customer_name || '',
+          row.branch || '',
+          row.warehouse_name || '',
+          row.quantity || '',
+          row.engineer || '',
+          row.serial_number || '',
+          row.warranty_type || '',
+          row.invoice_number || '',
+          row.purchase_price || '',
+          row.selling_price || '',
+          row.notes || ''
+        ]
+        return values.map((value) => `"${value}"`).join(",")
+      }),
     ].join("\n")
 
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })

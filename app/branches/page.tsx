@@ -109,7 +109,13 @@ export default function BranchesPage() {
         loadBranches()
       } catch (error) {
         console.error("Error deleting branch:", error)
-        toast.error("فشل في حذف الفرع")
+        const errorMessage = error instanceof Error ? error.message : "فشل في حذف الفرع"
+        
+        if (errorMessage.includes("issuances associated with this branch")) {
+          toast.error("لا يمكن حذف الفرع: يوجد إصدارات مرتبطة بهذا الفرع. يرجى إعادة تعيين أو حذف الإصدارات أولاً")
+        } else {
+          toast.error("فشل في حذف الفرع")
+        }
       }
     }
   }

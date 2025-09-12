@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Plus, Edit, Trash2, Warehouse, Search, Package } from "lucide-react"
+import { Sidebar } from "@/components/sidebar"
 import { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from "@/lib/database"
 import type { Warehouse, WarehouseInsert } from "@/lib/supabase"
 
@@ -113,269 +114,267 @@ export default function WarehousesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">جاري التحميل...</p>
+      <div className="flex min-h-screen bg-slate-900">
+        <Sidebar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-500 mx-auto"></div>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 relative overflow-hidden">
-      {/* Decorative background elements */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 via-transparent to-purple-500/5" />
-      <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl" />
-      
-      <div className="relative container mx-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4 space-x-reverse">
-          <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
-            <Warehouse className="h-8 w-8 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-white">إدارة المخازن</h1>
-            <p className="text-slate-400">إدارة مخازن الشركة والمواقع</p>
-          </div>
-        </div>
-        <div className="flex items-center space-x-4 space-x-reverse">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <Input
-              placeholder="البحث في المخازن..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-64 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-400 focus:bg-slate-800 focus:border-slate-600 transition-all duration-200"
-            />
-          </div>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                onClick={resetForm}
-                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                <Plus className="h-4 w-4 ml-2" />
-                إضافة مخزن جديد
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md bg-slate-800/95 border-slate-700/50 backdrop-blur-sm">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingWarehouse ? "تعديل المخزن" : "إضافة مخزن جديد"}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingWarehouse 
-                    ? "تعديل بيانات المخزن. رقم المخزن لا يمكن تعديله."
-                    : "إدخال بيانات المخزن الجديد. سيتم إنشاء رقم المخزن تلقائياً."
-                  }
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {editingWarehouse && (
-                  <div className="space-y-2">
-                    <Label>رقم المخزن</Label>
-                    <Input
-                      value={editingWarehouse.warehouse_number}
-                      disabled
-                      className="bg-slate-700/50 border-slate-600/50 text-slate-400"
-                    />
-                    <p className="text-sm text-gray-500">رقم المخزن لا يمكن تعديله</p>
-                  </div>
-                )}
-                <div className="space-y-2">
-                  <Label htmlFor="warehouse-name">اسم المخزن *</Label>
-                  <Input
-                    id="warehouse-name"
-                    value={form.name}
-                    onChange={(e) => setForm({...form, name: e.target.value})}
-                    placeholder="مثال: المخزن الرئيسي"
-                    className="bg-slate-700/50 border-slate-600/50 text-white focus:bg-slate-700 focus:border-slate-500 transition-colors"
-                    required
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="warehouse-location">الموقع</Label>
-                  <Input
-                    id="warehouse-location"
-                    value={form.location}
-                    onChange={(e) => setForm({...form, location: e.target.value})}
-                    placeholder="مثال: الطابق الأول - المبنى الرئيسي"
-                    className="bg-slate-700/50 border-slate-600/50 text-white focus:bg-slate-700 focus:border-slate-500 transition-colors"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="warehouse-description">الوصف</Label>
-                  <Textarea
-                    id="warehouse-description"
-                    value={form.description}
-                    onChange={(e) => setForm({...form, description: e.target.value})}
-                    placeholder="وصف المخزن والغرض منه..."
-                    className="bg-slate-700/50 border-slate-600/50 text-white focus:bg-slate-700 focus:border-slate-500 transition-colors"
-                    rows={3}
-                  />
-                </div>
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <Switch
-                    id="warehouse-active"
-                    checked={form.is_active}
-                    onCheckedChange={(checked) => setForm({...form, is_active: checked})}
-                  />
-                  <Label htmlFor="warehouse-active">مخزن نشط</Label>
-                </div>
-                <DialogFooter className="gap-3 pt-4">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setDialogOpen(false)}
-                    className="border-slate-600/50 hover:border-slate-500 hover:bg-slate-700/50 transition-all duration-200"
-                  >
-                    إلغاء
-                  </Button>
-                  <Button 
-                    type="submit"
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    {editingWarehouse ? "تحديث" : "إضافة"}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      <div className="grid gap-6">
-        {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/70 transition-all duration-200 hover:shadow-xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">إجمالي المخازن</CardTitle>
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <Warehouse className="h-4 w-4 text-blue-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-white">{warehouses.length}</div>
-              <p className="text-xs text-slate-400 mt-1">جميع المخازن المسجلة</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/70 transition-all duration-200 hover:shadow-xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">المخازن النشطة</CardTitle>
-              <div className="p-2 bg-green-500/20 rounded-lg">
-                <Package className="h-4 w-4 text-green-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-400">
-                {warehouses.filter(w => w.is_active).length}
-              </div>
-              <p className="text-xs text-slate-400 mt-1">مخازن جاهزة للاستخدام</p>
-            </CardContent>
-          </Card>
-          <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/70 transition-all duration-200 hover:shadow-xl">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300">المخازن غير النشطة</CardTitle>
-              <div className="p-2 bg-red-500/20 rounded-lg">
-                <Package className="h-4 w-4 text-red-400" />
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-400">
-                {warehouses.filter(w => !w.is_active).length}
-              </div>
-              <p className="text-xs text-slate-400 mt-1">مخازن معطلة مؤقتاً</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Warehouses Table */}
-        <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm">
-          <CardHeader>
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
-                <Warehouse className="h-5 w-5 text-blue-400" />
+    <div className="flex min-h-screen bg-slate-900">
+      <Sidebar />
+      <div className="flex-1 p-6 overflow-auto">
+        <div className="max-w-7xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4 space-x-reverse">
+              <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg">
+                <Warehouse className="h-8 w-8 text-white" />
               </div>
               <div>
-                <CardTitle className="text-white">قائمة المخازن</CardTitle>
-                <CardDescription className="text-slate-400">
-                  جميع مخازن الشركة مع أرقامها التلقائية ومعلوماتها
-                </CardDescription>
+                <h1 className="text-3xl font-bold text-white">إدارة المخازن</h1>
+                <p className="text-slate-400">إدارة مخازن الشركة والمواقع</p>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow className="border-slate-700/50 hover:bg-slate-700/30">
-                  <TableHead className="text-slate-300 font-semibold">رقم المخزن</TableHead>
-                  <TableHead className="text-slate-300 font-semibold">اسم المخزن</TableHead>
-                  <TableHead className="text-slate-300 font-semibold">الموقع</TableHead>
-                  <TableHead className="text-slate-300 font-semibold">الوصف</TableHead>
-                  <TableHead className="text-slate-300 font-semibold">تاريخ الإنشاء</TableHead>
-                  <TableHead className="text-slate-300 font-semibold">الحالة</TableHead>
-                  <TableHead className="text-slate-300 font-semibold">الإجراءات</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredWarehouses.map((warehouse) => (
-                  <TableRow key={warehouse.id} className="border-slate-700/50 hover:bg-slate-700/30 transition-colors">
-                    <TableCell className="font-mono font-medium text-blue-400">
-                      {warehouse.warehouse_number}
-                    </TableCell>
-                    <TableCell className="font-medium text-white">{warehouse.name}</TableCell>
-                    <TableCell className="text-slate-300">{warehouse.location || "-"}</TableCell>
-                    <TableCell className="max-w-xs truncate text-slate-300">
-                      {warehouse.description || "-"}
-                    </TableCell>
-                    <TableCell className="text-slate-300">
-                      {new Date(warehouse.created_at).toLocaleDateString('ar-SA')}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={warehouse.is_active ? "default" : "secondary"}>
-                        {warehouse.is_active ? "نشط" : "غير نشط"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2 space-x-reverse">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleEdit(warehouse)}
-                          className="border-slate-600/50 hover:border-blue-500 hover:bg-blue-500/10 hover:text-blue-400 transition-all duration-200"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(warehouse.id)}
-                          className="border-slate-600/50 hover:border-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-            {filteredWarehouses.length === 0 && (
-              <div className="text-center py-12 text-slate-400">
-                <Warehouse className="h-12 w-12 mx-auto mb-4 text-slate-500" />
-                <p className="text-lg font-medium mb-2">
-                  {searchTerm ? "لا توجد مخازن مطابقة للبحث" : "لا توجد مخازن مضافة بعد"}
-                </p>
-                <p className="text-sm">
-                  {searchTerm ? "جرب البحث بكلمات مختلفة" : "ابدأ بإضافة مخزن جديد"}
-                </p>
+            <div className="flex items-center space-x-4 space-x-reverse">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="البحث في المخازن..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 w-64 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-400 focus:bg-slate-800 focus:border-slate-600 transition-all duration-200"
+                />
               </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button 
+                    onClick={resetForm}
+                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+                  >
+                    <Plus className="h-4 w-4 ml-2" />
+                    إضافة مخزن جديد
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md bg-slate-800/95 border-slate-700/50 backdrop-blur-sm">
+                  <DialogHeader>
+                    <DialogTitle>
+                      {editingWarehouse ? "تعديل المخزن" : "إضافة مخزن جديد"}
+                    </DialogTitle>
+                    <DialogDescription>
+                      {editingWarehouse 
+                        ? "تعديل بيانات المخزن. رقم المخزن لا يمكن تعديله."
+                        : "إدخال بيانات المخزن الجديد. سيتم إنشاء رقم المخزن تلقائياً."
+                      }
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    {editingWarehouse && (
+                      <div className="space-y-2">
+                        <Label>رقم المخزن</Label>
+                        <Input
+                          value={editingWarehouse.warehouse_number}
+                          disabled
+                          className="bg-slate-700/50 border-slate-600/50 text-slate-400"
+                        />
+                        <p className="text-sm text-gray-500">رقم المخزن لا يمكن تعديله</p>
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="warehouse-name">اسم المخزن *</Label>
+                      <Input
+                        id="warehouse-name"
+                        value={form.name}
+                        onChange={(e) => setForm({...form, name: e.target.value})}
+                        required
+                        className="bg-slate-700/50 border-slate-600/50 text-white focus:bg-slate-700 focus:border-slate-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="warehouse-location">الموقع</Label>
+                      <Input
+                        id="warehouse-location"
+                        value={form.location}
+                        onChange={(e) => setForm({...form, location: e.target.value})}
+                        className="bg-slate-700/50 border-slate-600/50 text-white focus:bg-slate-700 focus:border-slate-500"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="warehouse-description">الوصف</Label>
+                      <Textarea
+                        id="warehouse-description"
+                        value={form.description}
+                        onChange={(e) => setForm({...form, description: e.target.value})}
+                        className="bg-slate-700/50 border-slate-600/50 text-white focus:bg-slate-700 focus:border-slate-500"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2 space-x-reverse">
+                      <Switch
+                        id="warehouse-active"
+                        checked={form.is_active}
+                        onCheckedChange={(checked) => setForm({...form, is_active: checked})}
+                      />
+                      <Label htmlFor="warehouse-active">مخزن نشط</Label>
+                    </div>
+                    <DialogFooter className="gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setDialogOpen(false)}
+                        className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                      >
+                        إلغاء
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                      >
+                        {editingWarehouse ? "تحديث" : "إضافة"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {/* Main Content */}
+          <div className="grid gap-6">
+            {/* Statistics Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/70 transition-all duration-200 hover:shadow-xl">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-slate-300">إجمالي المخازن</CardTitle>
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <Warehouse className="h-4 w-4 text-blue-400" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-white">{warehouses.length}</div>
+                  <p className="text-xs text-slate-400 mt-1">جميع المخازن المسجلة</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/70 transition-all duration-200 hover:shadow-xl">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-slate-300">المخازن النشطة</CardTitle>
+                  <div className="p-2 bg-green-500/20 rounded-lg">
+                    <Package className="h-4 w-4 text-green-400" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-400">
+                    {warehouses.filter(w => w.is_active).length}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">مخازن جاهزة للاستخدام</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm hover:bg-slate-800/70 transition-all duration-200 hover:shadow-xl">
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-slate-300">المخازن غير النشطة</CardTitle>
+                  <div className="p-2 bg-red-500/20 rounded-lg">
+                    <Package className="h-4 w-4 text-red-400" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-red-400">
+                    {warehouses.filter(w => !w.is_active).length}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">مخازن معطلة مؤقتاً</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Warehouses Table */}
+            <Card className="bg-slate-800/50 border-slate-700/50 backdrop-blur-sm">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/20 rounded-lg">
+                    <Warehouse className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-white">قائمة المخازن</CardTitle>
+                    <CardDescription className="text-slate-400">
+                      عرض وإدارة جميع المخازن المسجلة في النظام
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {filteredWarehouses.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-slate-700/50 hover:bg-slate-700/30">
+                        <TableHead className="text-slate-300 text-center w-[120px]">رقم المخزن</TableHead>
+                        <TableHead className="text-slate-300 text-left w-[200px]">اسم المخزن</TableHead>
+                        <TableHead className="text-slate-300 text-left w-[180px]">الموقع</TableHead>
+                        <TableHead className="text-slate-300 text-left w-[200px]">الوصف</TableHead>
+                        <TableHead className="text-slate-300 text-center w-[150px]">تاريخ الإنشاء</TableHead>
+                        <TableHead className="text-slate-300 text-center w-[100px]">الحالة</TableHead>
+                        <TableHead className="text-slate-300 text-center w-[120px]">الإجراءات</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredWarehouses.map((warehouse) => (
+                        <TableRow key={warehouse.id} className="border-slate-700/50 hover:bg-slate-700/30">
+                          <TableCell className="font-medium text-white text-center w-[120px]">
+                            {warehouse.warehouse_number}
+                          </TableCell>
+                          <TableCell className="text-white text-left w-[200px]">{warehouse.name}</TableCell>
+                          <TableCell className="text-slate-300 text-left w-[180px]">{warehouse.location || "-"}</TableCell>
+                          <TableCell className="text-slate-300 text-left w-[200px]">
+                            {warehouse.description || "-"}
+                          </TableCell>
+                          <TableCell className="text-slate-300 text-center w-[150px]">
+                            {new Date(warehouse.created_at).toLocaleDateString('ar-SA')}
+                          </TableCell>
+                          <TableCell className="text-center w-[100px]">
+                            <Badge variant={warehouse.is_active ? "default" : "secondary"}>
+                              {warehouse.is_active ? "نشط" : "غير نشط"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center w-[120px]">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleEdit(warehouse)}
+                                className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleDelete(warehouse.id)}
+                                className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-12">
+                    <Warehouse className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                    <p className="text-lg font-medium text-slate-300 mb-2">
+                      {searchTerm ? "لا توجد مخازن مطابقة للبحث" : "لا توجد مخازن مضافة بعد"}
+                    </p>
+                    <p className="text-sm text-slate-400">
+                      {searchTerm ? "جرب البحث بكلمات مختلفة" : "ابدأ بإضافة مخزن جديد"}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   )

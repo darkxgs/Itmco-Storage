@@ -1027,6 +1027,19 @@ export async function deleteBranch(id: number) {
       throw new SecurityError("Invalid branch ID", "INVALID_INPUT")
     }
 
+    // Check if branch has related issuances
+    const { data: relatedIssuances, error: checkError } = await supabase
+      .from("issuances")
+      .select("id")
+      .eq("branch_id", branchId)
+      .limit(1)
+
+    if (checkError) throw checkError
+
+    if (relatedIssuances && relatedIssuances.length > 0) {
+      throw new Error("Cannot delete branch: There are issuances associated with this branch. Please reassign or delete the issuances first.")
+    }
+
     const { error } = await createSecureQuery("branches", "delete")
       .delete()
       .eq("id", branchId)
@@ -1359,4 +1372,122 @@ export async function getUserById(userId: string) {
     if (error) throw error
     return data
   }, "Failed to fetch user")
+}
+
+// Categories CRUD operations
+export async function getCategories() {
+  return withErrorHandling(async () => {
+    const { data, error } = await supabase
+      .from("categories")
+      .select("*")
+      .order("name", { ascending: true })
+
+    if (error) throw error
+    return data || []
+  }, "Failed to fetch categories")
+}
+
+export async function createCategory(category: { name: string; description?: string; is_active?: boolean }) {
+  return withErrorHandling(async () => {
+    // Validate and sanitize input
+    const sanitizedCategory = validateObject(category)
+    
+    // Validate required fields
+    if (!sanitizedCategory.name || sanitizedCategory.name.trim().length === 0) {
+      throw new SecurityError("Category name is required", "INVALID_INPUT")
+    }
+
+    // Check for duplicate category name
+    const { data: existingCategory } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("name", sanitizedCategory.name.trim())
+      .single()
+
+    if (existingCategory) {
+      throw new SecurityError("Category with this name already exists", "DUPLICATE_ENTRY")
+    }
+
+    const { data, error } = await supabase
+      .from("categories")
+      .insert({
+        name: sanitizedCategory.name.trim(),
+        description: sanitizedCategory.description?.trim() || null,
+        is_active: sanitizedCategory.is_active ?? true
+      })
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }, "Failed to create category")
+}
+
+export async function updateCategory(id: number, updates: { name?: string; description?: string; is_active?: boolean }) {
+  return withErrorHandling(async () => {
+    // Validate and sanitize input
+    const sanitizedUpdates = validateObject(updates)
+    
+    // Validate ID
+    if (!id || id <= 0) {
+      throw new SecurityError("Invalid category ID", "INVALID_INPUT")
+    }
+
+    // If updating name, check for duplicates
+    if (sanitizedUpdates.name) {
+      const { data: existingCategory } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("name", sanitizedUpdates.name.trim())
+        .neq("id", id)
+        .single()
+
+      if (existingCategory) {
+        throw new SecurityError("Category with this name already exists", "DUPLICATE_ENTRY")
+      }
+    }
+
+    const updateData: any = {}
+    if (sanitizedUpdates.name !== undefined) updateData.name = sanitizedUpdates.name.trim()
+    if (sanitizedUpdates.description !== undefined) updateData.description = sanitizedUpdates.description?.trim() || null
+    if (sanitizedUpdates.is_active !== undefined) updateData.is_active = sanitizedUpdates.is_active
+
+    const { data, error } = await supabase
+      .from("categories")
+      .update(updateData)
+      .eq("id", id)
+      .select()
+      .single()
+
+    if (error) throw error
+    return data
+  }, "Failed to update category")
+}
+
+export async function deleteCategory(id: number) {
+  return withErrorHandling(async () => {
+    // Validate ID
+    if (!id || id <= 0) {
+      throw new SecurityError("Invalid category ID", "INVALID_INPUT")
+    }
+
+    // Check if category is being used by any products
+    const { data: productsUsingCategory } = await supabase
+      .from("products")
+      .select("id")
+      .eq("category", id)
+      .limit(1)
+
+    if (productsUsingCategory && productsUsingCategory.length > 0) {
+      throw new SecurityError("Cannot delete category that is being used by products", "CONSTRAINT_VIOLATION")
+    }
+
+    const { error } = await supabase
+      .from("categories")
+      .delete()
+      .eq("id", id)
+
+    if (error) throw error
+    return { success: true }
+  }, "Failed to delete category")
 }

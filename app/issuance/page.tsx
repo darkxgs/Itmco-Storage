@@ -43,8 +43,10 @@ export default function IssuancePage() {
   const [selectedBranch, setSelectedBranch] = useState("")
   const [selectedWarehouse, setSelectedWarehouse] = useState("")
   const [engineer, setEngineer] = useState("")
-  const [serialNumber, setSerialNumber] = useState("")
-  const [notes, setNotes] = useState("")
+  const [serialNumber, setSerialNumber] = useState('')
+  const [warrantyType, setWarrantyType] = useState('')
+  const [invoiceNumber, setInvoiceNumber] = useState('')
+  const [notes, setNotes] = useState('')
   const [editingIssuance, setEditingIssuance] = useState<any>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -58,6 +60,8 @@ export default function IssuancePage() {
   const [itemSearchResults, setItemSearchResults] = useState<Product[]>([])
   const [isItemSearching, setIsItemSearching] = useState(false)
   const [showProductSearch, setShowProductSearch] = useState(false)
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [selectedIndex, setSelectedIndex] = useState(-1)
   const { toast } = useToast()
 
   // Filter issuances based on search criteria
@@ -219,6 +223,8 @@ export default function IssuancePage() {
           warehouse_id: selectedWarehouse && selectedWarehouse !== "none" ? Number.parseInt(selectedWarehouse) : null,
           engineer,
           serial_number: serialNumber,
+          warranty_type: warrantyType,
+          invoice_number: warrantyType === 'no_warranty' ? invoiceNumber : null,
           notes,
           issued_by: user.id,
           date: new Date().toISOString().split('T')[0]
@@ -277,6 +283,8 @@ export default function IssuancePage() {
     setSelectedWarehouse(issuance.warehouse_id?.toString() || "")
     setEngineer(issuance.engineer || "")
     setSerialNumber(issuance.serial_number || "")
+    setWarrantyType(issuance.warranty_type || "")
+    setInvoiceNumber(issuance.invoice_number || "")
     setNotes(issuance.notes || "")
     setIsEditDialogOpen(true)
   }
@@ -303,6 +311,8 @@ export default function IssuancePage() {
         warehouse_id: selectedWarehouse && selectedWarehouse !== "none" ? Number.parseInt(selectedWarehouse) : null,
         engineer,
         serial_number: serialNumber,
+        warranty_type: warrantyType,
+        invoice_number: warrantyType === 'no_warranty' ? invoiceNumber : null,
         notes
       }
 
@@ -383,6 +393,8 @@ export default function IssuancePage() {
     setSelectedWarehouse("")
     setEngineer("")
     setSerialNumber("")
+    setWarrantyType("")
+    setInvoiceNumber("")
     setNotes("")
     setSelectedProducts([])
     setProductCodeSearch("")
@@ -526,26 +538,83 @@ export default function IssuancePage() {
   }, [itemCodeSearch])
 
   const filteredProductCodes = useMemo(() => {
-    if (!productCodeSearch) return products.filter(p => p.item_code)
+    if (!productCodeSearch || productCodeSearch.trim().length === 0) return []
     
-    // First try local search for immediate feedback
+    const searchTerm = productCodeSearch.toLowerCase().trim()
+    
+    // Enhanced local search with multiple field matching
     const localResults = products.filter(p => {
-      const code = p.item_code
-      return code && code.toLowerCase().includes(productCodeSearch.toLowerCase())
+      if (!p.item_code) return false
+      
+      const itemCode = p.item_code.toLowerCase()
+      const name = p.name.toLowerCase()
+      const brand = p.brand.toLowerCase()
+      const model = p.model.toLowerCase()
+      
+      // Search in multiple fields for better results
+      return itemCode.includes(searchTerm) ||
+             name.includes(searchTerm) ||
+             brand.includes(searchTerm) ||
+             model.includes(searchTerm) ||
+             itemCode.startsWith(searchTerm) // Prioritize exact matches
     })
     
-    // If we have search results from database, use them, otherwise use local results
-    return searchResults.length > 0 ? searchResults : localResults
+    // Sort results by relevance
+    const sortedResults = localResults.sort((a, b) => {
+      const aCode = a.item_code?.toLowerCase() || ''
+      const bCode = b.item_code?.toLowerCase() || ''
+      
+      // Exact matches first
+      if (aCode === searchTerm) return -1
+      if (bCode === searchTerm) return 1
+      
+      // Starts with search term
+      if (aCode.startsWith(searchTerm) && !bCode.startsWith(searchTerm)) return -1
+      if (bCode.startsWith(searchTerm) && !aCode.startsWith(searchTerm)) return 1
+      
+      // Alphabetical order
+      return aCode.localeCompare(bCode)
+    })
+    
+    // If we have search results from database, merge and deduplicate
+    if (searchResults.length > 0) {
+      const combined = [...searchResults, ...sortedResults]
+      const unique = combined.filter((item, index, self) => 
+        index === self.findIndex(t => t.id === item.id)
+      )
+      return unique.slice(0, 10) // Limit to 10 results for performance
+    }
+    
+    return sortedResults.slice(0, 10) // Limit to 10 results for performance
   }, [products, productCodeSearch, searchResults])
 
   const selectProductByCode = (product: Product) => {
+    // Set the selected product
     setSelectedProduct(product.id.toString())
-    setProductCodeSearch(product.item_code || "")
+    
+    // Clear search and hide dropdown with smooth transition
+    setProductCodeSearch("")
     setShowProductSearch(false)
+    
+    // Show success feedback
+    toast({
+      title: "تم اختيار المنتج",
+      description: `${product.item_code} - ${product.name}`,
+      duration: 2000,
+    })
+    
+    // Focus back to quantity field for better UX
+    setTimeout(() => {
+      const quantityInput = document.getElementById('quantity')
+      if (quantityInput) {
+        quantityInput.focus()
+      }
+    }, 100)
   }
 
   const filteredItemCodes = useMemo(() => {
-    if (!itemCodeSearch) return products.filter(p => p.item_code)
+    // Return empty array if no search term
+    if (!itemCodeSearch || itemCodeSearch.trim() === '') return []
     
     // First try local search for immediate feedback
     const localResults = products.filter(p => {
@@ -558,7 +627,17 @@ export default function IssuancePage() {
   }, [products, itemCodeSearch, itemSearchResults])
 
   const selectItemByCode = (product: Product) => {
+    // Keep the selected product code in the search field
     setItemCodeSearch(product.item_code || "")
+    setIsDropdownOpen(false)
+    setSelectedIndex(-1)
+    
+    // Show success feedback with enhanced styling
+    toast({
+      title: "✅ تم اختيار المنتج بنجاح",
+      description: `${product.item_code} - ${product.name}`,
+      duration: 3000,
+    })
   }
 
   const canEditOrDelete = (issuance: any) => {
@@ -684,54 +763,103 @@ export default function IssuancePage() {
                   </div>
                   
                   {showProductSearch && (
-                    <div className="mt-2 p-3 bg-slate-700 rounded-lg border border-slate-600">
-                      <Label htmlFor="productCode" className="text-slate-300 text-right text-sm">
-                        البحث بكود المنتج
-                      </Label>
-                      <div className="relative mt-1">
+                    <div className="mt-2 p-4 bg-gradient-to-br from-slate-700 to-slate-800 rounded-xl border border-slate-600 shadow-lg">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Search className="w-4 h-4 text-blue-400" />
+                        <Label htmlFor="productCode" className="text-slate-200 text-right text-sm font-medium">
+                          البحث السريع بكود المنتج
+                        </Label>
+                      </div>
+                      <div className="relative">
                         <Input
                           id="productCode"
                           value={productCodeSearch}
                           onChange={(e) => setProductCodeSearch(e.target.value)}
-                          placeholder="أدخل كود المنتج (مثل: ITM-01)"
-                          className="bg-slate-600 border-slate-500 text-white text-right"
-                          onKeyPress={(e) => {
+                          placeholder="ابدأ الكتابة للبحث... (مثل: ITM-01)"
+                          className="bg-slate-600/80 border-slate-500 text-white text-right pr-10 pl-4 py-3 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
+                          onKeyDown={(e) => {
                             if (e.key === 'Enter' && filteredProductCodes.length === 1) {
                               selectProductByCode(filteredProductCodes[0])
                             }
+                            if (e.key === 'Escape') {
+                              setProductCodeSearch('')
+                            }
                           }}
                         />
-                        {(productCodeSearch || filteredProductCodes.length > 0) && (
-                          <div className="absolute top-full left-0 right-0 mt-1 bg-slate-600 border border-slate-500 rounded-lg max-h-40 overflow-y-auto z-10">
+                        <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        
+                        {productCodeSearch && productCodeSearch.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 mt-2 bg-slate-700 border border-slate-500 rounded-xl shadow-2xl max-h-64 overflow-hidden z-20">
                             {filteredProductCodes.length > 0 ? (
-                              filteredProductCodes.map((product) => (
-                                <div
-                                  key={product.id}
-                                  className="p-2 hover:bg-slate-500 cursor-pointer border-b border-slate-500 last:border-b-0"
-                                  onClick={() => selectProductByCode(product)}
-                                  onDoubleClick={() => selectProductByCode(product)}
-                                >
-                                  <div className="text-white text-right text-sm font-medium">
-                                    {product.item_code}
-                                  </div>
-                                  <div className="text-slate-300 text-right text-xs">
-                                    {product.name} - {product.brand} {product.model}
-                                  </div>
-                                  <div className="text-slate-400 text-right text-xs">
-                                    متوفر: {product.stock} قطعة
+                              <>
+                                <div className="p-2 bg-slate-600 border-b border-slate-500">
+                                  <div className="text-xs text-slate-300 text-right">
+                                    {filteredProductCodes.length} نتيجة موجودة
                                   </div>
                                 </div>
-                              ))
+                                <div className="max-h-48 overflow-y-auto">
+                                  {filteredProductCodes.map((product, index) => (
+                                    <div
+                                      key={product.id}
+                                      className="p-3 hover:bg-slate-600 cursor-pointer border-b border-slate-600 last:border-b-0 transition-colors duration-150 group"
+                                      onClick={() => selectProductByCode(product)}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-right flex-1">
+                                          <div className="text-white text-sm font-semibold mb-1 group-hover:text-blue-300">
+                                            {product.item_code}
+                                          </div>
+                                          <div className="text-slate-300 text-xs mb-1">
+                                            {product.name}
+                                          </div>
+                                          <div className="text-slate-400 text-xs">
+                                            {product.brand} {product.model}
+                                          </div>
+                                        </div>
+                                        <div className="text-left ml-3">
+                                          <div className={`text-xs px-2 py-1 rounded-full ${
+                                            product.stock > 10 
+                                              ? 'bg-green-500/20 text-green-400' 
+                                              : product.stock > 0 
+                                              ? 'bg-yellow-500/20 text-yellow-400'
+                                              : 'bg-red-500/20 text-red-400'
+                                          }`}>
+                                            {product.stock} قطعة
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </>
                             ) : (
-                              <div className="p-2 text-slate-400 text-right text-sm">
-                                لا توجد منتجات تطابق البحث
+                              <div className="p-4 text-center">
+                                <div className="text-slate-400 text-sm mb-2">
+                                  🔍 لا توجد منتجات تطابق البحث
+                                </div>
+                                <div className="text-slate-500 text-xs">
+                                  جرب كلمات مختلفة أو تأكد من الإملاء
+                                </div>
                               </div>
                             )}
                           </div>
                         )}
                       </div>
-                      <div className="mt-2 text-xs text-slate-400 text-right">
-                        اكتب للبحث أو انقر نقرة مزدوجة للاختيار
+                      <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
+                        <div className="text-right">
+                          💡 اكتب للبحث الفوري • Enter للاختيار • Esc للإلغاء
+                        </div>
+                        {productCodeSearch && (
+                          <Button
+                            type="button"
+                            onClick={() => setProductCodeSearch('')}
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 px-2 text-slate-400 hover:text-white"
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -905,6 +1033,37 @@ export default function IssuancePage() {
                 </div>
 
                 <div className="grid gap-2">
+                  <Label htmlFor="warranty" className="text-slate-300 text-right">
+                    نوع الضمان
+                  </Label>
+                  <Select value={warrantyType} onValueChange={setWarrantyType}>
+                    <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
+                      <SelectValue placeholder="اختر نوع الضمان" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
+                      <SelectItem value="comprehensive">عقد شامل لقطع الغيار</SelectItem>
+                      <SelectItem value="warranty">ضمان</SelectItem>
+                      <SelectItem value="no_warranty">بدون ضمان</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {warrantyType === 'no_warranty' && (
+                  <div className="grid gap-2">
+                    <Label htmlFor="invoice" className="text-slate-300 text-right">
+                      رقم الفاتورة
+                    </Label>
+                    <Input
+                      id="invoice"
+                      value={invoiceNumber}
+                      onChange={(e) => setInvoiceNumber(e.target.value)}
+                      placeholder="رقم فاتورة قطع الغيار"
+                      className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                    />
+                  </div>
+                )}
+
+                <div className="grid gap-2">
                   <Label htmlFor="notes" className="text-slate-300 text-right">
                     ملاحظات (اختياري)
                   </Label>
@@ -952,45 +1111,141 @@ export default function IssuancePage() {
               <div>
                 <Label htmlFor="itemCode" className="text-slate-300 text-right">البحث بكود المنتج</Label>
                 <div className="relative">
-                  <Input
-                    id="itemCode"
-                    value={itemCodeSearch}
-                    onChange={(e) => setItemCodeSearch(e.target.value)}
-                    placeholder="أدخل كود المنتج للبحث (مثل: ITM-06)"
-                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter' && filteredItemCodes.length === 1) {
-                        selectItemByCode(filteredItemCodes[0])
-                      }
-                    }}
-                  />
-                  {(itemCodeSearch || filteredItemCodes.length > 0) && (
-                    <div className="absolute top-full left-0 right-0 mt-1 bg-slate-600 border border-slate-500 rounded-lg max-h-40 overflow-y-auto z-10">
-                      {filteredItemCodes.length > 0 ? (
-                        filteredItemCodes.map((product) => (
-                          <div
-                            key={product.id}
-                            className="p-2 hover:bg-slate-500 cursor-pointer border-b border-slate-500 last:border-b-0"
-                            onClick={() => selectItemByCode(product)}
-                            onDoubleClick={() => selectItemByCode(product)}
-                          >
-                            <div className="text-white text-right text-sm font-medium">
-                              {product.item_code}
-                            </div>
-                            <div className="text-slate-300 text-right text-xs">
-                              {product.name} - {product.brand} {product.model}
-                            </div>
-                            <div className="text-slate-400 text-right text-xs">
-                              متوفر: {product.stock} قطعة
+                  <div className="relative">
+                    <Input
+                      id="itemCode"
+                      value={itemCodeSearch}
+                      onChange={(e) => {
+                        setItemCodeSearch(e.target.value)
+                        setIsDropdownOpen(e.target.value.trim() !== '')
+                        setSelectedIndex(-1)
+                      }}
+                      onFocus={() => {
+                        if (itemCodeSearch.trim() !== '') {
+                          setIsDropdownOpen(true)
+                        }
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Escape') {
+                          setIsDropdownOpen(false)
+                          setSelectedIndex(-1)
+                        } else if (e.key === 'ArrowDown') {
+                          e.preventDefault()
+                          setSelectedIndex(prev => 
+                            prev < filteredItemCodes.length - 1 ? prev + 1 : prev
+                          )
+                        } else if (e.key === 'ArrowUp') {
+                          e.preventDefault()
+                          setSelectedIndex(prev => prev > 0 ? prev - 1 : -1)
+                        } else if (e.key === 'Enter') {
+                          e.preventDefault()
+                          if (selectedIndex >= 0 && filteredItemCodes[selectedIndex]) {
+                            selectItemByCode(filteredItemCodes[selectedIndex])
+                          } else if (filteredItemCodes.length === 1) {
+                            selectItemByCode(filteredItemCodes[0])
+                          }
+                        }
+                      }}
+                      placeholder="أدخل كود المنتج للبحث (مثل: ITM-06)"
+                      className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-all duration-200 pr-10"
+                    />
+                    {itemCodeSearch && (
+                      <button
+                        onClick={() => {
+                          setItemCodeSearch('')
+                          setIsDropdownOpen(false)
+                          setSelectedIndex(-1)
+                        }}
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-white transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  
+                  {/* Modern Dropdown */}
+                  {isDropdownOpen && itemCodeSearch.trim() !== '' && (
+                    <>
+                      {/* Backdrop */}
+                      <div 
+                        className="fixed inset-0 z-10" 
+                        onClick={() => {
+                          setIsDropdownOpen(false)
+                          setSelectedIndex(-1)
+                        }}
+                      />
+                      
+                      {/* Dropdown */}
+                      <div className="absolute top-full left-0 right-0 mt-2 z-20 animate-in slide-in-from-top-2 duration-200">
+                        <div className="bg-slate-800/95 backdrop-blur-sm border border-slate-600/50 rounded-xl shadow-2xl overflow-hidden">
+                          {/* Header */}
+                          <div className="px-4 py-3 bg-gradient-to-r from-blue-600/20 to-purple-600/20 border-b border-slate-600/50">
+                            <div className="flex items-center justify-between">
+                              <div className="text-sm text-slate-300 text-right">
+                                {filteredItemCodes.length > 0 
+                                  ? `تم العثور على ${filteredItemCodes.length} منتج`
+                                  : 'لا توجد نتائج'
+                                }
+                              </div>
+                              <Search className="w-4 h-4 text-blue-400" />
                             </div>
                           </div>
-                        ))
-                      ) : (
-                        <div className="p-2 text-slate-400 text-right text-sm">
-                          لا توجد منتجات تطابق البحث
+                          
+                          {/* Results */}
+                          <div className="max-h-64 overflow-y-auto">
+                            {filteredItemCodes.length > 0 ? (
+                              filteredItemCodes.map((product, index) => (
+                                <div
+                                  key={product.id}
+                                  className={`p-4 cursor-pointer transition-all duration-150 border-b border-slate-700/50 last:border-b-0 ${
+                                    index === selectedIndex 
+                                      ? 'bg-blue-600/20 border-blue-500/30' 
+                                      : 'hover:bg-slate-700/50'
+                                  }`}
+                                  onClick={() => selectItemByCode(product)}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="text-right flex-1">
+                                      <div className="text-white font-medium text-sm mb-1">
+                                        {product.item_code}
+                                      </div>
+                                      <div className="text-slate-300 text-xs mb-1">
+                                        {product.name} - {product.brand} {product.model}
+                                      </div>
+                                      <div className="flex items-center justify-end gap-2">
+                                        <Badge 
+                                          variant={product.stock > 10 ? "default" : product.stock > 0 ? "secondary" : "destructive"}
+                                          className="text-xs"
+                                        >
+                                          متوفر: {product.stock}
+                                        </Badge>
+                                      </div>
+                                    </div>
+                                    <div className="mr-3">
+                                      <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                                    </div>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-6 text-center">
+                                <div className="text-slate-400 text-sm mb-2">لا توجد منتجات تطابق البحث</div>
+                                <div className="text-slate-500 text-xs">جرب البحث بكود مختلف</div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Footer */}
+                          {filteredItemCodes.length > 0 && (
+                            <div className="px-4 py-2 bg-slate-900/50 border-t border-slate-600/50">
+                              <div className="text-xs text-slate-400 text-center">
+                                استخدم ↑↓ للتنقل، Enter للاختيار، Esc للإغلاق
+                              </div>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
@@ -1068,6 +1323,8 @@ export default function IssuancePage() {
                     <TableHead className="text-slate-300 text-right">المخزن</TableHead>
                     <TableHead className="text-slate-300 text-right">المهندس</TableHead>
                     <TableHead className="text-slate-300 text-right">الرقم التسلسلي</TableHead>
+                    <TableHead className="text-slate-300 text-right">نوع الضمان</TableHead>
+                    <TableHead className="text-slate-300 text-right">رقم الفاتورة</TableHead>
                     <TableHead className="text-slate-300 text-center">الإجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -1095,6 +1352,12 @@ export default function IssuancePage() {
                         </TableCell>
                         <TableCell className="text-slate-300 text-right">{issuance.engineer || 'غير محدد'}</TableCell>
                         <TableCell className="text-slate-300 text-right">{issuance.serial_number || 'غير محدد'}</TableCell>
+                        <TableCell className="text-slate-300 text-right">
+                          {issuance.warranty_type === 'comprehensive' ? 'عقد شامل لقطع الغيار' :
+                           issuance.warranty_type === 'warranty' ? 'ضمان' :
+                           issuance.warranty_type === 'no_warranty' ? 'بدون ضمان' : 'غير محدد'}
+                        </TableCell>
+                        <TableCell className="text-slate-300 text-right">{issuance.invoice_number || 'غير محدد'}</TableCell>
                         <TableCell className="text-center">
                           {canEditOrDelete(issuance) && (
                             <div className="flex justify-center gap-2">
@@ -1284,6 +1547,35 @@ export default function IssuancePage() {
                     value={serialNumber}
                     onChange={(e) => setSerialNumber(e.target.value)}
                     placeholder="أدخل الرقم التسلسلي"
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                  />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-warranty" className="text-slate-300 text-right">
+                  نوع الضمان
+                </Label>
+                <Select value={warrantyType} onValueChange={setWarrantyType}>
+                  <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
+                    <SelectValue placeholder="اختر نوع الضمان" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
+                    <SelectItem value="comprehensive">عقد شامل لقطع الغيار</SelectItem>
+                    <SelectItem value="warranty">ضمان</SelectItem>
+                    <SelectItem value="no_warranty">بدون ضمان</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-invoice" className="text-slate-300 text-right">
+                  رقم الفاتورة
+                </Label>
+                <Input
+                    id="edit-invoice"
+                    value={invoiceNumber}
+                    onChange={(e) => setInvoiceNumber(e.target.value)}
+                    placeholder="أدخل رقم الفاتورة"
                     className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                   />
               </div>

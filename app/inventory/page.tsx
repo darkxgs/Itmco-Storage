@@ -31,6 +31,7 @@ import {
   AlertTriangle,
   Filter,
   Download,
+  Upload,
   Package,
   TrendingUp,
   TrendingDown,
@@ -41,7 +42,7 @@ import {
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { getProducts, createProduct, updateProduct, deleteProduct, getWarehouses, searchByItemCode, generateNextItemCode } from "@/lib/database"
+import { getProducts, createProduct, updateProduct, deleteProduct, getWarehouses, getCategories, searchByItemCode, generateNextItemCode } from "@/lib/database"
 import { logActivity } from "@/lib/auth"
 import { validateData, productSchema } from "@/lib/validation"
 import { Pagination } from "@/components/ui/pagination"
@@ -90,6 +91,9 @@ export default function InventoryPage() {
   })
   const [formErrors, setFormErrors] = useState<string[]>([])  
   const [submitting, setSubmitting] = useState(false)
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importing, setImporting] = useState(false)
   const { toast } = useToast()
 
   // Simple role-based access check
@@ -406,14 +410,18 @@ export default function InventoryPage() {
   const handleExportProducts = () => {
     try {
       const csvData = [
-        ["اسم المنتج", "العلامة التجارية", "الموديل", "الفئة", "المخزون", "الحد الأدنى", "الوصف"],
+        ["اسم المنتج", "العلامة التجارية", "الموديل", "الفئة", "كود المنتج", "اسم المستودع", "المخزون", "الحد الأدنى", "سعر الشراء", "سعر البيع", "الوصف"],
         ...filteredProducts.map((product) => [
           product.name,
           product.brand,
           product.model,
           product.category,
+          product.item_code || "",
+          product.warehouse_name || "",
           product.stock,
           product.min_stock || product.minStock,
+          product.purchase_price || "",
+          product.selling_price || "",
           product.description || "",
         ]),
       ]
@@ -437,6 +445,331 @@ export default function InventoryPage() {
       toast({
         title: "فشل في التصدير",
         description: "حدث خطأ أثناء تصدير البيانات",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleImportExcel = async () => {
+    if (!importFile) {
+      toast({
+        title: "خطأ",
+        description: "يرجى اختيار ملف Excel",
+        variant: "destructive",
+      })
+      return
+    }
+
+    setImporting(true)
+    try {
+      // Import xlsx library dynamically
+      const XLSX = await import('xlsx')
+      
+      const data = await importFile.arrayBuffer()
+      const workbook = XLSX.read(data, { type: 'array' })
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+
+      if (jsonData.length < 2) {
+        throw new Error("الملف فارغ أو لا يحتوي على بيانات")
+      }
+
+      const headers = jsonData[0] as string[]
+      const rows = jsonData.slice(1) as any[][]
+
+      // Map column indices
+      const columnMap = {
+        name: headers.findIndex(h => h?.includes('اسم المنتج') || h?.includes('name')),
+        brand: headers.findIndex(h => h?.includes('العلامة التجارية') || h?.includes('brand')),
+        model: headers.findIndex(h => h?.includes('الموديل') || h?.includes('model')),
+        category: headers.findIndex(h => h?.includes('الفئة') || h?.includes('category')),
+        item_code: headers.findIndex(h => h?.includes('كود الصنف') || h?.includes('item_code')),
+        warehouse: headers.findIndex(h => h?.includes('المخزن') || h?.includes('warehouse')),
+        purchase_price: headers.findIndex(h => h?.includes('سعر الشراء') || h?.includes('purchase_price')),
+        selling_price: headers.findIndex(h => h?.includes('سعر البيع') || h?.includes('selling_price')),
+        stock: headers.findIndex(h => h?.includes('الكمية') || h?.includes('stock')),
+        minStock: headers.findIndex(h => h?.includes('الحد الأدنى') || h?.includes('min_stock')),
+        description: headers.findIndex(h => h?.includes('الوصف') || h?.includes('description'))
+      }
+
+      // Validate required columns
+      if (columnMap.name === -1 || columnMap.brand === -1 || columnMap.category === -1) {
+        throw new Error("الملف يجب أن يحتوي على الأعمدة المطلوبة: اسم المنتج، العلامة التجارية، الفئة")
+      }
+
+      const importedProducts = []
+      const errors = []
+
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i]
+        if (!row || row.length === 0) continue
+
+        try {
+          // Find warehouse by name
+          const warehouseName = row[columnMap.warehouse]?.toString()?.trim()
+          const warehouse = warehouses.find(w => w.name === warehouseName)
+          
+          const productData = {
+            name: row[columnMap.name]?.toString()?.trim() || '',
+            brand: row[columnMap.brand]?.toString()?.trim() || '',
+            model: row[columnMap.model]?.toString()?.trim() || '',
+            category: row[columnMap.category]?.toString()?.trim() || '',
+            item_code: row[columnMap.item_code]?.toString()?.trim() || '',
+            warehouse_id: warehouse?.id?.toString() || warehouses[0]?.id?.toString() || '',
+            purchase_price: row[columnMap.purchase_price]?.toString() || '',
+            selling_price: row[columnMap.selling_price]?.toString() || '',
+            stock: parseInt(row[columnMap.stock]?.toString()) || 0,
+            minStock: parseInt(row[columnMap.minStock]?.toString()) || 5,
+            description: row[columnMap.description]?.toString()?.trim() || ''
+          }
+
+          // Validate required fields
+          if (!productData.name || !productData.brand || !productData.category) {
+            errors.push(`الصف ${i + 2}: بيانات مطلوبة مفقودة (اسم المنتج، العلامة التجارية، الفئة)`)
+            continue
+          }
+
+          // Generate item code if not provided
+          if (!productData.item_code) {
+            productData.item_code = await generateNextItemCode()
+          }
+
+          const newProduct = await createProduct(productData, user.id)
+          importedProducts.push(newProduct)
+
+        } catch (error: any) {
+          errors.push(`الصف ${i + 2}: ${error.message}`)
+        }
+      }
+
+      // Update products list
+      if (importedProducts.length > 0) {
+        setProducts([...importedProducts, ...products])
+        
+        // Log activity
+        await logActivity(
+          user.id,
+          user.name,
+          "استيراد منتجات",
+          "إدارة المخزون",
+          `تم استيراد ${importedProducts.length} منتج من ملف Excel`
+        )
+      }
+
+      // Show results
+      if (errors.length > 0) {
+        toast({
+          title: `تم استيراد ${importedProducts.length} منتج مع ${errors.length} خطأ`,
+          description: errors.slice(0, 3).join('\n') + (errors.length > 3 ? '\n...' : ''),
+          variant: "destructive",
+        })
+      } else {
+        toast({
+          title: "تم الاستيراد بنجاح",
+          description: `تم استيراد ${importedProducts.length} منتج بنجاح`,
+        })
+      }
+
+      // Close dialog and reset
+      setIsImportDialogOpen(false)
+      setImportFile(null)
+
+    } catch (error: any) {
+      console.error("Error importing Excel:", error)
+      toast({
+        title: "فشل في الاستيراد",
+        description: error.message || "حدث خطأ أثناء استيراد الملف",
+        variant: "destructive",
+      })
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  const handleDownloadTemplate = async () => {
+    try {
+      // Import ExcelJS library dynamically
+      const ExcelJS = await import('exceljs')
+      
+      // Fetch fresh categories and warehouses from database
+      const [categoriesData, warehousesData] = await Promise.all([
+        getCategories(),
+        getWarehouses()
+      ])
+      
+      // Create a new workbook
+      const workbook = new ExcelJS.Workbook()
+      
+      // Create the main data sheet
+      const worksheet = workbook.addWorksheet('المنتجات')
+      
+      // Add headers with styling
+      const headers = [
+        'اسم المنتج',
+        'العلامة التجارية', 
+        'الموديل',
+        'الفئة',
+        'كود الصنف',
+        'المخزن',
+        'سعر الشراء',
+        'سعر البيع',
+        'الكمية',
+        'الحد الأدنى',
+        'الوصف'
+      ]
+      
+      const headerRow = worksheet.addRow(headers)
+      headerRow.font = { bold: true, color: { argb: 'FFFFFF' } }
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: '366092' }
+      }
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle' }
+      
+      // Add sample data row
+      const sampleData = [
+        'آلة عد النقود ABC-123',
+        'ABC Company',
+        'Model-2024',
+        'آلات عد النقود',
+        'ITM-001',
+        'المخزن الرئيسي',
+        '1500',
+        '2000',
+        '10',
+        '5',
+        'آلة عد النقود عالية الجودة'
+      ]
+      
+      const sampleRow = worksheet.addRow(sampleData)
+      sampleRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'F0F8FF' }
+      }
+      
+      // Set column widths
+      worksheet.columns = [
+        { width: 25 }, // اسم المنتج
+        { width: 20 }, // العلامة التجارية
+        { width: 15 }, // الموديل
+        { width: 20 }, // الفئة
+        { width: 15 }, // كود الصنف
+        { width: 20 }, // المخزن
+        { width: 12 }, // سعر الشراء
+        { width: 12 }, // سعر البيع
+        { width: 10 }, // الكمية
+        { width: 12 }, // الحد الأدنى
+        { width: 30 }  // الوصف
+      ]
+      
+      // Add data validation for categories (column D - الفئة)
+      if (categoriesData && categoriesData.length > 0) {
+        const categoryNames = categoriesData.map(cat => cat.name).join(',')
+        worksheet.dataValidations.add('D2:D1000', {
+          type: 'list',
+          allowBlank: true,
+          formulae: [`"${categoryNames}"`],
+          showErrorMessage: true,
+          errorTitle: 'خطأ في الفئة',
+          error: 'يرجى اختيار فئة من القائمة المنسدلة'
+        })
+      }
+      
+      // Add data validation for warehouses (column F - المخزن)
+      if (warehousesData && warehousesData.length > 0) {
+        const warehouseNames = warehousesData.map(warehouse => warehouse.name).join(',')
+        worksheet.dataValidations.add('F2:F1000', {
+          type: 'list',
+          allowBlank: true,
+          formulae: [`"${warehouseNames}"`],
+          showErrorMessage: true,
+          errorTitle: 'خطأ في المخزن',
+          error: 'يرجى اختيار مخزن من القائمة المنسدلة'
+        })
+      }
+      
+      // Create categories reference sheet
+      const categoriesSheet = workbook.addWorksheet('الفئات')
+      categoriesSheet.addRow(['الفئات المتاحة'])
+      if (categoriesData && categoriesData.length > 0) {
+        categoriesData.forEach(cat => {
+          categoriesSheet.addRow([cat.name])
+        })
+      }
+      categoriesSheet.getRow(1).font = { bold: true }
+      categoriesSheet.getColumn(1).width = 30
+      
+      // Create warehouses reference sheet
+      const warehousesSheet = workbook.addWorksheet('المخازن')
+      warehousesSheet.addRow(['المخازن المتاحة'])
+      if (warehousesData && warehousesData.length > 0) {
+        warehousesData.forEach(warehouse => {
+          warehousesSheet.addRow([warehouse.name])
+        })
+      }
+      warehousesSheet.getRow(1).font = { bold: true }
+      warehousesSheet.getColumn(1).width = 30
+      
+      // Create instructions sheet
+      const instructionsSheet = workbook.addWorksheet('التعليمات')
+      const instructions = [
+        ['تعليمات استيراد المنتجات'],
+        [''],
+        ['الحقول المطلوبة (يجب ملؤها):'],
+        ['• اسم المنتج'],
+        ['• العلامة التجارية'],
+        ['• الفئة (اختر من القائمة المنسدلة)'],
+        [''],
+        ['الحقول الاختيارية:'],
+        ['• الموديل'],
+        ['• كود الصنف (سيتم إنشاؤه تلقائياً إذا ترك فارغاً)'],
+        ['• المخزن (اختر من القائمة المنسدلة)'],
+        ['• سعر الشراء'],
+        ['• سعر البيع'],
+        ['• الكمية (افتراضي: 0)'],
+        ['• الحد الأدنى (افتراضي: 5)'],
+        ['• الوصف'],
+        [''],
+        ['ملاحظات مهمة:'],
+        ['• استخدم القوائم المنسدلة للفئات والمخازن'],
+        ['• احذف الصف النموذجي قبل إضافة بياناتك'],
+        ['• تأكد من حفظ الملف بصيغة Excel (.xlsx)'],
+        ['• يمكنك مراجعة الفئات والمخازن المتاحة في الأوراق المرجعية']
+      ]
+      
+      instructions.forEach(instruction => {
+        instructionsSheet.addRow(instruction)
+      })
+      
+      instructionsSheet.getRow(1).font = { bold: true, size: 14 }
+      instructionsSheet.getColumn(1).width = 60
+      
+      // Generate and download the file
+      const buffer = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `قالب_استيراد_المنتجات_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+      
+      toast({
+        title: "تم تحميل القالب",
+        description: "تم تحميل قالب Excel مع القوائم المنسدلة بنجاح. يرجى ملء البيانات واستيرادها.",
+      })
+      
+    } catch (error: any) {
+      console.error("Error downloading template:", error)
+      toast({
+        title: "فشل في تحميل القالب",
+        description: "حدث خطأ أثناء إنشاء قالب Excel",
         variant: "destructive",
       })
     }
@@ -590,6 +923,97 @@ export default function InventoryPage() {
                     <span className="hidden sm:inline">تصدير CSV</span>
                     <span className="sm:hidden">تصدير</span>
                   </Button>
+                  {canAddProduct() && (
+                    <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm" className="bg-green-600/80 hover:bg-green-600 border-green-500/50 hover:border-green-500 transition-colors shadow-lg text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2">
+                          <Upload className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2" />
+                          <span className="hidden sm:inline">استيراد Excel</span>
+                          <span className="sm:hidden">استيراد</span>
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="bg-slate-800/95 border-slate-700/50 text-white max-w-2xl backdrop-blur-sm shadow-2xl" dir="rtl">
+                        <DialogHeader>
+                          <DialogTitle className="text-right">استيراد منتجات من ملف Excel</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                          <Alert className="bg-green-900/20 border-green-800">
+                            <Download className="h-4 w-4" />
+                            <AlertDescription className="text-green-300">
+                              <div className="font-medium mb-3">ابدأ بتحميل القالب الجاهز:</div>
+                              <Button
+                                onClick={handleDownloadTemplate}
+                                variant="outline"
+                                className="bg-green-700/30 border-green-600/50 hover:bg-green-600/40 text-green-200 hover:text-green-100 mb-3"
+                              >
+                                <Download className="w-4 h-4 ml-2" />
+                                تحميل قالب Excel
+                              </Button>
+                              <div className="text-sm text-green-400">
+                                القالب يحتوي على جميع الأعمدة المطلوبة وقوائم مرجعية للفئات والمخازن
+                              </div>
+                            </AlertDescription>
+                          </Alert>
+                          <Alert className="bg-blue-900/20 border-blue-800">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription className="text-blue-300">
+                              <div className="font-medium mb-2">تعليمات مهمة:</div>
+                              <ul className="list-disc list-inside space-y-1 text-sm">
+                                <li><strong>الحقول المطلوبة:</strong> اسم المنتج، العلامة التجارية، الفئة</li>
+                                <li><strong>الفئة والمخزن:</strong> يجب أن تطابق تماماً الأسماء في القوائم المرجعية</li>
+                                <li><strong>كود الصنف:</strong> سيتم إنشاؤه تلقائياً إذا ترك فارغاً</li>
+                                <li><strong>صيغة الملف:</strong> .xlsx أو .xls فقط</li>
+                                <li><strong>احذف الصف النموذجي</strong> من القالب قبل إضافة بياناتك</li>
+                              </ul>
+                            </AlertDescription>
+                          </Alert>
+                          <div className="grid gap-4">
+                            <div className="grid gap-2">
+                              <Label htmlFor="excel-file" className="text-right">
+                                اختر ملف Excel *
+                              </Label>
+                              <Input
+                                id="excel-file"
+                                type="file"
+                                accept=".xlsx,.xls"
+                                onChange={(e) => setImportFile(e.target.files?.[0] || null)}
+                                className="bg-slate-700/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/20 text-right transition-colors"
+                              />
+                            </div>
+                            <div className="flex gap-3 justify-end">
+                              <Button
+                                variant="outline"
+                                onClick={() => {
+                                  setIsImportDialogOpen(false)
+                                  setImportFile(null)
+                                }}
+                                className="bg-slate-700/50 border-slate-600/50 hover:bg-slate-600/50"
+                              >
+                                إلغاء
+                              </Button>
+                              <Button
+                                onClick={handleImportExcel}
+                                disabled={!importFile || importing}
+                                className="bg-green-600/80 hover:bg-green-600 border-green-500/50 hover:border-green-500"
+                              >
+                                {importing ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                                    جاري الاستيراد...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Upload className="w-4 h-4 ml-2" />
+                                    استيراد البيانات
+                                  </>
+                                )}
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
                   {canAddProduct() && (
                     <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
                       <DialogTrigger asChild>

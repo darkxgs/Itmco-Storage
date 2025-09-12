@@ -174,13 +174,15 @@ export default function ProfitMarginReportPage() {
       "اسم المنتج",
       "العلامة التجارية",
       "الفئة",
+      "كود المنتج",
       "المخزن",
       "سعر الشراء",
       "سعر البيع",
       "هامش الربح",
       "نسبة هامش الربح %",
       "الكمية",
-      "إجمالي الربح المحتمل"
+      "إجمالي الربح المحتمل",
+      "الوصف"
     ]
     
     const csvContent = [
@@ -189,13 +191,15 @@ export default function ProfitMarginReportPage() {
         item.name,
         item.brand,
         item.category,
+        item.item_code || '',
         item.warehouse_name,
         item.purchase_price.toFixed(2),
         item.selling_price.toFixed(2),
         item.profit_margin.toFixed(2),
         item.profit_margin_percentage.toFixed(2),
         item.stock,
-        item.total_profit_potential.toFixed(2)
+        item.total_profit_potential.toFixed(2),
+        item.description || ''
       ].join(","))
     ].join("\n")
     
@@ -235,14 +239,14 @@ export default function ProfitMarginReportPage() {
     <ErrorBoundary>
       <div className="flex h-screen bg-slate-950 relative overflow-hidden">
         {/* Decorative background */}
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.20),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.20),transparent_60%),radial-gradient(500px_circle_at_50%_50%,rgba(34,197,94,0.10),transparent_60%)]" />
-        <div className="absolute inset-0">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 [background:radial-gradient(700px_circle_at_100%_0%,rgba(37,99,235,0.20),transparent_60%),radial-gradient(700px_circle_at_0%_100%,rgba(14,165,233,0.20),transparent_60%),radial-gradient(500px_circle_at_50%_50%,rgba(34,197,94,0.10),transparent_60%)]" />
+        <div className="absolute inset-0 -z-10">
           <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
           <div className="absolute bottom-0 right-0 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" />
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-green-500/10 rounded-full blur-3xl" />
         </div>
         <Sidebar />
-        <div className="flex-1 overflow-auto relative">
+        <div className="flex-1 overflow-auto relative z-10">
           <div className="p-6">
             <div className="mb-8 relative">
               <div className="flex items-center gap-4 mb-4">
@@ -474,39 +478,39 @@ export default function ProfitMarginReportPage() {
                     <Table>
                       <TableHeader>
                         <TableRow className="border-slate-600/50 bg-slate-700/30">
-                          <TableHead className="text-slate-200 font-semibold">اسم المنتج</TableHead>
-                          <TableHead className="text-slate-200 font-semibold">العلامة التجارية</TableHead>
-                          <TableHead className="text-slate-200 font-semibold">الفئة</TableHead>
-                          <TableHead className="text-slate-200 font-semibold">المخزن</TableHead>
-                          <TableHead className="text-slate-200 font-semibold">سعر الشراء</TableHead>
-                          <TableHead className="text-slate-200 font-semibold">سعر البيع</TableHead>
-                          <TableHead className="text-slate-200 font-semibold">هامش الربح</TableHead>
-                          <TableHead className="text-slate-200 font-semibold">نسبة هامش الربح</TableHead>
-                          <TableHead className="text-slate-200 font-semibold">الكمية</TableHead>
-                          <TableHead className="text-slate-200 font-semibold">إجمالي الربح المحتمل</TableHead>
+                          <TableHead className="text-slate-200 font-semibold text-left w-[180px]">اسم المنتج</TableHead>
+                           <TableHead className="text-slate-200 font-semibold text-left w-[140px]">العلامة التجارية</TableHead>
+                           <TableHead className="text-slate-200 font-semibold text-left w-[120px]">الفئة</TableHead>
+                           <TableHead className="text-slate-200 font-semibold text-center w-[140px]">المخزن</TableHead>
+                           <TableHead className="text-slate-200 font-semibold text-right w-[120px]">سعر الشراء</TableHead>
+                           <TableHead className="text-slate-200 font-semibold text-right w-[120px]">سعر البيع</TableHead>
+                           <TableHead className="text-slate-200 font-semibold text-right w-[120px]">هامش الربح</TableHead>
+                           <TableHead className="text-slate-200 font-semibold text-right w-[140px]">نسبة هامش الربح</TableHead>
+                           <TableHead className="text-slate-200 font-semibold text-right w-[100px]">الكمية</TableHead>
+                           <TableHead className="text-slate-200 font-semibold text-right w-[160px]">إجمالي الربح المحتمل</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {sortedData.map((item) => (
                           <TableRow key={item.id} className="border-slate-600/50 hover:bg-slate-700/30 transition-colors duration-200">
-                            <TableCell className="font-medium text-white">{item.name}</TableCell>
-                            <TableCell className="text-slate-300">{item.brand}</TableCell>
-                            <TableCell className="text-slate-300">{item.category}</TableCell>
-                            <TableCell className="text-slate-300">{item.warehouse_name}</TableCell>
-                            <TableCell className="text-slate-300 font-mono">{item.purchase_price.toFixed(2)}</TableCell>
-                            <TableCell className="text-slate-300 font-mono">{item.selling_price.toFixed(2)}</TableCell>
-                            <TableCell>
+                            <TableCell className="font-medium text-white text-left w-[180px]">{item.name}</TableCell>
+                            <TableCell className="text-slate-300 text-left w-[140px]">{item.brand}</TableCell>
+                            <TableCell className="text-slate-300 text-left w-[120px]">{item.category}</TableCell>
+                            <TableCell className="text-slate-300 text-center w-[140px]">{item.warehouse_name}</TableCell>
+                            <TableCell className="text-slate-300 font-mono text-right w-[120px]">{item.purchase_price.toFixed(2)}</TableCell>
+                            <TableCell className="text-slate-300 font-mono text-right w-[120px]">{item.selling_price.toFixed(2)}</TableCell>
+                            <TableCell className="text-right w-[120px]">
                               <span className={item.profit_margin >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
                                 {item.profit_margin.toFixed(2)}
                               </span>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="text-right w-[140px]">
                               <Badge className={`${getMarginBadgeColor(item.profit_margin_percentage)} text-white`}>
                                 {item.profit_margin_percentage.toFixed(1)}%
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-slate-300">{item.stock}</TableCell>
-                            <TableCell>
+                            <TableCell className="text-slate-300 text-right w-[100px]">{item.stock}</TableCell>
+                            <TableCell className="text-right w-[160px]">
                               <span className={item.total_profit_potential >= 0 ? "text-green-400 font-semibold" : "text-red-400 font-semibold"}>
                                 {item.total_profit_potential.toFixed(2)}
                               </span>

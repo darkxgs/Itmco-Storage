@@ -1,13 +1,12 @@
 "use client"
 
-import { useEffect, useState, useMemo } from "react"
+import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Package, TrendingUp, AlertTriangle, Users, RefreshCw, BarChart3 as BarChartIcon, CheckCircle, XCircle, Clock as ClockIcon, ArrowUpRight, ArrowDownRight } from "lucide-react"
+import { Package, TrendingUp, AlertTriangle, Users, RefreshCw, BarChart3 as BarChartIcon } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
-import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis, CartesianGrid, LabelList } from "recharts"
+import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts"
 import { Button } from "@/components/ui/button"
-import { Switch } from "@/components/ui/switch"
 import {
   getDashboardStats,
   getMonthlyIssuances,
@@ -31,28 +30,17 @@ export default function DashboardPage() {
     todayIssuances: 0,
     lowStockCount: 0,
   })
-  const [monthlyStockData, setMonthlyStockData] = useState<any[]>([])
-  const [weeklyIssuanceData, setWeeklyIssuanceData] = useState<any[]>([])
-  const [monthlyData, setMonthlyData] = useState<any[]>([])
-  const [productData, setProductData] = useState<any[]>([])
-  const [branchData, setBranchData] = useState<any[]>([])
-  const [recentActivity, setRecentActivity] = useState<any[]>([])
+  const [monthlyStockData, setMonthlyStockData] = useState([])
+  const [weeklyIssuanceData, setWeeklyIssuanceData] = useState([])
+  const [monthlyData, setMonthlyData] = useState([])
+  const [productData, setProductData] = useState([])
+  const [branchData, setBranchData] = useState([])
+  const [recentActivity, setRecentActivity] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  // UI state: auto-refresh and last updated
-  const [autoRefresh, setAutoRefresh] = useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      const pref = localStorage.getItem("dashboardAutoRefresh")
-      return pref ? pref === "true" : true
-    }
-    return true
-  })
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
-
-  // Unified color palette
-  const COLORS = useMemo(() => ["#60a5fa", "#34d399", "#f59e0b", "#a78bfa"], [])
+  // Remove the manual user loading effect since useAuth handles it
 
   const loadDashboardData = async (showRefreshToast = false) => {
     if (!user) return
@@ -80,7 +68,6 @@ export default function DashboardPage() {
       setRecentActivity(activityData)
       setMonthlyStockData(stockData)
       setWeeklyIssuanceData(issuanceData)
-      setLastUpdated(new Date())
 
       if (showRefreshToast) {
         toast({
@@ -106,50 +93,9 @@ export default function DashboardPage() {
     loadDashboardData()
   }, [user])
 
-  // Persist auto-refresh preference and schedule refreshes
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("dashboardAutoRefresh", String(autoRefresh))
-    }
-    if (!autoRefresh || !user) return
-    const id = setInterval(() => {
-      loadDashboardData(true)
-    }, 5 * 60 * 1000) // every 5 minutes
-    return () => clearInterval(id)
-  }, [autoRefresh, user])
-
   const handleRefresh = () => {
     loadDashboardData(true)
   }
-
-  // Helpers: activity icon by action
-  const getActivityIcon = (action: string) => {
-    const lower = action.toLowerCase()
-    if (/[\u0625\u062C\u062F\u0622]?نشاء|إصدار|تم|نجاح|إنجاز/.test(action)) {
-      return <CheckCircle className="w-4 h-4 text-green-400 mt-0.5" />
-    }
-    if (/حذف|فشل|خطأ|رفض/.test(action)) {
-      return <XCircle className="w-4 h-4 text-red-400 mt-0.5" />
-    }
-    return <ClockIcon className="w-4 h-4 text-slate-400 mt-0.5" />
-  }
-
-  // Simple trends based on available series
-  const stockTrend = useMemo(() => {
-    const s = monthlyStockData
-    if (!s || s.length < 2) return 0
-    const last = s[s.length - 1]?.stock ?? 0
-    const prev = s[s.length - 2]?.stock ?? 0
-    return last - prev
-  }, [monthlyStockData])
-
-  const issuanceTrend = useMemo(() => {
-    const s = weeklyIssuanceData
-    if (!s || s.length < 2) return 0
-    const last = s[s.length - 1]?.issued ?? 0
-    const prev = s[s.length - 2]?.issued ?? 0
-    return last - prev
-  }, [weeklyIssuanceData])
 
   if (authLoading || !user) {
     return (
@@ -196,24 +142,15 @@ export default function DashboardPage() {
               <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 sm:mb-2">لوحة التحكم</h1>
               <p className="text-sm sm:text-base text-slate-300">مرحباً {user.name} - نظرة عامة على النظام</p>
             </div>
-            <div className="flex items-center gap-3 sm:gap-4 w-full sm:w-auto">
-              <div className="hidden sm:flex flex-col text-xs text-slate-400">
-                <span>تحديث تلقائي</span>
-                <div className="flex items-center gap-2">
-                  <Switch motion="ltr" checked={autoRefresh} onCheckedChange={(v) => setAutoRefresh(Boolean(v))} />
-                  <span className="text-[11px] sm:text-xs">{lastUpdated ? `آخر تحديث: ${lastUpdated.toLocaleTimeString("ar-SA")}` : "—"}</span>
-                </div>
-              </div>
-              <Button
-                onClick={handleRefresh}
-                disabled={refreshing}
-                variant="outline"
-                className="bg-gradient-to-r from-blue-600 to-blue-700 text-white border-transparent hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-2.5 w-full sm:w-auto"
-              >
-                <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-                تحديث
-              </Button>
-            </div>
+            <Button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              variant="outline"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 text-white border-transparent hover:from-blue-700 hover:to-blue-800 shadow-md hover:shadow-lg text-sm sm:text-base px-3 sm:px-4 py-2 sm:py-2.5 w-full sm:w-auto"
+            >
+              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+              تحديث
+            </Button>
           </div>
 
           {loading ? (
@@ -237,15 +174,7 @@ export default function DashboardPage() {
                     <Package className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />
                   </CardHeader>
                   <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
-                    <div className="flex items-center gap-2">
-                      <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white">{stats.totalStock.toLocaleString()}</div>
-                      {stockTrend !== 0 && (
-                        <span className={`inline-flex items-center text-xs sm:text-sm ${stockTrend > 0 ? "text-green-400" : "text-red-400"}`}>
-                          {stockTrend > 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                          {Math.abs(stockTrend)}
-                        </span>
-                      )}
-                    </div>
+                    <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{stats.totalStock.toLocaleString()}</div>
                     <p className="text-xs text-slate-400">المنتجات المتوفرة</p>
                   </CardContent>
                 </Card>
@@ -256,15 +185,7 @@ export default function DashboardPage() {
                     <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-400" />
                   </CardHeader>
                   <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
-                    <div className="flex items-center gap-2">
-                      <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white">{stats.todayIssuances}</div>
-                      {issuanceTrend !== 0 && (
-                        <span className={`inline-flex items-center text-xs sm:text-sm ${issuanceTrend > 0 ? "text-green-400" : "text-red-400"}`}>
-                          {issuanceTrend > 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
-                          {Math.abs(issuanceTrend)}
-                        </span>
-                      )}
-                    </div>
+                    <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{stats.todayIssuances}</div>
                     <p className="text-xs text-slate-400">إصدارات اليوم</p>
                   </CardContent>
                 </Card>
@@ -275,7 +196,7 @@ export default function DashboardPage() {
                     <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-orange-400" />
                   </CardHeader>
                   <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
-                    <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-orange-400">{stats.lowStockCount}</div>
+                    <div className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-400">{stats.lowStockCount}</div>
                     <p className="text-xs text-slate-400">يتطلب إعادة تموين</p>
                   </CardContent>
                 </Card>
@@ -286,7 +207,7 @@ export default function DashboardPage() {
                     <Users className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400" />
                   </CardHeader>
                   <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
-                    <div className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-white">{stats.totalProducts}</div>
+                    <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">{stats.totalProducts}</div>
                     <p className="text-xs text-slate-400">أنواع المنتجات</p>
                   </CardContent>
                 </Card>
@@ -304,18 +225,17 @@ export default function DashboardPage() {
                         config={{
                           stock: {
                             label: "المخزون",
-                            color: "#60a5fa",
+                            color: "#8884d8",
                           },
                         }}
                         className="h-[200px] sm:h-[250px] lg:h-[300px]"
                       >
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={monthlyStockData}>
-                            <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
-                            <XAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 12 }} />
-                            <YAxis stroke="#94a3b8" tick={{ fontSize: 12 }} allowDecimals={false} />
+                            <XAxis dataKey="name" stroke="#64748b" />
+                            <YAxis stroke="#64748b" />
                             <ChartTooltip content={<ChartTooltipContent />} />
-                            <Line type="monotone" dataKey="stock" stroke="#60a5fa" strokeWidth={2} dot={{ r: 2 }} />
+                            <Line type="monotone" dataKey="stock" stroke="#8884d8" strokeWidth={2} />
                           </LineChart>
                         </ResponsiveContainer>
                       </ChartContainer>
@@ -345,9 +265,9 @@ export default function DashboardPage() {
                       >
                         <ResponsiveContainer width="100%" height="100%">
                           <PieChart>
-                            <Pie data={productData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="count" paddingAngle={3} cornerRadius={4} label={({ percent }) => `${Math.round((percent || 0) * 100)}%`} labelLine={false}>
-                              {productData.map((_, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                            <Pie data={productData} cx="50%" cy="50%" outerRadius={80} dataKey="count">
+                              {productData.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={`hsl(${index * 45}, 70%, 50%)`} />
                               ))}
                             </Pie>
                             <ChartTooltip content={<ChartTooltipContent />} />
@@ -377,23 +297,17 @@ export default function DashboardPage() {
                         config={{
                           issued: {
                             label: "المصدر",
-                            color: "#34d399",
+                            color: "#82ca9d",
                           },
                         }}
                         className="h-[200px] sm:h-[250px] lg:h-[300px]"
                       >
                         <ResponsiveContainer width="100%" height="100%">
                           <BarChart data={weeklyIssuanceData}>
-                            <CartesianGrid stroke="#334155" strokeDasharray="3 3" />
-                            <XAxis dataKey="name" stroke="#94a3b8" tick={{ fontSize: 12 }} />
-                            <YAxis stroke="#94a3b8" tick={{ fontSize: 12 }} allowDecimals={false} />
+                            <XAxis dataKey="name" stroke="#64748b" />
+                            <YAxis stroke="#64748b" />
                             <ChartTooltip content={<ChartTooltipContent />} />
-                            <Bar dataKey="issued">
-                              <LabelList dataKey="issued" position="top" fill="#cbd5e1" fontSize={12} />
-                              {weeklyIssuanceData.map((_, i) => (
-                                <Cell key={`bar-${i}`} fill={COLORS[i % COLORS.length]} />
-                              ))}
-                            </Bar>
+                            <Bar dataKey="issued" fill="#82ca9d" />
                           </BarChart>
                         </ResponsiveContainer>
                       </ChartContainer>
@@ -417,12 +331,12 @@ export default function DashboardPage() {
                         recentActivity.map((activity) => (
                           <div
                             key={activity.id}
-                            className="flex items-start gap-3 p-2.5 sm:p-3.5 bg-slate-700/30 hover:bg-slate-700/40 transition-colors rounded-lg"
+                            className="flex items-start space-x-3 sm:space-x-4 space-x-reverse p-2.5 sm:p-3.5 bg-slate-700/30 hover:bg-slate-700/40 transition-colors rounded-lg"
                           >
-                            <div className="flex-shrink-0">{getActivityIcon(activity.action || "")}</div>
+                            <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-400 rounded-full mt-1.5 sm:mt-2 flex-shrink-0"></div>
                             <div className="flex-1 min-w-0">
                               <p className="text-xs sm:text-sm text-white font-medium truncate">{activity.action}</p>
-                              <p className="text-[11px] sm:text-xs text-slate-400 mt-1">
+                              <p className="text-xs text-slate-400 mt-1">
                                 {activity.user_name} • {new Date(activity.created_at).toLocaleString("ar-SA")}
                               </p>
                             </div>

@@ -24,6 +24,8 @@ import {
   Building2,
   UserCheck,
   BarChart3,
+  Warehouse,
+  Tag,
 } from "lucide-react"
 
 const navigation = [
@@ -37,6 +39,18 @@ const navigation = [
     name: "إدارة المخزون",
     href: "/inventory",
     icon: Package,
+    roles: ["admin", "inventory_manager"],
+  },
+  {
+    name: "المخازن",
+    href: "/warehouses",
+    icon: Warehouse,
+    roles: ["admin", "inventory_manager"],
+  },
+  {
+    name: "الفئات",
+    href: "/categories",
+    icon: Tag,
     roles: ["admin", "inventory_manager"],
   },
   {

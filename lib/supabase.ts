@@ -207,6 +207,8 @@ export type Database = {
           branch: string
           engineer: string
           serial_number: string
+          warranty_type: string | null
+          invoice_number: string | null
           notes: string | null
           issued_by: string
           customer_id: number | null
@@ -227,6 +229,8 @@ export type Database = {
           branch: string
           engineer: string
           serial_number: string
+          warranty_type?: string | null
+          invoice_number?: string | null
           notes?: string | null
           issued_by: string
           customer_id?: number | null
@@ -247,6 +251,8 @@ export type Database = {
           branch?: string
           engineer?: string
           serial_number?: string
+          warranty_type?: string | null
+          invoice_number?: string | null
           notes?: string | null
           issued_by?: string
           customer_id?: number | null

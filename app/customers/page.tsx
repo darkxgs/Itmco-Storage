@@ -346,13 +346,13 @@ export default function CustomersPage() {
                   <Table className="w-full table-fixed">
                     <TableHeader>
                       <TableRow className="border-b border-slate-700/50 bg-slate-800/30">
-                        <TableHead className="text-slate-300 font-semibold py-4 px-6" style={{width: '200px'}}>اسم العميل</TableHead>
-                        <TableHead className="text-slate-300 font-semibold py-4 px-6" style={{width: '120px'}}>الكود</TableHead>
-                        <TableHead className="text-slate-300 font-semibold py-4 px-6" style={{width: '220px'}}>البريد الإلكتروني</TableHead>
-                        <TableHead className="text-slate-300 font-semibold py-4 px-6" style={{width: '150px'}}>الهاتف</TableHead>
-                        <TableHead className="text-slate-300 font-semibold py-4 px-6" style={{width: '180px'}}>الشخص المسؤول</TableHead>
-                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-center" style={{width: '120px'}}>الحالة</TableHead>
-                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-center" style={{width: '140px'}}>الإجراءات</TableHead>
+                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-left w-[200px]">اسم العميل</TableHead>
+                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-center w-[120px]">الكود</TableHead>
+                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-left w-[220px]">البريد الإلكتروني</TableHead>
+                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-center w-[150px]">الهاتف</TableHead>
+                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-left w-[180px]">الشخص المسؤول</TableHead>
+                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-center w-[120px]">الحالة</TableHead>
+                        <TableHead className="text-slate-300 font-semibold py-4 px-6 text-center w-[140px]">الإجراءات</TableHead>
                       </TableRow>
                     </TableHeader>
                      <TableBody>
@@ -361,12 +361,12 @@ export default function CustomersPage() {
                            key={customer.id}
                            className="border-b border-slate-700/30 hover:bg-slate-700/20 transition-colors duration-200"
                          >
-                           <TableCell className="font-medium text-white py-4 px-6 truncate" style={{width: '200px'}}>{customer.name}</TableCell>
-                           <TableCell className="text-slate-300 py-4 px-6" style={{width: '120px'}}>{customer.code || "-"}</TableCell>
-                           <TableCell className="text-slate-300 py-4 px-6 truncate" style={{width: '220px'}}>{customer.email || "-"}</TableCell>
-                           <TableCell className="text-slate-300 py-4 px-6" style={{width: '150px'}}>{customer.phone || "-"}</TableCell>
-                           <TableCell className="text-slate-300 py-4 px-6 truncate" style={{width: '180px'}}>{customer.contact_person || "-"}</TableCell>
-                           <TableCell className="py-4 px-6 text-center" style={{width: '120px'}}>
+                           <TableCell className="font-medium text-white py-4 px-6 truncate text-left w-[200px]">{customer.name}</TableCell>
+                           <TableCell className="text-slate-300 py-4 px-6 text-center w-[120px]">{customer.code || "-"}</TableCell>
+                           <TableCell className="text-slate-300 py-4 px-6 truncate text-left w-[220px]">{customer.email || "-"}</TableCell>
+                           <TableCell className="text-slate-300 py-4 px-6 text-center w-[150px]">{customer.phone || "-"}</TableCell>
+                           <TableCell className="text-slate-300 py-4 px-6 truncate text-left w-[180px]">{customer.contact_person || "-"}</TableCell>
+                           <TableCell className="py-4 px-6 text-center w-[120px]">
                              <Badge 
                                variant={customer.is_active ? "default" : "secondary"}
                                className={customer.is_active 
@@ -377,7 +377,7 @@ export default function CustomersPage() {
                                {customer.is_active ? "نشط" : "غير نشط"}
                              </Badge>
                            </TableCell>
-                           <TableCell className="py-4 px-6" style={{width: '140px'}}>
+                           <TableCell className="py-4 px-6 text-center w-[140px]">
                              <div className="flex items-center justify-center space-x-2 space-x-reverse">
                                <Button
                                  variant="outline"
