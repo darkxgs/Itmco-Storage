@@ -267,7 +267,7 @@ export function Sidebar() {
       {/* Desktop sidebar */}
       <div
         className={cn(
-          "hidden lg:flex flex-col bg-slate-900 border-l border-slate-700 transition-all duration-300",
+          "hidden lg:flex flex-col bg-slate-900 border-l border-slate-700 transition-all duration-300 flex-shrink-0",
           collapsed ? "w-16" : "w-64",
         )}
       >
@@ -277,7 +277,7 @@ export function Sidebar() {
       {/* Mobile sidebar */}
       <div
         className={cn(
-          "fixed inset-y-0 right-0 z-50 w-64 bg-slate-900 border-l border-slate-700 transform transition-transform duration-300 lg:hidden",
+          "fixed inset-y-0 right-0 z-50 w-64 bg-slate-900 border-l border-slate-700 transform transition-transform duration-300 lg:hidden flex-shrink-0",
           mobileOpen ? "translate-x-0" : "translate-x-full",
         )}
       >

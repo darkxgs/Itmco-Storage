@@ -73,6 +73,11 @@
     @apply flex flex-col sm:flex-row;
   }
   
+  /* RTL support for mobile stack */
+  [dir="rtl"] .mobile-stack {
+    @apply sm:flex-row-reverse;
+  }
+  
   .mobile-full {
     @apply w-full sm:w-auto;
   }
@@ -116,41 +121,55 @@
 @media (max-width: 480px) {
   /* iPhone and small mobile devices */
   .mobile-compact {
-    padding: 0.5rem !important;
+    padding: 0.5rem;
   }
   
   .mobile-text-sm {
-    font-size: 0.75rem !important;
+    font-size: 0.75rem;
   }
   
   .mobile-hide {
-    display: none !important;
+    display: none;
+  }
+  
+  /* Fix layout issues on small screens */
+  body {
+    overflow-x: hidden;
+  }
+  
+  .flex {
+    min-width: 0;
   }
 }
 
 @media (min-width: 481px) and (max-width: 768px) {
   /* iPad portrait and large mobile devices */
   .tablet-compact {
-    padding: 1rem !important;
+    padding: 1rem;
+  }
+  
+  /* Ensure proper flex behavior for mobile layouts */
+  .mobile-layout .flex {
+    min-width: 0;
   }
 }
 
 @media (min-width: 769px) and (max-width: 1024px) {
   /* iPad landscape and small laptops */
   .laptop-compact {
-    padding: 1.5rem !important;
+    padding: 1.5rem;
+  }
+  
+  /* Ensure proper flex behavior for tablet layouts */
+  .tablet-layout .flex {
+    min-width: 0;
   }
 }
 
 @media (min-width: 1025px) and (max-width: 1440px) {
-  /* Standard laptops - fix zoom issues */
+  /* Standard laptops */
   .laptop-standard {
-    zoom: 1 !important;
-    transform: scale(1) !important;
-  }
-  
-  body {
-    zoom: 1 !important;
+    max-width: 100%;
   }
 }
 
@@ -197,6 +216,34 @@
   }
   body {
     @apply bg-background text-foreground;
+    overflow-x: hidden;
+    min-height: 100vh;
+    min-width: 320px;
+  }
+  
+  /* Fix flex container issues for specific layouts */
+  .flex-container {
+    min-width: 0;
+  }
+  
+  .sidebar-layout .flex {
+    min-width: 0;
+  }
+  
+  /* Ensure proper responsive behavior */
+  .flex-1 {
+    min-width: 0;
+    flex: 1 1 0%;
+  }
+  
+  /* Fix container overflow issues */
+  .container {
+    width: 100%;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 }
 
@@ -209,23 +256,30 @@
   --tw-space-x-reverse: 1;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
+/* Custom scrollbar - scoped to specific containers */
+.custom-scrollbar::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
-::-webkit-scrollbar-track {
+.custom-scrollbar::-webkit-scrollbar-track {
   background: #1e293b;
 }
 
-::-webkit-scrollbar-thumb {
+.custom-scrollbar::-webkit-scrollbar-thumb {
   background: #475569;
   border-radius: 4px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #64748b;
+}
+
+/* Apply to main content areas */
+.main-content,
+.sidebar,
+.table-container {
+  @apply custom-scrollbar;
 }
 
 /* Loading animation */
@@ -278,95 +332,44 @@
 }
 
 .switch-root[data-state="checked"] .switch-thumb {
-  transform: translateX(18px);
+  transform: translateX(20px);
 }
 
 [dir="rtl"] .switch-root[data-state="checked"] .switch-thumb {
-  transform: translateX(-18px);
+  transform: translateX(-20px);
 }
 
 /* Auto zoom-out for pages that don't fit (use transform scaling on .page-container only to prevent double-scaling) */
 /* Removed body zoom rules to avoid compounding with .page-container scaling */
 
-/* Ensure minimum content width for zoom calculations */
-body {
-  min-width: 320px;
-  overflow-x: auto;
+
+
+/* Responsive layout utilities - prefer Tailwind breakpoints over scaling */
+.dashboard-container {
+  @apply w-full max-w-7xl mx-auto;
 }
 
-/* Transform-based scaling on .page-container for better browser support */
-@media screen and (max-width: 1366px) {
-  .page-container {
-    transform: scale(0.95);
-    transform-origin: top left;
-    width: 105.26%; /* 100% / 0.95 */
-  }
-}
-
-@media screen and (max-width: 1200px) {
-  .page-container {
+/* Only apply minimal scaling to complex dashboard tables if absolutely needed */
+@media screen and (max-width: 768px) {
+  .complex-table {
     transform: scale(0.9);
     transform-origin: top left;
-    width: 111.11%; /* 100% / 0.9 */
-  }
-}
-
-@media screen and (max-width: 1024px) {
-  .page-container {
-    transform: scale(0.82);
-    transform-origin: top left;
-    width: 121.95%; /* 100% / 0.82 */
-  }
-}
-
-@media screen and (max-width: 768px) {
-  .page-container {
-    transform: scale(0.8);
-    transform-origin: top left;
-    width: 125%; /* 100% / 0.8 */
+    width: 111.11%;
   }
 }
 
 @media screen and (max-width: 480px) {
-  .page-container {
-    transform: scale(0.75);
+  .complex-table {
+    transform: scale(0.85);
     transform-origin: top left;
-    width: 133.33%; /* 100% / 0.75 */
+    width: 117.65%;
   }
 }
 
-@media screen and (max-width: 360px) {
-  .page-container {
-    transform: scale(0.65);
-    transform-origin: top left;
-    width: 153.85%; /* 100% / 0.65 */
-  }
-}
 
-/* Height-based compact overrides for short screens (place after width rules to take precedence) */
-@media screen and (max-height: 720px) and (min-width: 1024px) {
-  .page-container {
-    transform: scale(0.8);
-    width: 125%;
-  }
-}
-
-@media screen and (max-height: 650px) and (min-width: 1024px) {
-  .page-container {
-    transform: scale(0.75);
-    width: 133.33%;
-  }
-}
-
-.switch-root[data-state="checked"] .switch-thumb {
-  transform: translateX(22px);
-}
-
-[dir="rtl"] .switch-root[data-state="checked"] .switch-thumb {
-  transform: translateX(-22px);
-}
 
 .switch-root:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
