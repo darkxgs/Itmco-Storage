@@ -67,7 +67,7 @@ export async function generateNextItemCode(): Promise<string> {
   }, "Failed to generate item code")
 }
 
-export async function createProduct(product: ProductInsert & { minStock?: number }) {
+export async function createProduct(product: ProductInsert & { minStock?: number }, userId?: string, userName?: string) {
   return withErrorHandling(async () => {
     // Validate and sanitize input
     const sanitizedProduct = validateObject(product)
@@ -119,6 +119,24 @@ export async function createProduct(product: ProductInsert & { minStock?: number
     const { data, error } = await createSecureQuery("products", "insert").insert(dbProduct).select().single()
 
     if (error) throw error
+
+    // Create initial stock entry if stock > 0
+    if (dbProduct.stock > 0) {
+      const stockEntryData: StockEntryInsert = {
+        product_id: data.id,
+        product_name: data.name,
+        item_code: data.item_code,
+        quantity_added: dbProduct.stock,
+        previous_stock: 0,
+        new_stock: dbProduct.stock,
+        notes: "إدخال أولي عند إنشاء المنتج",
+        entered_by: userName || "النظام",
+        user_id: userId || null,
+        warehouse_id: data.warehouse_id
+      }
+
+      await supabase.from("stock_entries").insert(stockEntryData)
+    }
 
     // Map back to frontend format
     return {
@@ -917,6 +935,180 @@ export const BRANCHES = [
 ];
 
 
+// ==================== STOCK ENTRIES FUNCTIONS ====================
+
+export async function getStockEntries(productId?: number, limit = 50) {
+  return withErrorHandling(async () => {
+    let query = supabase
+      .from("stock_entries")
+      .select("*")
+      .order("entry_datetime", { ascending: false })
+
+    if (productId) {
+      query = query.eq("product_id", productId)
+    }
+
+    if (limit) {
+      query = query.limit(limit)
+    }
+
+    const { data, error } = await query
+
+    if (error) throw error
+
+    return (data || []).map(entry => ({
+      ...entry,
+      entryDateFormatted: formatDate(entry.entry_date),
+      entryTimeFormatted: formatTimeOnly(entry.entry_time),
+      entryDateTimeFormatted: formatDateTime(entry.entry_datetime)
+    }))
+  }, "Failed to fetch stock entries")
+}
+
+export async function createStockEntry(entry: {
+  productId: number
+  quantityAdded: number
+  notes?: string
+  userId: string
+  userName: string
+}) {
+  return withErrorHandling(async () => {
+    // Get current product data
+    const { data: product, error: productError } = await supabase
+      .from("products")
+      .select("*")
+      .eq("id", entry.productId)
+      .single()
+
+    if (productError || !product) {
+      throw new Error("Product not found")
+    }
+
+    // Check warehouse permission if product has warehouse
+    if (product.warehouse_id) {
+      await checkWarehousePermission(product.warehouse_id, 'edit')
+    }
+
+    const previousStock = product.stock
+    const newStock = previousStock + entry.quantityAdded
+
+    // Create stock entry record
+    const stockEntryData: StockEntryInsert = {
+      product_id: entry.productId,
+      product_name: product.name,
+      item_code: product.item_code,
+      quantity_added: entry.quantityAdded,
+      previous_stock: previousStock,
+      new_stock: newStock,
+      notes: entry.notes || null,
+      entered_by: entry.userName,
+      user_id: entry.userId,
+      warehouse_id: product.warehouse_id
+    }
+
+    const { data: stockEntry, error: entryError } = await supabase
+      .from("stock_entries")
+      .insert(stockEntryData)
+      .select()
+      .single()
+
+    if (entryError) throw entryError
+
+    // Update product stock
+    const { error: updateError } = await supabase
+      .from("products")
+      .update({
+        stock: newStock,
+        updated_at: new Date().toISOString()
+      })
+      .eq("id", entry.productId)
+
+    if (updateError) throw updateError
+
+    return {
+      ...stockEntry,
+      entryDateFormatted: formatDate(stockEntry.entry_date),
+      entryTimeFormatted: stockEntry.entry_time,
+      entryDateTimeFormatted: formatDateTime(stockEntry.entry_datetime)
+    }
+  }, "Failed to create stock entry")
+}
+
+export async function getProductStockHistory(productId: number) {
+  return withErrorHandling(async () => {
+    const { data, error } = await supabase
+      .from("stock_entries")
+      .select("*")
+      .eq("product_id", productId)
+      .order("entry_datetime", { ascending: false })
+
+    if (error) throw error
+
+    return (data || []).map(entry => ({
+      ...entry,
+      entryDateFormatted: formatDate(entry.entry_date),
+      entryTimeFormatted: formatTimeOnly(entry.entry_time),
+      entryDateTimeFormatted: formatDateTime(entry.entry_datetime)
+    }))
+  }, "Failed to fetch product stock history")
+}
+
+export async function getStockEntriesCount(productId: number, startDate?: string, endDate?: string) {
+  return withErrorHandling(async () => {
+    let query = supabase
+      .from("stock_entries")
+      .select("id", { count: "exact" })
+      .eq("product_id", productId)
+
+    if (startDate) {
+      query = query.gte("entry_date", startDate)
+    }
+
+    if (endDate) {
+      query = query.lte("entry_date", endDate)
+    }
+
+    const { count, error } = await query
+
+    if (error) throw error
+
+    return count || 0
+  }, "Failed to get stock entries count")
+}
+
+export async function getStockEntriesSummary(productId: number, startDate?: string, endDate?: string) {
+  return withErrorHandling(async () => {
+    let query = supabase
+      .from("stock_entries")
+      .select("quantity_added, entry_date")
+      .eq("product_id", productId)
+
+    if (startDate) {
+      query = query.gte("entry_date", startDate)
+    }
+
+    if (endDate) {
+      query = query.lte("entry_date", endDate)
+    }
+
+    const { data, error } = await query
+
+    if (error) throw error
+
+    const entries = data || []
+    const totalQuantityAdded = entries.reduce((sum, entry) => sum + entry.quantity_added, 0)
+    const entriesCount = entries.length
+    const uniqueDates = new Set(entries.map(entry => entry.entry_date)).size
+
+    return {
+      totalQuantityAdded,
+      entriesCount,
+      uniqueDates,
+      averagePerEntry: entriesCount > 0 ? Math.round(totalQuantityAdded / entriesCount) : 0
+    }
+  }, "Failed to get stock entries summary")
+}
+
 // Utility functions
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("ar-SA", {
@@ -926,10 +1118,71 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatDate(date: string | Date): string {
-  return new Date(date).toLocaleDateString("ar-SA", {
+  return new Date(date).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
+  })
+}
+
+export function formatDateTime(dateTime: string | Date): string {
+  return new Date(dateTime).toLocaleString("en-US", {
+    timeZone: "Africa/Cairo",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
+  })
+}
+
+export function formatDateOnly(date: string | Date): string {
+  return new Date(date).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "numeric",
+    day: "numeric",
+  })
+}
+
+export function formatTimeOnly(time: string): string {
+  try {
+    // إذا كان الوقت يحتوي على ثواني وميكروثانية، نقوم بتنظيفه
+    const timeParts = time.split(':')
+    if (timeParts.length >= 2) {
+      let hours = parseInt(timeParts[0])
+      const minutes = timeParts[1].split('.')[0] // إزالة الميكروثانية إن وجدت
+      
+      // إضافة 3 ساعات للتوقيت المصري (UTC+3 في الصيف، UTC+2 في الشتاء)
+      // نستخدم UTC+3 لأن مصر تستخدم التوقيت الصيفي حالياً
+      hours = (hours + 3) % 24
+      
+      // تحويل إلى تنسيق 12 ساعة
+      const hour12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
+      const ampm = hours >= 12 ? 'PM' : 'AM'
+      
+      // التأكد من أن الدقائق تظهر بصيغة رقمين
+      const formattedMinutes = minutes.padStart(2, '0')
+      
+      return `${hour12}:${formattedMinutes} ${ampm}`
+    }
+    
+    return time
+  } catch (error) {
+    // في حالة حدوث خطأ، نعيد الوقت كما هو
+    return time
+  }
+}
+
+export function getCurrentEgyptTime(): string {
+  // الحصول على التوقيت المصري (UTC+3 في الصيف)
+  const now = new Date()
+  const egyptTime = new Date(now.getTime() + (3 * 60 * 60 * 1000)) // إضافة 3 ساعات لـ UTC
+  
+  return egyptTime.toLocaleString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true
   })
 }
 

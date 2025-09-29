@@ -377,6 +377,62 @@ export type Database = {
           updated_at?: string
         }
       }
+      stock_entries: {
+        Row: {
+          id: number
+          product_id: number
+          product_name: string
+          item_code: string | null
+          quantity_added: number
+          previous_stock: number
+          new_stock: number
+          entry_date: string
+          entry_time: string
+          entry_datetime: string
+          notes: string | null
+          entered_by: string
+          user_id: string | null
+          warehouse_id: number | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          product_id: number
+          product_name: string
+          item_code?: string | null
+          quantity_added: number
+          previous_stock?: number
+          new_stock: number
+          entry_date?: string
+          entry_time?: string
+          entry_datetime?: string
+          notes?: string | null
+          entered_by: string
+          user_id?: string | null
+          warehouse_id?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          product_id?: number
+          product_name?: string
+          item_code?: string | null
+          quantity_added?: number
+          previous_stock?: number
+          new_stock?: number
+          entry_date?: string
+          entry_time?: string
+          entry_datetime?: string
+          notes?: string | null
+          entered_by?: string
+          user_id?: string | null
+          warehouse_id?: number | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
     }
   }
 }
@@ -412,3 +468,7 @@ export type ActivityLog = Database['public']['Tables']['activity_logs']['Row']
 export type UserWarehousePermission = Database['public']['Tables']['user_warehouse_permissions']['Row']
 export type UserWarehousePermissionInsert = Database['public']['Tables']['user_warehouse_permissions']['Insert']
 export type UserWarehousePermissionUpdate = Database['public']['Tables']['user_warehouse_permissions']['Update']
+
+export type StockEntry = Database['public']['Tables']['stock_entries']['Row']
+export type StockEntryInsert = Database['public']['Tables']['stock_entries']['Insert']
+export type StockEntryUpdate = Database['public']['Tables']['stock_entries']['Update']

@@ -38,6 +38,8 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
+  Calendar,
+  Clock,
 } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
@@ -47,6 +49,7 @@ import { logActivity } from "@/lib/auth"
 import { validateData, productSchema } from "@/lib/validation"
 import { Pagination } from "@/components/ui/pagination"
 import { ErrorBoundary } from "@/components/error-boundary"
+import { StockEntriesDialog } from "@/components/stock-entries-dialog"
 
 const categories = [
   "آلات عد النقود",
@@ -94,6 +97,8 @@ export default function InventoryPage() {
   const [isImportDialogOpen, setIsImportDialogOpen] = useState(false)
   const [importFile, setImportFile] = useState<File | null>(null)
   const [importing, setImporting] = useState(false)
+  const [isStockEntriesDialogOpen, setIsStockEntriesDialogOpen] = useState(false)
+  const [selectedProductForHistory, setSelectedProductForHistory] = useState<any>(null)
   const { toast } = useToast()
 
   // Simple role-based access check
@@ -231,7 +236,7 @@ export default function InventoryPage() {
 
     setSubmitting(true)
     try {
-      const product = await createProduct(newProduct, user.id)
+      const product = await createProduct(newProduct, user.id, user.name)
       setProducts([product, ...products])
 
       // Log activity
@@ -535,7 +540,7 @@ export default function InventoryPage() {
             productData.item_code = await generateNextItemCode()
           }
 
-          const newProduct = await createProduct(productData, user.id)
+          const newProduct = await createProduct(productData, user.id, user.name)
           importedProducts.push(newProduct)
 
         } catch (error: any) {
@@ -832,6 +837,35 @@ export default function InventoryPage() {
           <div className="mb-4 sm:mb-6 lg:mb-8">
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-white mb-1 sm:mb-2">إدارة المخزون</h1>
             <p className="text-slate-300 text-sm sm:text-base">إضافة وتعديل وحذف المنتجات</p>
+            <div className="flex items-center gap-4 mt-2">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-blue-400" />
+                <span className="text-slate-400 text-sm">
+                  التاريخ الميلادي: {new Date().toLocaleDateString("en-US", {
+                    year: "numeric", 
+                    month: "numeric",
+                    day: "numeric"
+                  })} - {new Date().toLocaleDateString("en-US", {
+                    weekday: "long"
+                  })}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-green-400" />
+                <span className="text-slate-400 text-sm">
+                  التوقيت المصري: {(() => {
+                    const now = new Date()
+                    // إضافة 3 ساعات للتوقيت المصري
+                    const egyptTime = new Date(now.getTime() + (3 * 60 * 60 * 1000))
+                    return egyptTime.toLocaleString("en-US", {
+                      hour: "numeric",
+                      minute: "2-digit",
+                      hour12: true
+                    })
+                  })()}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Enhanced Stats Cards */}
@@ -1694,6 +1728,26 @@ export default function InventoryPage() {
                                   </DialogContent>
                                 </Dialog>
                                 )}
+                                
+                                {/* زر تاريخ إدخال الكميات */}
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedProductForHistory({
+                                      id: product.id,
+                                      name: product.name,
+                                      item_code: product.item_code,
+                                      stock: product.stock
+                                    })
+                                    setIsStockEntriesDialogOpen(true)
+                                  }}
+                                  className="bg-purple-900/20 border-purple-700/50 text-purple-400 hover:bg-purple-900/30 hover:text-purple-300 hover:border-purple-600/50 transition-colors h-6 w-6 sm:h-8 sm:w-8 p-0"
+                                  title="عرض تاريخ إدخال الكميات"
+                                >
+                                  <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
+                                </Button>
+                                
                                 {canEditProduct(product) && (
                                   <Button
                                     variant="outline"
@@ -1748,6 +1802,29 @@ export default function InventoryPage() {
           </Card>
         </div>
       </div>
+
+      {/* Dialog لعرض تاريخ إدخال الكميات */}
+      <StockEntriesDialog
+        isOpen={isStockEntriesDialogOpen}
+        onClose={() => {
+          setIsStockEntriesDialogOpen(false)
+          setSelectedProductForHistory(null)
+        }}
+        product={selectedProductForHistory}
+        user={user}
+        onStockUpdated={() => {
+          // إعادة تحميل المنتجات عند تحديث المخزون
+          const loadData = async () => {
+            try {
+              const productsData = await getProducts()
+              setProducts(productsData)
+            } catch (error) {
+              console.error("Error reloading products:", error)
+            }
+          }
+          loadData()
+        }}
+      />
     </ErrorBoundary>
   )
 }
