@@ -329,7 +329,7 @@ export default function WarehousesPage() {
                             {warehouse.description || "-"}
                           </TableCell>
                           <TableCell className="text-slate-300 text-center w-[150px]">
-                            {new Date(warehouse.created_at).toLocaleDateString('ar-SA')}
+                            {new Date(warehouse.created_at).toLocaleDateString('en-US')}
                           </TableCell>
                           <TableCell className="text-center w-[100px]">
                             <Badge variant={warehouse.is_active ? "default" : "secondary"}>

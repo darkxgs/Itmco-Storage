@@ -337,7 +337,7 @@ export default function DashboardPage() {
                             <div className="flex-1 min-w-0">
                               <p className="text-xs sm:text-sm text-white font-medium truncate">{activity.action}</p>
                               <p className="text-xs text-slate-400 mt-1">
-                                {activity.user_name} • {new Date(activity.created_at).toLocaleString("ar-SA")}
+                                {activity.user_name} • {new Date(activity.created_at).toLocaleString("en-US")}
                               </p>
                             </div>
                           </div>

@@ -442,7 +442,7 @@ export default function SearchPage() {
                         {searchType === "issuances" && (
                           <>
                             <TableCell className="text-slate-300">
-                              {new Date(item.created_at).toLocaleDateString("ar-SA")}
+                              {new Date(item.created_at).toLocaleDateString("en-US")}
                             </TableCell>
                             <TableCell className="text-white font-medium">{item.product_name}</TableCell>
                             <TableCell className="text-slate-300">{item.customer_name}</TableCell>
@@ -479,7 +479,7 @@ export default function SearchPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-slate-300">
-                              {new Date(item.created_at).toLocaleDateString("ar-SA")}
+                              {new Date(item.created_at).toLocaleDateString("en-US")}
                             </TableCell>
                           </>
                         )}

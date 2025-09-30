@@ -474,7 +474,7 @@ export default function CategoriesPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-slate-300 text-right">
-                          {new Date(category.created_at).toLocaleDateString('ar-SA')}
+                          {new Date(category.created_at).toLocaleDateString('en-US')}
                         </TableCell>
                         <TableCell className="text-slate-300 text-right">
                           {category.description || "-"}

@@ -262,7 +262,7 @@ export default function BackupPage() {
             <CardContent>
               <div className="text-white font-medium">
                 {backupHistory.length > 0
-                  ? new Date(backupHistory[0].timestamp).toLocaleDateString("ar-SA")
+                  ? new Date(backupHistory[0].timestamp).toLocaleDateString("en-US")
                   : "لا توجد"}
               </div>
             </CardContent>
@@ -389,7 +389,7 @@ export default function BackupPage() {
                     <div className="flex justify-between">
                       <span className="text-slate-300">التاريخ:</span>
                       <span className="text-white">
-                        {new Date(restoreData.metadata.timestamp).toLocaleString("ar-SA")}
+                        {new Date(restoreData.metadata.timestamp).toLocaleString("en-US")}
                       </span>
                     </div>
                     <div className="flex justify-between">
@@ -430,7 +430,7 @@ export default function BackupPage() {
                 {backupHistory.map((backup) => (
                   <div key={backup.id} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
                     <div>
-                      <div className="text-white font-medium">{new Date(backup.timestamp).toLocaleString("ar-SA")}</div>
+                      <div className="text-white font-medium">{new Date(backup.timestamp).toLocaleString("en-US")}</div>
                       <div className="text-slate-300 text-sm">
                         {backup.tables.length} جداول - {formatFileSize(backup.size)}
                       </div>
