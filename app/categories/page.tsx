@@ -29,88 +29,7 @@ type Category = {
 export default function CategoriesPage() {
   const { user } = useAuth()
   const { toast } = useToast()
-  const [categories, setCategories] = useState<Category[]>([
-    {
-      "id": 2,
-      "name": "آلات ربط النقود",
-      "description": "أجهزة ربط وتجميع النقود",
-      "is_active": true,
-      "created_at": "2025-09-11 20:22:08.50094+00",
-      "updated_at": "2025-09-11 20:22:08.50094+00"
-    },
-    {
-      "id": 1,
-      "name": "آلات عد النقود",
-      "description": "أجهزة عد وفرز النقود الورقية والمعدنية",
-      "is_active": true,
-      "created_at": "2025-09-11 20:22:08.50094+00",
-      "updated_at": "2025-09-11 20:22:08.50094+00"
-    },
-    {
-      "id": 3,
-      "name": "آلات فحص الشيكات",
-      "description": "أجهزة فحص وتصديق الشيكات",
-      "is_active": true,
-      "created_at": "2025-09-11 20:22:08.50094+00",
-      "updated_at": "2025-09-11 20:22:08.50094+00"
-    },
-    {
-      "id": 8,
-      "name": "أجهزة كمبيوتر",
-      "description": "أجهزة كمبيوتر مكتبية ومحمولة",
-      "is_active": true,
-      "created_at": "2025-09-11 20:22:08.50094+00",
-      "updated_at": "2025-09-11 20:22:08.50094+00"
-    },
-    {
-      "id": 5,
-      "name": "أنظمة الحضور والانصراف",
-      "description": "أنظمة تتبع الحضور والانصراف",
-      "is_active": true,
-      "created_at": "2025-09-11 20:22:08.50094+00",
-      "updated_at": "2025-09-11 20:22:08.50094+00"
-    },
-    {
-      "id": 7,
-      "name": "بوابات الأمان",
-      "description": "بوابات الدخول والخروج الأمنية",
-      "is_active": true,
-      "created_at": "2025-09-11 20:22:08.50094+00",
-      "updated_at": "2025-09-11 20:22:08.50094+00"
-    },
-    {
-      "id": 4,
-      "name": "ساعات الأمان",
-      "description": "ساعات الحضور والانصراف الأمنية",
-      "is_active": true,
-      "created_at": "2025-09-11 20:22:08.50094+00",
-      "updated_at": "2025-09-11 20:22:08.50094+00"
-    },
-    {
-      "id": 6,
-      "name": "ساعات السكرتارية",
-      "description": "ساعات إدارية ومكتبية",
-      "is_active": true,
-      "created_at": "2025-09-11 20:22:08.50094+00",
-      "updated_at": "2025-09-11 20:22:08.50094+00"
-    },
-    {
-      "id": 10,
-      "name": "شاشات",
-      "description": "شاشات عرض مختلفة الأحجام",
-      "is_active": true,
-      "created_at": "2025-09-11 20:22:08.50094+00",
-      "updated_at": "2025-09-11 20:22:08.50094+00"
-    },
-    {
-      "id": 9,
-      "name": "طابعات",
-      "description": "طابعات ليزر ونافثة للحبر",
-      "is_active": true,
-      "created_at": "2025-09-11 20:22:08.50094+00",
-      "updated_at": "2025-09-11 20:22:08.50094+00"
-    }
-  ])
+  const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
@@ -122,6 +41,10 @@ export default function CategoriesPage() {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [isActive, setIsActive] = useState(true)
+
+  useEffect(() => {
+    loadCategories()
+  }, [])
 
   const loadCategories = async () => {
     try {
@@ -229,18 +152,11 @@ export default function CategoriesPage() {
 
     setSubmitting(true)
     try {
-      // Mock update - in real implementation, this would call an API
-      const updatedCategory: Category = {
-        ...editingCategory,
+      await updateCategory(editingCategory.id, {
         name: name.trim(),
-        description: description.trim() || null,
-        is_active: isActive,
-        updated_at: new Date().toISOString()
-      }
-      
-      setCategories(prev => prev.map(cat => 
-        cat.id === editingCategory.id ? updatedCategory : cat
-      ))
+        description: description.trim() || undefined,
+        is_active: isActive
+      })
       
       toast({
         title: "نجح",
@@ -250,11 +166,12 @@ export default function CategoriesPage() {
       setIsEditDialogOpen(false)
       resetForm()
       setEditingCategory(null)
+      loadCategories()
     } catch (error) {
       console.error('Error updating category:', error)
       toast({
         title: "خطأ",
-        description: "حدث خطأ في تحديث الفئة",
+        description: error.message || "حدث خطأ في تحديث الفئة",
         variant: "destructive",
       })
     } finally {
@@ -264,18 +181,19 @@ export default function CategoriesPage() {
 
   const handleDelete = async (categoryId: number) => {
     try {
-      // Mock deletion - in real implementation, this would call an API
-      setCategories(prev => prev.filter(cat => cat.id !== categoryId))
+      await deleteCategory(categoryId)
       
       toast({
         title: "نجح",
         description: "تم حذف الفئة بنجاح",
       })
+      
+      loadCategories()
     } catch (error) {
       console.error('Error deleting category:', error)
       toast({
         title: "خطأ",
-        description: "حدث خطأ في حذف الفئة",
+        description: error.message || "حدث خطأ في حذف الفئة",
         variant: "destructive",
       })
     }
