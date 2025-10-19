@@ -280,3 +280,50 @@ export async function filterByUserWarehouses<T extends { warehouse_id: number }>
   
   return items.filter(item => accessibleWarehouses.includes(item.warehouse_id))
 }
+
+/**
+ * Get full warehouse objects that user has access to
+ */
+export async function getUserAccessibleWarehousesWithData(
+  userId: string,
+  action: 'view' | 'add' | 'edit' | 'delete' = 'view'
+) {
+  // Check if user is admin first
+  const adminStatus = await isWarehouseAdmin(userId)
+  
+  if (adminStatus) {
+    // Admin users have access to all warehouses
+    const { data: allWarehouses, error: warehouseError } = await supabase
+      .from('warehouses')
+      .select('*')
+      .order('name')
+    
+    if (warehouseError) {
+      console.error('Error fetching all warehouses for admin:', warehouseError)
+      throw warehouseError
+    }
+    
+    return allWarehouses || []
+  }
+
+  // For non-admin users, get accessible warehouse IDs first
+  const accessibleWarehouseIds = await getUserAccessibleWarehouses(userId, action)
+  
+  if (accessibleWarehouseIds.length === 0) {
+    return []
+  }
+
+  // Fetch full warehouse data
+  const { data, error } = await supabase
+    .from('warehouses')
+    .select('*')
+    .in('id', accessibleWarehouseIds)
+    .order('name')
+  
+  if (error) {
+    console.error('Error fetching accessible warehouses:', error)
+    throw error
+  }
+
+  return data || []
+}

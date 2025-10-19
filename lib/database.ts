@@ -456,17 +456,39 @@ export async function getActivityLogs(limit = 100, offset = 0) {
 let dashboardStatsCache: { data: any; timestamp: number } | null = null
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
-export async function getDashboardStats() {
+export async function getDashboardStats(userId?: string) {
   return withErrorHandling(async () => {
-    // Check cache
-    if (dashboardStatsCache && Date.now() - dashboardStatsCache.timestamp < CACHE_DURATION) {
+    // Don't use cache if userId is provided (for warehouse-specific stats)
+    if (!userId && dashboardStatsCache && Date.now() - dashboardStatsCache.timestamp < CACHE_DURATION) {
       return dashboardStatsCache.data
     }
 
-    // Fetch fresh data
+    // Fetch fresh data with warehouse filtering
+    let productsQuery = supabase.from("products").select("stock, min_stock, warehouse_id")
+    let issuancesQuery = supabase.from("issuances").select("id, warehouse_id").gte("created_at", new Date().toISOString().split("T")[0])
+
+    // If userId is provided, filter by user's accessible warehouses
+    if (userId) {
+      const accessibleWarehouses = await getUserAccessibleWarehouses(userId)
+      const warehouseIds = accessibleWarehouses.map(w => w.id)
+      
+      if (warehouseIds.length > 0) {
+        productsQuery = productsQuery.in("warehouse_id", warehouseIds)
+        issuancesQuery = issuancesQuery.in("warehouse_id", warehouseIds)
+      } else {
+        // No accessible warehouses, return empty stats
+        return {
+          totalProducts: 0,
+          totalStock: 0,
+          todayIssuances: 0,
+          lowStockCount: 0,
+        }
+      }
+    }
+
     const [productsResult, issuancesResult] = await Promise.all([
-      supabase.from("products").select("stock, min_stock"),
-      supabase.from("issuances").select("id").gte("created_at", new Date().toISOString().split("T")[0]),
+      productsQuery,
+      issuancesQuery,
     ])
 
     const products = productsResult.data || []
@@ -482,10 +504,12 @@ export async function getDashboardStats() {
       lowStockCount,
     }
 
-    // Update cache
-    dashboardStatsCache = {
-      data: stats,
-      timestamp: Date.now(),
+    // Update cache only for non-user-specific queries
+    if (!userId) {
+      dashboardStatsCache = {
+        data: stats,
+        timestamp: Date.now(),
+      }
     }
 
     return stats
@@ -493,10 +517,26 @@ export async function getDashboardStats() {
 }
 
 // Enhanced chart data functions
-export async function getMonthlyStockData() {
+export async function getMonthlyStockData(userId?: string) {
   return withErrorHandling(async () => {
     const sixMonthsAgo = new Date()
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
+    
+    // Filter by user's warehouses if userId provided
+    let productsQuery = supabase.from("products").select("stock")
+    let issuancesQuery = supabase.from("issuances").select("created_at, quantity").gte("created_at", sixMonthsAgo.toISOString())
+    
+    if (userId) {
+      const accessibleWarehouses = await getUserAccessibleWarehouses(userId)
+      const warehouseIds = accessibleWarehouses.map(w => w.id)
+      
+      if (warehouseIds.length > 0) {
+        productsQuery = productsQuery.in("warehouse_id", warehouseIds)
+        issuancesQuery = issuancesQuery.in("warehouse_id", warehouseIds)
+      } else {
+        return []
+      }
+    }
 
     const [issuancesResult, productsResult] = await Promise.all([
       supabase.from("issuances").select("created_at, quantity").gte("created_at", sixMonthsAgo.toISOString()),
@@ -546,15 +586,29 @@ export async function getMonthlyStockData() {
   }, "Failed to fetch monthly stock data")
 }
 
-export async function getWeeklyIssuanceData() {
+export async function getWeeklyIssuanceData(userId?: string) {
   return withErrorHandling(async () => {
     const oneWeekAgo = new Date()
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
-    const { data: issuances } = await supabase
+    let query = supabase
       .from("issuances")
-      .select("created_at, quantity")
+      .select("created_at, quantity, warehouse_id")
       .gte("created_at", oneWeekAgo.toISOString())
+    
+    // Filter by user's warehouses if userId provided
+    if (userId) {
+      const accessibleWarehouses = await getUserAccessibleWarehouses(userId)
+      const warehouseIds = accessibleWarehouses.map(w => w.id)
+      
+      if (warehouseIds.length > 0) {
+        query = query.in("warehouse_id", warehouseIds)
+      } else {
+        return []
+      }
+    }
+
+    const { data: issuances } = await query
 
     const weekDays = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"]
     const weeklyData = []

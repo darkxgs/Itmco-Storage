@@ -57,7 +57,7 @@ const navigation = [
     name: "الإصدارات",
     href: "/issuance",
     icon: FileText,
-    roles: ["admin", "engineer"],
+    roles: ["admin", "engineer", "inventory_manager"],
   },
   {
     name: "البحث المتقدم",

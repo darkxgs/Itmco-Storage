@@ -50,15 +50,18 @@ export default function DashboardPage() {
       setRefreshing(showRefreshToast)
       setError(null)
 
+      // Pass userId for non-admin users to filter by their warehouses
+      const userId = user.role !== 'admin' ? user.id : undefined
+      
       const [statsData, monthlyStats, productStats, branchStats, activityData, stockData, issuanceData] =
         await Promise.all([
-          getDashboardStats(),
+          getDashboardStats(userId),
           getMonthlyIssuances(),
           getProductFrequency(),
           getBranchPerformance(),
           getActivityLogs(10),
-          getMonthlyStockData(),
-          getWeeklyIssuanceData(),
+          getMonthlyStockData(userId),
+          getWeeklyIssuanceData(userId),
         ])
 
       setStats(statsData)

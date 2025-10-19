@@ -13,8 +13,10 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Plus, Edit, Trash2, Warehouse, Search, Package } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
+import { useAuth } from "@/hooks/use-auth"
 import { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from "@/lib/database"
-import type { Warehouse, WarehouseInsert } from "@/lib/supabase"
+import { getUserAccessibleWarehousesWithData } from "@/lib/warehouse-permissions"
+import type { Warehouse as WarehouseType, WarehouseInsert } from "@/lib/supabase"
 
 interface WarehouseFormData {
   name: string
@@ -24,11 +26,12 @@ interface WarehouseFormData {
 }
 
 export default function WarehousesPage() {
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([])
+  const { user, loading: authLoading } = useAuth()
+  const [warehouses, setWarehouses] = useState<WarehouseType[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [editingWarehouse, setEditingWarehouse] = useState<Warehouse | null>(null)
+  const [editingWarehouse, setEditingWarehouse] = useState<WarehouseType | null>(null)
   const [form, setForm] = useState<WarehouseFormData>({
     name: "",
     location: "",
@@ -37,13 +40,19 @@ export default function WarehousesPage() {
   })
 
   useEffect(() => {
-    loadWarehouses()
-  }, [])
+    if (user) {
+      loadWarehouses()
+    }
+  }, [user])
 
   const loadWarehouses = async () => {
+    if (!user) return
+    
     try {
       setLoading(true)
-      const data = await getWarehouses()
+      
+      // Get warehouses based on user role and permissions
+      const data = await getUserAccessibleWarehousesWithData(user.id)
       setWarehouses(data)
     } catch (error) {
       console.error("Error loading warehouses:", error)
@@ -51,6 +60,11 @@ export default function WarehousesPage() {
     } finally {
       setLoading(false)
     }
+  }
+  
+  // Check if user can add/edit/delete warehouses
+  const canManageWarehouses = () => {
+    return user?.role === 'admin'
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -107,9 +121,9 @@ export default function WarehousesPage() {
   }
 
   const filteredWarehouses = warehouses.filter(warehouse =>
-    warehouse.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    warehouse.warehouse_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (warehouse.location && warehouse.location.toLowerCase().includes(searchTerm.toLowerCase()))
+    warehouse?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    warehouse?.warehouse_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (warehouse?.location && warehouse.location.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   if (loading) {
@@ -149,16 +163,17 @@ export default function WarehousesPage() {
                   className="pl-10 w-64 bg-slate-800/50 border-slate-700/50 text-white placeholder:text-slate-400 focus:bg-slate-800 focus:border-slate-600 transition-all duration-200"
                 />
               </div>
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button 
-                    onClick={resetForm}
-                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
-                  >
-                    <Plus className="h-4 w-4 ml-2" />
-                    إضافة مخزن جديد
-                  </Button>
-                </DialogTrigger>
+              {canManageWarehouses() && (
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button 
+                      onClick={resetForm}
+                      className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white border-0 shadow-lg hover:shadow-xl transition-all duration-200"
+                    >
+                      <Plus className="h-4 w-4 ml-2" />
+                      إضافة مخزن جديد
+                    </Button>
+                  </DialogTrigger>
                 <DialogContent className="max-w-md bg-slate-800/95 border-slate-700/50 backdrop-blur-sm">
                   <DialogHeader>
                     <DialogTitle>
@@ -239,6 +254,7 @@ export default function WarehousesPage() {
                   </form>
                 </DialogContent>
               </Dialog>
+              )}
             </div>
           </div>
 
@@ -338,22 +354,28 @@ export default function WarehousesPage() {
                           </TableCell>
                           <TableCell className="text-center w-[120px]">
                             <div className="flex items-center gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEdit(warehouse)}
-                                className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDelete(warehouse.id)}
-                                className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              {canManageWarehouses() ? (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleEdit(warehouse)}
+                                    className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/20"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDelete(warehouse.id)}
+                                    className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <span className="text-slate-500 text-sm">عرض فقط</span>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
