@@ -656,7 +656,7 @@ export default function IssuancePage() {
     )
   }
 
-  if (!user || !["admin", "engineer"].includes(user.role)) {
+  if (!user || !["admin", "engineer", "inventory_manager"].includes(user.role)) {
     return (
       <div className="flex min-h-screen bg-slate-950 relative overflow-hidden" dir="rtl">
         {/* Decorative background */}
