@@ -17,6 +17,7 @@ import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import { getProducts, getIssuances, createIssuance, updateIssuance, deleteIssuance, getBranches, getCustomers, getWarehouses, searchByItemCode, searchIssuancesByFilters } from "@/lib/database"
+import { getUserAccessibleWarehousesWithData } from "@/lib/warehouse-permissions"
 import { logActivity } from "@/lib/auth"
 
 type Product = {
@@ -89,12 +90,14 @@ export default function IssuancePage() {
     const loadData = async () => {
       if (!user) return
       try {
-        const [productsData, issuancesData, branchesData, customersData, warehousesData] = await Promise.all([
+        // Get warehouses based on user permissions
+        const warehousesData = await getUserAccessibleWarehousesWithData(user.id)
+        
+        const [productsData, issuancesData, branchesData, customersData] = await Promise.all([
           getProducts(),
           getIssuances(),
           getBranches(),
-          getCustomers(),
-          getWarehouses()
+          getCustomers()
         ])
         setProducts(productsData || [])
         setIssuances(issuancesData || [])
