@@ -1,15 +1,13 @@
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { NextResponse } from 'next/server'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
   try {
-    const supabase = createClient()
-    
     // Simple query to keep database active
     const { data, error } = await supabase
-      .from('users')
+      .from('products')
       .select('id')
       .limit(1)
     
@@ -24,13 +22,14 @@ export async function GET() {
     return NextResponse.json({ 
       success: true, 
       message: 'Database is active',
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      recordsFound: data?.length || 0
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Keep-alive error:', error)
     return NextResponse.json({ 
       success: false, 
-      error: 'Internal server error' 
+      error: error?.message || 'Internal server error' 
     }, { status: 500 })
   }
 }
