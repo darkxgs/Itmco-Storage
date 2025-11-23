@@ -12,7 +12,7 @@ import { Download, FileText, Calendar, TrendingUp, Package, AlertTriangle } from
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { getMonthlyIssuances, getProductFrequency, getBranchPerformance, getFilteredIssuances, CATEGORIES, getBranches, getCustomers, getWarehouses } from "@/lib/database"
+import { getMonthlyIssuances, getProductFrequency, getBranchPerformance, getFilteredIssuances, getBranches, getCustomers, getWarehouses, getCategories } from "@/lib/database"
 import { getCurrentUserId } from "@/lib/warehouse-permissions"
 import { exportToCSV, exportToPDF, exportToExcel, validateExportData, generateSummaryStats } from "@/lib/export-utils"
 import { ErrorBoundary } from "@/components/error-boundary"
@@ -41,6 +41,7 @@ export default function ReportsPage() {
   const [branches, setBranches] = useState([])
   const [customers, setCustomers] = useState([])
   const [warehouses, setWarehouses] = useState([])
+  const [categories, setCategories] = useState<any[]>([])
 
   const [monthlyData, setMonthlyData] = useState([])
   const [productFrequency, setProductFrequency] = useState([])
@@ -64,15 +65,17 @@ export default function ReportsPage() {
       
       // Load dynamic data first
       const userId = await getCurrentUserId()
-      const [branchesData, customersData, warehousesData] = await Promise.all([
+      const [branchesData, customersData, warehousesData, categoriesData] = await Promise.all([
         getBranches(),
         getCustomers(),
-        getWarehouses(userId)
+        getWarehouses(userId),
+        getCategories()
       ])
       
       setBranches(branchesData)
       setCustomers(customersData)
       setWarehouses(warehousesData)
+      setCategories(categoriesData)
       
       // Prepare filter parameters
       const filterParams = {
@@ -324,8 +327,8 @@ export default function ReportsPage() {
                     </SelectTrigger>
                     <SelectContent className="bg-slate-700 border-slate-600">
                       <SelectItem value="all">جميع الفئات</SelectItem>
-                      {CATEGORIES.map(category => (
-                        <SelectItem key={category} value={category}>{category}</SelectItem>
+                      {categories.filter(cat => cat.is_active).map(category => (
+                        <SelectItem key={category.id} value={category.name}>{category.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

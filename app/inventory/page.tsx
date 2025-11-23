@@ -51,22 +51,13 @@ import { Pagination } from "@/components/ui/pagination"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { StockEntriesDialog } from "@/components/stock-entries-dialog"
 
-const categories = [
-  "آلات عد النقود",
-  "آلات ربط النقود",
-  "آلات فحص الشيكات",
-  "ساعات الأمان",
-  "أنظمة الحضور والانصراف",
-  "ساعات السكرتارية",
-  "بوابات الأمان",
-]
-
 const ITEMS_PER_PAGE = 10
 
 export default function InventoryPage() {
   const { user, loading: authLoading } = useAuth()
   const [products, setProducts] = useState([])
   const [warehouses, setWarehouses] = useState<any[]>([])
+  const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("all")
@@ -123,13 +114,15 @@ export default function InventoryPage() {
       try {
         setLoading(true)
         
-        // Load all products and warehouses for all authorized users
-        const [productsData, warehousesData] = await Promise.all([
+        // Load all products, warehouses and categories for all authorized users
+        const [productsData, warehousesData, categoriesData] = await Promise.all([
           getProducts(),
-          getWarehouses()
+          getWarehouses(),
+          getCategories()
         ])
         setProducts(productsData)
         setWarehouses(warehousesData)
+        setCategories(categoriesData)
 
         toast({
           title: "تم تحميل البيانات",
@@ -1127,9 +1120,9 @@ export default function InventoryPage() {
                               <SelectValue placeholder="اختر الفئة" />
                             </SelectTrigger>
                             <SelectContent className="bg-slate-800 border-slate-700">
-                              {categories.map((category) => (
-                                <SelectItem key={category} value={category} className="text-right">
-                                  {category}
+                              {categories.filter(cat => cat.is_active).map((category) => (
+                                <SelectItem key={category.id} value={category.name} className="text-right">
+                                  {category.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -1296,9 +1289,9 @@ export default function InventoryPage() {
                     <SelectItem value="all" className="text-right text-sm sm:text-base">
                       جميع الفئات
                     </SelectItem>
-                    {categories.map((category) => (
-                      <SelectItem key={category} value={category} className="text-right text-sm sm:text-base">
-                        {category}
+                    {categories.filter(cat => cat.is_active).map((category) => (
+                      <SelectItem key={category.id} value={category.name} className="text-right text-sm sm:text-base">
+                        {category.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1571,9 +1564,9 @@ export default function InventoryPage() {
                                               <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent className="bg-slate-800 border-slate-700">
-                                              {categories.map((category) => (
-                                                <SelectItem key={category} value={category} className="text-right">
-                                                  {category}
+                                              {categories.filter(cat => cat.is_active).map((category) => (
+                                                <SelectItem key={category.id} value={category.name} className="text-right">
+                                                  {category.name}
                                                 </SelectItem>
                                               ))}
                                             </SelectContent>

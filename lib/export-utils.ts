@@ -305,7 +305,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
           const globalIdx = chunkIdx * pageSize + idx
        const cells = [
          `<td ${cellStyle}>${item.id ?? ''}</td>`,
-         `<td ${cellStyle}>${new Date(item.date).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</td>`,
+         `<td ${cellStyle}>${new Date(item.date).toLocaleDateString('en-GB')}</td>`,
          `<td ${cellStyle}>${item.productName ?? ''}</td>`,
          `<td ${cellStyle}>${item.customerName ?? ''}</td>`,
          `<td ${cellStyle}>${item.branch ?? ''}</td>`,
@@ -450,11 +450,7 @@ const TABLE_HEADERS = [
 // Enhanced mapping with priority ordering and Arabic formatting
 const mapRowForStrings = (item: ExportData): string[] => [
   `${item.id ?? ''}`,
-  new Date(item.date).toLocaleDateString('ar-SA', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric'
-  }),
+  new Date(item.date).toLocaleDateString('en-GB'), // تاريخ ميلادي
   item.productName ?? '',
   item.customerName ?? '',
   item.branch ?? '',
@@ -504,20 +500,20 @@ export function exportToExcel(options: ExportOptions): void {
 
   // removed local mapRowForStrings (now shared at top-level)
 
-  // Build rows
+  // Build rows - الترتيب الصحيح حسب الهيدر
   const tableData = data.map(item => [
     item.id,
-    new Date(item.date).toLocaleDateString('ar-SA'),
+    new Date(item.date).toLocaleDateString('en-GB'), // تاريخ ميلادي
     item.productName || '',
+    item.customerName || '',
+    item.branch || '',
+    item.quantity,
+    item.engineer || '',
     item.category || '',
     item.itemCode || '',
     item.partNumber || '',
     item.brand || '',
-    item.customerName || '',
-    item.branch || '',
     item.warehouseName || '',
-    item.quantity,
-    item.engineer || '',
     item.serialNumber || '',
     item.warrantyType || '',
     item.invoiceNumber || '',
