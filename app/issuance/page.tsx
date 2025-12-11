@@ -55,6 +55,9 @@ export default function IssuancePage() {
   const [filterBranch, setFilterBranch] = useState("")
   const [filterCustomer, setFilterCustomer] = useState("")
   const [filterWarehouse, setFilterWarehouse] = useState("")
+  const [branchSearchTerm, setBranchSearchTerm] = useState("")
+  const [customerSearchTerm, setCustomerSearchTerm] = useState("")
+  const [warehouseSearchTerm, setWarehouseSearchTerm] = useState("")
   const [itemCodeSearch, setItemCodeSearch] = useState("")
   const [productCodeSearch, setProductCodeSearch] = useState("")
   const [selectedProducts, setSelectedProducts] = useState<Array<{id: number, name: string, brand: string, model: string, quantity: number, stock: number, item_code?: string}>>([])  
@@ -1259,13 +1262,23 @@ export default function IssuancePage() {
                   <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
                     <SelectValue placeholder="جميع الفروع" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
+                  <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm max-h-[300px]">
+                    <div className="p-2 sticky top-0 bg-slate-800 z-10">
+                      <Input
+                        placeholder="ابحث عن فرع..."
+                        value={branchSearchTerm}
+                        onChange={(e) => setBranchSearchTerm(e.target.value)}
+                        className="bg-slate-700 border-slate-600 text-white text-right h-8"
+                      />
+                    </div>
                     <SelectItem value="all">جميع الفروع</SelectItem>
-                    {branches.map((branch) => (
-                      <SelectItem key={branch.id} value={branch.id.toString()}>
-                        {branch.name}
-                      </SelectItem>
-                    ))}
+                    {branches
+                      .filter(branch => branch.name.toLowerCase().includes(branchSearchTerm.toLowerCase()))
+                      .map((branch) => (
+                        <SelectItem key={branch.id} value={branch.id.toString()}>
+                          {branch.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1276,13 +1289,23 @@ export default function IssuancePage() {
                   <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
                     <SelectValue placeholder="جميع العملاء" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
+                  <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm max-h-[300px]">
+                    <div className="p-2 sticky top-0 bg-slate-800 z-10">
+                      <Input
+                        placeholder="ابحث عن عميل..."
+                        value={customerSearchTerm}
+                        onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                        className="bg-slate-700 border-slate-600 text-white text-right h-8"
+                      />
+                    </div>
                     <SelectItem value="all">جميع العملاء</SelectItem>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id.toString()}>
-                        {customer.name}
-                      </SelectItem>
-                    ))}
+                    {customers
+                      .filter(customer => customer.name.toLowerCase().includes(customerSearchTerm.toLowerCase()))
+                      .map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id.toString()}>
+                          {customer.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -1293,13 +1316,26 @@ export default function IssuancePage() {
                   <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
                     <SelectValue placeholder="جميع المخازن" />
                   </SelectTrigger>
-                  <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
+                  <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm max-h-[300px]">
+                    <div className="p-2 sticky top-0 bg-slate-800 z-10">
+                      <Input
+                        placeholder="ابحث عن مخزن..."
+                        value={warehouseSearchTerm}
+                        onChange={(e) => setWarehouseSearchTerm(e.target.value)}
+                        className="bg-slate-700 border-slate-600 text-white text-right h-8"
+                      />
+                    </div>
                     <SelectItem value="all">جميع المخازن</SelectItem>
-                    {warehouses.map((warehouse) => (
-                      <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
-                        {warehouse.name} - {warehouse.warehouse_number}
-                      </SelectItem>
-                    ))}
+                    {warehouses
+                      .filter(warehouse => 
+                        warehouse.name.toLowerCase().includes(warehouseSearchTerm.toLowerCase()) ||
+                        warehouse.warehouse_number?.toLowerCase().includes(warehouseSearchTerm.toLowerCase())
+                      )
+                      .map((warehouse) => (
+                        <SelectItem key={warehouse.id} value={warehouse.id.toString()}>
+                          {warehouse.name} - {warehouse.warehouse_number}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
