@@ -12,8 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { Plus, Edit, Trash2, Building2, Search, AlertTriangle, RefreshCw } from "lucide-react"
-import { getBranches, createBranch, updateBranch, deleteBranch } from "@/lib/database"
-import type { Branch, BranchInsert } from "@/lib/supabase"
+import { getBranches, createBranch, updateBranch, deleteBranch, getCustomers } from "@/lib/database"
+import type { Branch, BranchInsert, Customer } from "@/lib/supabase"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sidebar } from "@/components/sidebar"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { useAuth } from "@/hooks/use-auth"
@@ -24,12 +25,14 @@ interface BranchFormData {
   address: string
   phone: string
   manager_name: string
+  customer_id: string
   is_active: boolean
 }
 
 export default function BranchesPage() {
   const { user, loading: authLoading } = useAuth()
   const [branches, setBranches] = useState<Branch[]>([])
+  const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -43,6 +46,7 @@ export default function BranchesPage() {
     address: "",
     phone: "",
     manager_name: "",
+    customer_id: "",
     is_active: true
   })
 
@@ -58,8 +62,12 @@ export default function BranchesPage() {
     try {
       setLoading(true)
       setError(null)
-      const branchesData = await getBranches()
+      const [branchesData, customersData] = await Promise.all([
+        getBranches(),
+        getCustomers()
+      ])
       setBranches(branchesData)
+      setCustomers(customersData)
     } catch (error) {
       console.error("Error loading branches:", error)
       setError("فشل في تحميل الفروع")
@@ -96,6 +104,7 @@ export default function BranchesPage() {
       address: branch.address || "",
       phone: branch.phone || "",
       manager_name: branch.manager_name || "",
+      customer_id: branch.customer_id?.toString() || "",
       is_active: branch.is_active
     })
     setBranchDialogOpen(true)
@@ -127,6 +136,7 @@ export default function BranchesPage() {
       address: "",
       phone: "",
       manager_name: "",
+      customer_id: "",
       is_active: true
     })
     setEditingBranch(null)
@@ -294,6 +304,26 @@ export default function BranchesPage() {
                         placeholder="اسم مدير الفرع"
                       />
                     </div>
+                  </div>
+                  <div className="space-y-3">
+                    <Label htmlFor="branch-customer" className="text-slate-300 font-medium">العميل (اختياري)</Label>
+                    <Select 
+                      value={branchForm.customer_id} 
+                      onValueChange={(value) => setBranchForm({...branchForm, customer_id: value})}
+                    >
+                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                        <SelectValue placeholder="اختر العميل المرتبط بالفرع" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-800 border-slate-600">
+                        <SelectItem value="">بدون عميل</SelectItem>
+                        {customers.map((customer) => (
+                          <SelectItem key={customer.id} value={customer.id.toString()}>
+                            {customer.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-slate-400">ربط الفرع بعميل معين سيجعله يظهر فقط عند اختيار هذا العميل في الصادرات</p>
                   </div>
                   <div className="flex items-center justify-between p-4 bg-slate-700/50 rounded-lg border border-slate-600">
                     <div className="flex flex-col">

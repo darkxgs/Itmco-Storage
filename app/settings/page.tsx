@@ -122,11 +122,93 @@ export default function SettingsPage() {
     }
   }
 
-  const handleTestNotification = () => {
-    toast({
-      title: "اختبار التنبيهات",
-      description: "تم إرسال تنبيه تجريبي بنجاح",
-    })
+  const handleTestNotification = async () => {
+    // Check if browser supports notifications
+    if (!("Notification" in window)) {
+      toast({
+        title: "غير مدعوم",
+        description: "المتصفح لا يدعم الإشعارات",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Show current permission status
+    console.log("Current notification permission:", Notification.permission)
+
+    // Request permission if not granted
+    if (Notification.permission === "default") {
+      toast({
+        title: "طلب إذن",
+        description: "يرجى السماح بالإشعارات في النافذة المنبثقة",
+      })
+      
+      try {
+        const permission = await Notification.requestPermission()
+        console.log("Permission result:", permission)
+        
+        if (permission !== "granted") {
+          toast({
+            title: "تم رفض الإذن",
+            description: "يرجى السماح بالإشعارات من إعدادات المتصفح",
+            variant: "destructive",
+          })
+          return
+        }
+      } catch (error) {
+        console.error("Permission request error:", error)
+        toast({
+          title: "خطأ",
+          description: "حدث خطأ أثناء طلب الإذن",
+          variant: "destructive",
+        })
+        return
+      }
+    }
+
+    if (Notification.permission === "denied") {
+      toast({
+        title: "الإشعارات محظورة",
+        description: "اضغط على أيقونة القفل بجانب عنوان الموقع واسمح بالإشعارات",
+        variant: "destructive",
+      })
+      return
+    }
+
+    // Send browser notification
+    try {
+      const notification = new Notification("ITMCO - نظام إدارة المخزون", {
+        body: "تم إرسال تنبيه تجريبي بنجاح! الإشعارات تعمل بشكل صحيح.",
+        icon: "/favicon.ico",
+        tag: "test-notification",
+        requireInteraction: true, // Keep notification visible until user interacts
+      })
+
+      notification.onclick = () => {
+        window.focus()
+        notification.close()
+      }
+
+      notification.onshow = () => {
+        console.log("Notification shown successfully")
+      }
+
+      notification.onerror = (e) => {
+        console.error("Notification error:", e)
+      }
+
+      toast({
+        title: "✅ تم إرسال الإشعار",
+        description: "تحقق من إشعارات المتصفح (قد تظهر في أسفل يمين الشاشة)",
+      })
+    } catch (error) {
+      console.error("Notification creation error:", error)
+      toast({
+        title: "خطأ في إنشاء الإشعار",
+        description: "حدث خطأ أثناء إنشاء الإشعار",
+        variant: "destructive",
+      })
+    }
   }
 
   if (!user) {

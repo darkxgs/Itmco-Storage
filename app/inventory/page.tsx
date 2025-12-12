@@ -405,41 +405,101 @@ export default function InventoryPage() {
     }
   }
 
-  const handleExportProducts = () => {
+  const handleExportProducts = async () => {
     try {
-      const csvData = [
-        ["اسم المنتج", "العلامة التجارية", "الموديل", "الفئة", "كود المنتج", "اسم المستودع", "المخزون", "الحد الأدنى", "سعر الشراء", "سعر البيع", "الوصف"],
-        ...filteredProducts.map((product) => [
-          product.name,
-          product.brand,
-          product.model,
-          product.category,
-          product.item_code || "",
-          product.warehouse_name || "",
-          product.stock,
-          product.min_stock || product.minStock,
-          product.purchase_price || "",
-          product.selling_price || "",
-          product.description || "",
-        ]),
+      // Import ExcelJS library dynamically
+      const ExcelJS = (await import('exceljs')).default
+      const workbook = new ExcelJS.Workbook()
+      
+      // Create main products sheet
+      const worksheet = workbook.addWorksheet('المنتجات', {
+        views: [{ rightToLeft: true }]
+      })
+      
+      // Define columns with same format as import template
+      worksheet.columns = [
+        { header: 'اسم المنتج', key: 'name', width: 30 },
+        { header: 'العلامة التجارية', key: 'brand', width: 20 },
+        { header: 'الموديل', key: 'model', width: 20 },
+        { header: 'الفئة', key: 'category', width: 25 },
+        { header: 'كود المنتج', key: 'item_code', width: 15 },
+        { header: 'رقم المخزن', key: 'warehouse_number', width: 15 },
+        { header: 'الكمية', key: 'stock', width: 12 },
+        { header: 'الحد الأدنى', key: 'min_stock', width: 12 },
+        { header: 'سعر الشراء', key: 'purchase_price', width: 15 },
+        { header: 'سعر البيع', key: 'selling_price', width: 15 },
+        { header: 'الوصف', key: 'description', width: 40 },
       ]
-
-      const csvContent = csvData.map((row) => row.map((cell) => `"${cell}"`).join(",")).join("\n")
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-      const link = document.createElement("a")
+      
+      // Style header row
+      const headerRow = worksheet.getRow(1)
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF2563EB' }
+      }
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle' }
+      headerRow.height = 25
+      
+      // Add data rows
+      filteredProducts.forEach((product, index) => {
+        const warehouse = warehouses.find(w => w.id === product.warehouse_id)
+        const row = worksheet.addRow({
+          name: product.name,
+          brand: product.brand,
+          model: product.model,
+          category: product.category,
+          item_code: product.item_code || '',
+          warehouse_number: warehouse?.warehouse_number || '',
+          stock: product.stock,
+          min_stock: product.min_stock || product.minStock || 0,
+          purchase_price: product.purchase_price || '',
+          selling_price: product.selling_price || '',
+          description: product.description || '',
+        })
+        
+        // Zebra striping
+        if (index % 2 === 1) {
+          row.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFF8FAFC' }
+          }
+        }
+        row.alignment = { horizontal: 'right', vertical: 'middle' }
+      })
+      
+      // Add borders to all cells
+      worksheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+            left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+            bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+            right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+          }
+        })
+      })
+      
+      // Generate and download the file
+      const buffer = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
       const url = URL.createObjectURL(blob)
-      link.setAttribute("href", url)
-      link.setAttribute("download", `products_${new Date().toISOString().split("T")[0]}.csv`)
-      link.style.visibility = "hidden"
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `قطع_الغيار_${new Date().toISOString().split('T')[0]}.xlsx`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
+      URL.revokeObjectURL(url)
 
       toast({
         title: "تم التصدير بنجاح",
-        description: `تم تصدير ${filteredProducts.length} منتج إلى ملف CSV`,
+        description: `تم تصدير ${filteredProducts.length} منتج إلى ملف Excel`,
       })
     } catch (error) {
+      console.error("Export error:", error)
       toast({
         title: "فشل في التصدير",
         description: "حدث خطأ أثناء تصدير البيانات",
@@ -947,7 +1007,7 @@ export default function InventoryPage() {
                   )}
                   <Button onClick={handleExportProducts} variant="outline" size="sm" className="bg-slate-700/50 border-slate-600/50 hover:bg-slate-600/50 hover:border-slate-500/50 transition-colors text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2">
                     <Download className="w-3 h-3 sm:w-4 sm:h-4 ml-1 sm:ml-2" />
-                    <span className="hidden sm:inline">تصدير CSV</span>
+                    <span className="hidden sm:inline">تصدير Excel</span>
                     <span className="sm:hidden">تصدير</span>
                   </Button>
                   {canAddProduct() && (

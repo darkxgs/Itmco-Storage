@@ -1,12 +1,19 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { useAuth } from "@/hooks/use-auth"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import {
   LayoutDashboard,
   Package,
@@ -26,7 +33,12 @@ import {
   BarChart3,
   Warehouse,
   Tag,
+  AlertTriangle,
+  CheckCircle,
+  Info,
+  RefreshCw,
 } from "lucide-react"
+import { supabase } from "@/lib/supabase"
 
 const navigation = [
   {
@@ -120,12 +132,95 @@ export function Sidebar() {
   const { user, logout } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [notifications, setNotifications] = useState(0)
+  const [notifications, setNotifications] = useState<Array<{id: number, title: string, message: string, type: 'warning' | 'info' | 'success', time: string, read: boolean, productId?: number}>>([])
+  const [notificationOpen, setNotificationOpen] = useState(false)
+  const [loadingNotifications, setLoadingNotifications] = useState(false)
+  const [dismissedIds, setDismissedIds] = useState<number[]>([])
 
+  // Load dismissed notifications from localStorage
   useEffect(() => {
-    // Simulate notifications count
-    setNotifications(3)
+    const dismissed = localStorage.getItem('dismissedNotifications')
+    if (dismissed) {
+      setDismissedIds(JSON.parse(dismissed))
+    }
   }, [])
+
+  // Fetch low stock products from database
+  const fetchLowStockNotifications = useCallback(async () => {
+    if (!user) return
+    
+    setLoadingNotifications(true)
+    try {
+      // Get all products and filter in JS (Supabase can't compare columns directly)
+      const { data: allProducts, error } = await supabase
+        .from('products')
+        .select('id, name, stock, min_stock, item_code')
+        .order('stock', { ascending: true })
+
+      if (error) {
+        console.error('Error fetching products:', error)
+        return
+      }
+
+      // Filter products that are low stock (stock <= min_stock) or out of stock
+      const lowStockProducts = (allProducts || []).filter(p => {
+        const minStock = p.min_stock || 5
+        return p.stock <= minStock
+      })
+
+      // Create alerts from low stock products (not dismissed)
+      const alerts = lowStockProducts
+        .filter(p => !dismissedIds.includes(p.id))
+        .slice(0, 20) // Limit to 20
+        .map((product) => ({
+          id: product.id,
+          productId: product.id,
+          title: product.stock === 0 ? "⚠️ نفاد المخزون" : "تنبيه مخزون منخفض",
+          message: `${product.name} ${product.item_code ? `(${product.item_code})` : ''} - الكمية: ${product.stock}`,
+          type: product.stock === 0 ? 'warning' as const : 'info' as const,
+          time: product.stock === 0 ? "نفاد كامل" : `الحد الأدنى: ${product.min_stock || 5}`,
+          read: false
+        }))
+
+      setNotifications(alerts)
+    } catch (error) {
+      console.error('Error fetching notifications:', error)
+    } finally {
+      setLoadingNotifications(false)
+    }
+  }, [user, dismissedIds])
+
+  // Fetch notifications on mount and when user changes
+  useEffect(() => {
+    fetchLowStockNotifications()
+    
+    // Refresh every 5 minutes
+    const interval = setInterval(fetchLowStockNotifications, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [fetchLowStockNotifications])
+
+  const unreadCount = notifications.filter(n => !n.read).length
+
+  const markAsRead = (id: number) => {
+    setNotifications(prev => prev.map(n => n.id === id ? {...n, read: true} : n))
+  }
+
+  const markAllAsRead = () => {
+    setNotifications(prev => prev.map(n => ({...n, read: true})))
+  }
+
+  const dismissNotification = (id: number) => {
+    const newDismissed = [...dismissedIds, id]
+    setDismissedIds(newDismissed)
+    localStorage.setItem('dismissedNotifications', JSON.stringify(newDismissed))
+    setNotifications(prev => prev.filter(n => n.id !== id))
+  }
+
+  const clearAllDismissed = () => {
+    setDismissedIds([])
+    localStorage.removeItem('dismissedNotifications')
+    fetchLowStockNotifications()
+  }
 
   // Auto-collapse on medium widths and short heights to maximize content area
   useEffect(() => {
@@ -192,17 +287,134 @@ export function Sidebar() {
                 {user.role === "engineer" && "مهندس"}
               </p>
             </div>
-            {notifications > 0 && (
-              <div className="relative">
-                <Bell className="w-5 h-5 text-slate-400" />
-                <Badge
-                  variant="destructive"
-                  className="absolute -top-2 -right-2 w-5 h-5 p-0 flex items-center justify-center text-xs"
-                >
-                  {notifications}
-                </Badge>
-              </div>
-            )}
+            <Dialog open={notificationOpen} onOpenChange={setNotificationOpen}>
+              <DialogTrigger asChild>
+                <button className="relative p-2 rounded-lg hover:bg-slate-700 transition-colors">
+                  <Bell className="w-5 h-5 text-slate-400 hover:text-white" />
+                  {unreadCount > 0 && (
+                    <Badge
+                      variant="destructive"
+                      className="absolute -top-1 -right-1 w-5 h-5 p-0 flex items-center justify-center text-[10px]"
+                    >
+                      {unreadCount}
+                    </Badge>
+                  )}
+                </button>
+              </DialogTrigger>
+              <DialogContent className="bg-slate-800 border-slate-700 text-white max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center justify-between text-white">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-5 h-5" />
+                      تنبيهات المخزون
+                    </div>
+                    <button 
+                      onClick={fetchLowStockNotifications}
+                      disabled={loadingNotifications}
+                      className="p-2 rounded hover:bg-slate-700 transition-colors"
+                      title="تحديث"
+                    >
+                      <RefreshCw className={cn("w-4 h-4 text-slate-400", loadingNotifications && "animate-spin")} />
+                    </button>
+                  </DialogTitle>
+                </DialogHeader>
+                
+                <div className="max-h-[400px] overflow-y-auto -mx-6 px-6">
+                  {loadingNotifications ? (
+                    <div className="p-6 text-center text-slate-400">
+                      <RefreshCw className="w-8 h-8 mx-auto mb-3 animate-spin" />
+                      <p>جاري تحميل التنبيهات...</p>
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div className="p-6 text-center text-slate-400">
+                      <CheckCircle className="w-12 h-12 mx-auto mb-3 text-green-500" />
+                      <p className="text-lg font-medium text-white">لا توجد تنبيهات</p>
+                      <p className="text-sm mt-1">جميع المنتجات في مستوى آمن ✓</p>
+                      {dismissedIds.length > 0 && (
+                        <button 
+                          onClick={clearAllDismissed}
+                          className="text-sm text-blue-400 hover:text-blue-300 mt-4 underline"
+                        >
+                          إظهار التنبيهات المخفية ({dismissedIds.length})
+                        </button>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {unreadCount > 0 && (
+                        <div className="flex justify-end mb-2">
+                          <button 
+                            onClick={markAllAsRead}
+                            className="text-xs text-blue-400 hover:text-blue-300"
+                          >
+                            تحديد الكل كمقروء
+                          </button>
+                        </div>
+                      )}
+                      {notifications.map((notification) => (
+                        <div 
+                          key={notification.id}
+                          className={cn(
+                            "p-3 rounded-lg border transition-colors",
+                            !notification.read 
+                              ? "bg-slate-700/50 border-slate-600" 
+                              : "bg-slate-800/50 border-slate-700/50"
+                          )}
+                        >
+                          <div className="flex gap-3">
+                            <div className={cn(
+                              "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
+                              notification.type === 'warning' && "bg-red-500/20",
+                              notification.type === 'info' && "bg-yellow-500/20",
+                              notification.type === 'success' && "bg-green-500/20"
+                            )}>
+                              {notification.type === 'warning' && <AlertTriangle className="w-5 h-5 text-red-400" />}
+                              {notification.type === 'info' && <AlertTriangle className="w-5 h-5 text-yellow-400" />}
+                              {notification.type === 'success' && <CheckCircle className="w-5 h-5 text-green-400" />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start justify-between gap-2">
+                                <p className={cn(
+                                  "text-sm",
+                                  notification.read ? "text-slate-300" : "text-white font-medium"
+                                )}>
+                                  {notification.title}
+                                </p>
+                                <button
+                                  onClick={() => dismissNotification(notification.id)}
+                                  className="text-slate-500 hover:text-slate-300 p-1 -mt-1 -mr-1"
+                                  title="إخفاء"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                              <p className="text-sm text-slate-400 mt-1">{notification.message}</p>
+                              <p className="text-xs text-slate-500 mt-2">{notification.time}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                <div className="flex justify-between items-center pt-4 border-t border-slate-700 -mx-6 px-6">
+                  <Link href="/inventory" onClick={() => setNotificationOpen(false)}>
+                    <button className="text-sm text-blue-400 hover:text-blue-300">
+                      عرض المخزون ←
+                    </button>
+                  </Link>
+                  {dismissedIds.length > 0 && (
+                    <button 
+                      onClick={clearAllDismissed}
+                      className="text-xs text-slate-400 hover:text-slate-300"
+                    >
+                      إظهار المخفية ({dismissedIds.length})
+                    </button>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       )}

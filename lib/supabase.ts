@@ -48,6 +48,7 @@ export type Database = {
           address: string | null
           phone: string | null
           manager_name: string | null
+          customer_id: number | null
           is_active: boolean
           created_at: string
           updated_at: string
@@ -59,6 +60,7 @@ export type Database = {
           address?: string | null
           phone?: string | null
           manager_name?: string | null
+          customer_id?: number | null
           is_active?: boolean
           created_at?: string
           updated_at?: string
@@ -70,6 +72,7 @@ export type Database = {
           address?: string | null
           phone?: string | null
           manager_name?: string | null
+          customer_id?: number | null
           is_active?: boolean
           created_at?: string
           updated_at?: string

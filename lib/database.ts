@@ -1276,6 +1276,7 @@ export async function createBranch(branch: BranchInsert) {
       address: sanitizedBranch.address ? validateInput(sanitizedBranch.address) : null,
       phone: sanitizedBranch.phone ? validateInput(sanitizedBranch.phone) : null,
       manager_name: sanitizedBranch.manager_name ? validateInput(sanitizedBranch.manager_name) : null,
+      customer_id: sanitizedBranch.customer_id ? Number(sanitizedBranch.customer_id) : null,
       is_active: sanitizedBranch.is_active !== undefined ? sanitizedBranch.is_active : true,
     }
 
@@ -1312,6 +1313,9 @@ export async function updateBranch(id: number, updates: BranchUpdate) {
     }
     if (sanitizedUpdates.manager_name !== undefined) {
       dbUpdates.manager_name = sanitizedUpdates.manager_name ? validateInput(sanitizedUpdates.manager_name) : null
+    }
+    if (sanitizedUpdates.customer_id !== undefined) {
+      dbUpdates.customer_id = sanitizedUpdates.customer_id ? Number(sanitizedUpdates.customer_id) : null
     }
     if (sanitizedUpdates.is_active !== undefined) dbUpdates.is_active = sanitizedUpdates.is_active
 

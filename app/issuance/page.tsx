@@ -58,6 +58,8 @@ export default function IssuancePage() {
   const [branchSearchTerm, setBranchSearchTerm] = useState("")
   const [customerSearchTerm, setCustomerSearchTerm] = useState("")
   const [warehouseSearchTerm, setWarehouseSearchTerm] = useState("")
+  const [formBranchSearch, setFormBranchSearch] = useState("")
+  const [formCustomerSearch, setFormCustomerSearch] = useState("")
   const [itemCodeSearch, setItemCodeSearch] = useState("")
   const [productCodeSearch, setProductCodeSearch] = useState("")
   const [selectedProducts, setSelectedProducts] = useState<Array<{id: number, name: string, brand: string, model: string, quantity: number, stock: number, item_code?: string}>>([])  
@@ -947,16 +949,29 @@ export default function IssuancePage() {
                   <Label className="text-slate-300 text-right">
                     العميل
                   </Label>
-                  <Select value={selectedCustomer} onValueChange={setSelectedCustomer}>
+                  <Select value={selectedCustomer} onValueChange={(value) => {
+                    setSelectedCustomer(value)
+                    setSelectedBranch("") // Reset branch when customer changes
+                  }}>
                     <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
                       <SelectValue placeholder="اختر العميل" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
-                      {customers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id.toString()}>
-                          {customer.name}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm max-h-[300px]">
+                      <div className="p-2 sticky top-0 bg-slate-800 z-10">
+                        <Input
+                          placeholder="ابحث عن عميل..."
+                          value={formCustomerSearch}
+                          onChange={(e) => setFormCustomerSearch(e.target.value)}
+                          className="bg-slate-700 border-slate-600 text-white text-right h-8"
+                        />
+                      </div>
+                      {customers
+                        .filter(customer => customer.name.toLowerCase().includes(formCustomerSearch.toLowerCase()))
+                        .map((customer) => (
+                          <SelectItem key={customer.id} value={customer.id.toString()}>
+                            {customer.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -977,18 +992,36 @@ export default function IssuancePage() {
 
                 <div className="grid gap-2">
                   <Label htmlFor="branch" className="text-slate-300 text-right">
-                    الفرع
+                    الفرع {selectedCustomer && "(فروع العميل المحدد)"}
                   </Label>
                   <Select value={selectedBranch} onValueChange={setSelectedBranch}>
                     <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
                       <SelectValue placeholder="اختر الفرع" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
-                      {branches.map((branch) => (
-                        <SelectItem key={branch.id} value={branch.id.toString()}>
-                          {branch.name}
-                        </SelectItem>
-                      ))}
+                    <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm max-h-[300px]">
+                      <div className="p-2 sticky top-0 bg-slate-800 z-10">
+                        <Input
+                          placeholder="ابحث عن فرع..."
+                          value={formBranchSearch}
+                          onChange={(e) => setFormBranchSearch(e.target.value)}
+                          className="bg-slate-700 border-slate-600 text-white text-right h-8"
+                        />
+                      </div>
+                      {branches
+                        .filter(branch => {
+                          // Filter by customer if selected
+                          if (selectedCustomer && branch.customer_id) {
+                            return branch.customer_id.toString() === selectedCustomer
+                          }
+                          // Show all branches if no customer selected or branch has no customer
+                          return !selectedCustomer || !branch.customer_id
+                        })
+                        .filter(branch => branch.name.toLowerCase().includes(formBranchSearch.toLowerCase()))
+                        .map((branch) => (
+                          <SelectItem key={branch.id} value={branch.id.toString()}>
+                            {branch.name}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1027,13 +1060,13 @@ export default function IssuancePage() {
 
                 <div className="grid gap-2">
                   <Label htmlFor="serial" className="text-slate-300 text-right">
-                    الرقم التسلسلي
+                    رقم سريال الماكينة
                   </Label>
                   <Input
                     id="serial"
                     value={serialNumber}
                     onChange={(e) => setSerialNumber(e.target.value)}
-                    placeholder="أدخل الرقم التسلسلي"
+                    placeholder="أدخل رقم سريال الماكينة"
                     className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                   />
                 </div>
@@ -1049,6 +1082,7 @@ export default function IssuancePage() {
                     <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
                       <SelectItem value="comprehensive">عقد شامل لقطع الغيار</SelectItem>
                       <SelectItem value="warranty">ضمان</SelectItem>
+                      <SelectItem value="custody">عهدة</SelectItem>
                       <SelectItem value="no_warranty">بدون ضمان</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1109,7 +1143,7 @@ export default function IssuancePage() {
                   id="search"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="البحث في العميل، المهندس، أو الرقم التسلسلي"
+                  placeholder="البحث في العميل، المهندس، أو رقم سريال الماكينة"
                   className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                 />
               </div>
@@ -1361,7 +1395,7 @@ export default function IssuancePage() {
                     <TableHead className="text-slate-300 text-right">الفرع</TableHead>
                     <TableHead className="text-slate-300 text-right">المخزن</TableHead>
                     <TableHead className="text-slate-300 text-right">المهندس</TableHead>
-                    <TableHead className="text-slate-300 text-right">الرقم التسلسلي</TableHead>
+                    <TableHead className="text-slate-300 text-right">رقم سريال الماكينة</TableHead>
                     <TableHead className="text-slate-300 text-right">نوع الضمان</TableHead>
                     <TableHead className="text-slate-300 text-right">رقم الفاتورة</TableHead>
                     <TableHead className="text-slate-300 text-center">الإجراءات</TableHead>
@@ -1394,6 +1428,7 @@ export default function IssuancePage() {
                         <TableCell className="text-slate-300 text-right">
                           {issuance.warranty_type === 'comprehensive' ? 'عقد شامل لقطع الغيار' :
                            issuance.warranty_type === 'warranty' ? 'ضمان' :
+                           issuance.warranty_type === 'custody' ? 'عهدة' :
                            issuance.warranty_type === 'no_warranty' ? 'بدون ضمان' : 'غير محدد'}
                         </TableCell>
                         <TableCell className="text-slate-300 text-right">{issuance.invoice_number || 'غير محدد'}</TableCell>
@@ -1579,13 +1614,13 @@ export default function IssuancePage() {
 
               <div className="grid gap-2">
                 <Label htmlFor="edit-serial" className="text-slate-300 text-right">
-                  الرقم التسلسلي
+                  رقم سريال الماكينة
                 </Label>
                 <Input
                     id="edit-serial"
                     value={serialNumber}
                     onChange={(e) => setSerialNumber(e.target.value)}
-                    placeholder="أدخل الرقم التسلسلي"
+                    placeholder="أدخل رقم سريال الماكينة"
                     className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                   />
               </div>
@@ -1601,6 +1636,7 @@ export default function IssuancePage() {
                   <SelectContent className="bg-slate-800/95 border-slate-600/50 backdrop-blur-sm">
                     <SelectItem value="comprehensive">عقد شامل لقطع الغيار</SelectItem>
                     <SelectItem value="warranty">ضمان</SelectItem>
+                    <SelectItem value="custody">عهدة</SelectItem>
                     <SelectItem value="no_warranty">بدون ضمان</SelectItem>
                   </SelectContent>
                 </Select>
