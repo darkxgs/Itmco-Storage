@@ -14,41 +14,85 @@ import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import { supabase } from "@/lib/supabase"
+import { getCategories } from "@/lib/database"
 
-const categories = [
-  "آلات عد النقود",
-  "آلات ربط النقود",
-  "آلات فحص الشيكات",
-  "ساعات الأمان",
-  "أنظمة الحضور والانصراف",
-  "ساعات السكرتارية",
-  "بوابات الأمان",
-]
+// Types for search results
+interface ProductResult {
+  id: number
+  name: string
+  brand: string
+  model: string
+  category: string
+  item_code?: string
+  stock: number
+  min_stock: number
+  purchase_price?: number
+  selling_price?: number
+  description?: string
+  created_at: string
+}
 
-const branches = [
-  "الفرع الرئيسي - الرياض",
-  "فرع جدة",
-  "فرع الدمام",
-  "فرع مكة المكرمة",
-  "فرع المدينة المنورة",
-  "فرع الطائف",
-  "فرع أبها",
-  "فرع تبوك",
-]
+interface IssuanceResult {
+  id: number
+  product_name: string
+  customer_name: string
+  branch: string
+  quantity: number
+  engineer: string
+  serial_number?: string
+  warranty_type?: string
+  invoice_number?: string
+  notes?: string
+  date?: string
+  created_at: string
+}
+
+interface UserResult {
+  id: number
+  name: string
+  email: string
+  role: string
+  is_active: boolean
+  created_at: string
+}
+
+type SearchResult = ProductResult | IssuanceResult | UserResult
 
 export default function SearchPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user } = useAuth()
   const [searchType, setSearchType] = useState("products")
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [selectedBranch, setSelectedBranch] = useState("all")
   const [stockFilter, setStockFilter] = useState("all")
   const [dateRange, setDateRange] = useState<any>(null)
-  const [results, setResults] = useState([])
+  const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
+  const [categories, setCategories] = useState<{id: number, name: string}[]>([])
+  const [branches, setBranches] = useState<{id: number, name: string}[]>([])
   const { toast } = useToast()
 
-  // User authentication is handled by useAuth hook
+  // Load categories and branches from database
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        // Load categories
+        const categoriesData = await getCategories()
+        setCategories(categoriesData.filter((c: any) => c.is_active !== false))
+        
+        // Load branches
+        const { data: branchesData } = await supabase
+          .from('branches')
+          .select('id, name')
+          .eq('is_active', true)
+          .order('name')
+        setBranches(branchesData || [])
+      } catch (error) {
+        console.error('Error loading data:', error)
+      }
+    }
+    loadData()
+  }, [])
 
   const handleSearch = async () => {
     setLoading(true)
@@ -138,17 +182,17 @@ export default function SearchPage() {
         data = usersData
       }
 
-      setResults(data || [])
+      setResults((data || []) as SearchResult[])
 
       toast({
         title: "تم البحث",
         description: `تم العثور على ${data?.length || 0} نتيجة`,
       })
-    } catch (error) {
+    } catch (error: any) {
       console.error("Search error:", error)
       toast({
         title: "خطأ في البحث",
-        description: error.message || "حدث خطأ أثناء البحث",
+        description: error?.message || "حدث خطأ أثناء البحث",
         variant: "destructive",
       })
     } finally {
@@ -156,8 +200,8 @@ export default function SearchPage() {
     }
   }
 
-  const handleExport = () => {
-    // Convert results to CSV
+  const handleExport = async () => {
+    // Convert results to Excel
     if (results.length === 0) {
       toast({
         title: "لا توجد بيانات",
@@ -167,57 +211,135 @@ export default function SearchPage() {
       return
     }
 
-    // Define proper Arabic headers based on search type
-    const getHeaders = () => {
+    try {
+      // Import ExcelJS library dynamically
+      const ExcelJS = (await import('exceljs')).default
+      const workbook = new ExcelJS.Workbook()
+      
+      // Create worksheet
+      const worksheet = workbook.addWorksheet('نتائج البحث', {
+        views: [{ rightToLeft: true }]
+      })
+      
+      // Define headers based on search type
       if (searchType === 'products') {
-        return ["الرقم", "التاريخ", "اسم المنتج", "الفئة", "كود المنتج", "رقم القطعة", "العلامة التجارية", "اسم العميل", "الفرع", "اسم المستودع", "الكمية", "المهندس", "الرقم التسلسلي", "نوع الضمان", "رقم الفاتورة", "سعر الشراء", "سعر البيع", "الملاحظات"]
-      } else {
-        return ["الرقم", "التاريخ", "اسم المنتج", "الفئة", "كود المنتج", "رقم القطعة", "العلامة التجارية", "اسم العميل", "الفرع", "اسم المستودع", "الكمية", "المهندس", "الرقم التسلسلي", "نوع الضمان", "رقم الفاتورة", "سعر الشراء", "سعر البيع", "الملاحظات"]
-      }
-    }
-
-    const headers = getHeaders().join(",")
-    const csvContent = [
-      headers,
-      ...results.map((row) => {
-        const values = [
-          row.id || '',
-          row.date || row.created_at || '',
-          row.product_name || row.productName || '',
-          row.category || '',
-          row.item_code || '',
-          row.part_number || '',
-          row.brand || '',
-          row.customer_name || '',
-          row.branch || '',
-          row.warehouse_name || '',
-          row.quantity || '',
-          row.engineer || '',
-          row.serial_number || '',
-          row.warranty_type || '',
-          row.invoice_number || '',
-          row.purchase_price || '',
-          row.selling_price || '',
-          row.notes || ''
+        worksheet.columns = [
+          { header: 'الرقم', key: 'id', width: 10 },
+          { header: 'اسم المنتج', key: 'name', width: 30 },
+          { header: 'العلامة التجارية', key: 'brand', width: 20 },
+          { header: 'الموديل', key: 'model', width: 20 },
+          { header: 'الفئة', key: 'category', width: 25 },
+          { header: 'كود المنتج', key: 'item_code', width: 15 },
+          { header: 'الكمية', key: 'stock', width: 12 },
+          { header: 'الحد الأدنى', key: 'min_stock', width: 12 },
+          { header: 'سعر الشراء', key: 'purchase_price', width: 15 },
+          { header: 'سعر البيع', key: 'selling_price', width: 15 },
+          { header: 'الوصف', key: 'description', width: 40 },
         ]
-        return values.map((value) => `"${value}"`).join(",")
-      }),
-    ].join("\n")
+        
+        // Add data rows
+        results.forEach((product: any) => {
+          worksheet.addRow({
+            id: product.id,
+            name: product.name || '',
+            brand: product.brand || '',
+            model: product.model || '',
+            category: product.category || '',
+            item_code: product.item_code || '',
+            stock: product.stock || 0,
+            min_stock: product.min_stock || 0,
+            purchase_price: product.purchase_price || '',
+            selling_price: product.selling_price || '',
+            description: product.description || '',
+          })
+        })
+      } else {
+        // Issuances
+        worksheet.columns = [
+          { header: 'الرقم', key: 'id', width: 10 },
+          { header: 'التاريخ', key: 'date', width: 15 },
+          { header: 'اسم المنتج', key: 'product_name', width: 30 },
+          { header: 'العميل', key: 'customer_name', width: 25 },
+          { header: 'الفرع', key: 'branch', width: 20 },
+          { header: 'الكمية', key: 'quantity', width: 12 },
+          { header: 'المهندس', key: 'engineer', width: 20 },
+          { header: 'رقم سريال الماكينة', key: 'serial_number', width: 20 },
+          { header: 'نوع الضمان', key: 'warranty_type', width: 15 },
+          { header: 'رقم الفاتورة', key: 'invoice_number', width: 15 },
+          { header: 'ملاحظات', key: 'notes', width: 30 },
+        ]
+        
+        // Add data rows
+        results.forEach((issuance: any) => {
+          worksheet.addRow({
+            id: issuance.id,
+            date: issuance.date ? new Date(issuance.date).toLocaleDateString('en-GB') : '',
+            product_name: issuance.product_name || '',
+            customer_name: issuance.customer_name || '',
+            branch: issuance.branch || '',
+            quantity: issuance.quantity || 0,
+            engineer: issuance.engineer || '',
+            serial_number: issuance.serial_number || '',
+            warranty_type: issuance.warranty_type === 'comprehensive' ? 'عقد شامل' :
+                          issuance.warranty_type === 'warranty' ? 'ضمان' :
+                          issuance.warranty_type === 'custody' ? 'عهدة' :
+                          issuance.warranty_type === 'no_warranty' ? 'بدون ضمان' : '',
+            invoice_number: issuance.invoice_number || '',
+            notes: issuance.notes || '',
+          })
+        })
+      }
+      
+      // Style header row
+      const headerRow = worksheet.getRow(1)
+      headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+      headerRow.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF2563EB' }
+      }
+      headerRow.alignment = { horizontal: 'center', vertical: 'middle' }
+      headerRow.height = 25
+      
+      // Add borders to all cells
+      worksheet.eachRow((row, rowNumber) => {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+            left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+            bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+            right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+          }
+          if (rowNumber > 1) {
+            cell.alignment = { horizontal: 'right', vertical: 'middle' }
+          }
+        })
+      })
+      
+      // Generate and download the file
+      const buffer = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `نتائج_البحث_${searchType === 'products' ? 'المنتجات' : 'الإصدارات'}_${new Date().toISOString().split('T')[0]}.xlsx`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
 
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-    const link = document.createElement("a")
-    const url = URL.createObjectURL(blob)
-    link.setAttribute("href", url)
-    link.setAttribute("download", `search_results_${searchType}_${new Date().toISOString().split("T")[0]}.csv`)
-    link.style.visibility = "hidden"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-
-    toast({
-      title: "تم التصدير",
-      description: "تم تصدير النتائج بنجاح",
-    })
+      toast({
+        title: "تم التصدير بنجاح",
+        description: `تم تصدير ${results.length} نتيجة إلى ملف Excel`,
+      })
+    } catch (error) {
+      console.error("Export error:", error)
+      toast({
+        title: "فشل في التصدير",
+        description: "حدث خطأ أثناء تصدير البيانات",
+        variant: "destructive",
+      })
+    }
   }
 
   const clearFilters = () => {
@@ -298,8 +420,8 @@ export default function SearchPage() {
                       <SelectContent className="bg-slate-700 border-slate-600">
                         <SelectItem value="all">جميع الفئات</SelectItem>
                         {categories.map((category) => (
-                          <SelectItem key={category} value={category}>
-                            {category}
+                          <SelectItem key={category.id} value={category.name}>
+                            {category.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -333,8 +455,8 @@ export default function SearchPage() {
                       <SelectContent className="bg-slate-700 border-slate-600">
                         <SelectItem value="all">جميع الفروع</SelectItem>
                         {branches.map((branch) => (
-                          <SelectItem key={branch} value={branch}>
-                            {branch}
+                          <SelectItem key={branch.id} value={branch.name}>
+                            {branch.name}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -411,7 +533,7 @@ export default function SearchPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {results.map((item, index) => (
+                    {results.map((item: any, index) => (
                       <TableRow key={index} className="border-slate-700">
                         {searchType === "products" && (
                           <>
@@ -442,7 +564,7 @@ export default function SearchPage() {
                         {searchType === "issuances" && (
                           <>
                             <TableCell className="text-slate-300">
-                              {new Date(item.created_at).toLocaleDateString("en-US")}
+                              {new Date(item.created_at).toLocaleDateString("en-GB")}
                             </TableCell>
                             <TableCell className="text-white font-medium">{item.product_name}</TableCell>
                             <TableCell className="text-slate-300">{item.customer_name}</TableCell>
@@ -479,7 +601,7 @@ export default function SearchPage() {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-slate-300">
-                              {new Date(item.created_at).toLocaleDateString("en-US")}
+                              {new Date(item.created_at).toLocaleDateString("en-GB")}
                             </TableCell>
                           </>
                         )}
