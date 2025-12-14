@@ -308,14 +308,14 @@ export default function BranchesPage() {
                   <div className="space-y-3">
                     <Label htmlFor="branch-customer" className="text-slate-300 font-medium">العميل (اختياري)</Label>
                     <Select 
-                      value={branchForm.customer_id} 
-                      onValueChange={(value) => setBranchForm({...branchForm, customer_id: value})}
+                      value={branchForm.customer_id || "none"} 
+                      onValueChange={(value) => setBranchForm({...branchForm, customer_id: value === "none" ? "" : value})}
                     >
                       <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                         <SelectValue placeholder="اختر العميل المرتبط بالفرع" />
                       </SelectTrigger>
                       <SelectContent className="bg-slate-800 border-slate-600">
-                        <SelectItem value="">بدون عميل</SelectItem>
+                        <SelectItem value="none">بدون عميل</SelectItem>
                         {customers.map((customer) => (
                           <SelectItem key={customer.id} value={customer.id.toString()}>
                             {customer.name}
