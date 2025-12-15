@@ -255,7 +255,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
   // Filter headers based on data availability
   const filteredHeaders = PDF_HEADERS
   
-  const cellStyle = "style=\"border:1px solid #d1d5db;padding:4px 2px;color:#111827;vertical-align:middle;word-wrap:break-word;overflow-wrap:break-word;font-size:9px;text-align:center;\""
+  const cellStyle = "style=\"border:1px solid #d1d5db;padding:6px 3px;color:#111827;vertical-align:middle;word-wrap:break-word;overflow-wrap:break-word;font-size:9px;text-align:center;line-height:1.4;height:auto;display:table-cell;\""
 
   // Generate table content (grouped or ungrouped) with pagination
    let tableContent = ''
@@ -300,7 +300,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
          ]
          
          const rowClass = needsPageBreak ? 'page-break avoid-break' : 'avoid-break'
-         return `<tr class="${rowClass}" style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">${cells.join('')}</tr>`
+         return `<tr class="${rowClass}" style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};height:28px;">${cells.join('')}</tr>`
        }).join('')
        
        const sectionHeader = sectionIdx > 0 && sectionIdx % 3 === 0 ? 
@@ -338,7 +338,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
           ]
       
           const rowClass = chunkIdx > 0 && idx === 0 ? 'page-break avoid-break' : 'avoid-break'
-          return `<tr class="${rowClass}" style="background:${globalIdx % 2 === 0 ? '#ffffff' : '#f8fafc'};">${cells.join('')}</tr>`
+          return `<tr class="${rowClass}" style="background:${globalIdx % 2 === 0 ? '#ffffff' : '#f8fafc'};height:28px;">${cells.join('')}</tr>`
         }).join('')
         
         return chunkRows
@@ -359,12 +359,13 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
       td, th {
         word-wrap: break-word;
         overflow-wrap: break-word;
+        vertical-align: middle !important;
       }
     </style>
-    <table style="width:100%;border-collapse:collapse;font-size:9px;border:1px solid #d1d5db;table-layout:auto;line-height:1.3;">
+    <table style="width:100%;border-collapse:collapse;font-size:9px;border:1px solid #d1d5db;table-layout:auto;line-height:1.4;">
       <thead style="display:table-header-group;">
-        <tr>
-          ${filteredHeaders.map(h => `<th style='border:1px solid #d1d5db;background:linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);color:#ffffff;padding:6px 4px;text-align:center;font-weight:bold;font-size:9px;page-break-after:avoid;white-space:nowrap;'>${h}</th>`).join('')}
+        <tr style="height:32px;">
+          ${filteredHeaders.map(h => `<th style='border:1px solid #d1d5db;background:linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);color:#ffffff;padding:8px 4px;text-align:center;vertical-align:middle;font-weight:bold;font-size:9px;page-break-after:avoid;white-space:nowrap;'>${h}</th>`).join('')}
         </tr>
       </thead>
       <tbody style="display:table-row-group;">
