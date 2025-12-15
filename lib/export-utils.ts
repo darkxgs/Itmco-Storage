@@ -26,6 +26,7 @@ export interface ExportData {
   notes?: string
   warrantyType?: string
   invoiceNumber?: string
+  invoiceValue?: string // قيمة الفاتورة
   itemCode?: string // كود قطعة الغيار
   warehouseId?: number
   warehouseName?: string
@@ -100,21 +101,22 @@ export function exportToCSV(options: ExportOptions): void {
 
 // Enhanced PDF Export
 export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?: 'category' | 'branch' | 'none'; includeCharts?: boolean; pageSize?: number }): void {
-  const { data, title = 'تقرير الإصدارات', filename, filters, summaryStats, groupBy = 'none', includeCharts = false, pageSize = 50 } = options
+  const { data, title = 'تقرير الإصدارات', filename, filters, summaryStats, groupBy = 'none', includeCharts = false, pageSize = 30 } = options
 
   // Build an offscreen HTML document to guarantee correct Arabic shaping
+  // Using landscape A4 dimensions for better table fit
   const container = document.createElement('div')
   container.style.position = 'fixed'
   container.style.left = '-10000px'
   container.style.top = '0'
-  container.style.width = '794px' // approximately A4 width in px at 96 DPI
-  container.style.padding = '20mm' // إضافة حدود للصفحة
+  container.style.width = '1100px' // A4 landscape width approximately
+  container.style.padding = '10mm'
   container.style.background = '#ffffff'
-  container.style.fontFamily = "'Cairo','Amiri','Tahoma','Segoe UI',Arial,sans-serif" // Enhanced Arabic fonts
+  container.style.fontFamily = "'Cairo','Amiri','Tahoma','Segoe UI',Arial,sans-serif"
   container.style.direction = 'rtl'
   container.style.textAlign = 'right'
-  container.style.color = '#1f2937' // Enhanced dark text color
-  container.style.lineHeight = '1.5' // زيادة المسافة بين الصفوف
+  container.style.color = '#1f2937'
+  container.style.lineHeight = '1.3'
 
   const safeFilters = filters || {}
 
@@ -124,8 +126,9 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
   // Generate simple charts if requested
   let chartsHtml = ''
   if (includeCharts && stats.topProducts.length > 0) {
-    const maxCount = Math.max(...stats.topProducts.slice(0, 5).map(p => p.count))
-    const productChartBars = stats.topProducts.slice(0, 5).map(product => {
+    const topProductsTyped = stats.topProducts as { name: string; count: number }[]
+    const maxCount = Math.max(...topProductsTyped.slice(0, 5).map(p => p.count))
+    const productChartBars = topProductsTyped.slice(0, 5).map(product => {
       const percentage = (product.count / maxCount) * 100
       return `
         <div style="margin:5px 0;">
@@ -233,18 +236,48 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
   const hasPurchasePrices = data.some(item => item.purchasePrice && item.purchasePrice > 0)
   const hasSellingPrices = data.some(item => item.sellingPrice && item.sellingPrice > 0)
   
-  // Filter headers and create dynamic table structure
-  const filteredHeaders = TABLE_HEADERS.filter((header, index) => {
-    if (header === 'سعر الشراء' && !hasPurchasePrices) return false
-    if (header === 'سعر البيع' && !hasSellingPrices) return false
-    return true
-  })
+  // PDF-specific headers - simplified for better readability
+  const PDF_HEADERS = [
+    '#',
+    'التاريخ',
+    'المنتج',
+    'العميل',
+    'الفرع',
+    'الكمية',
+    'المهندس',
+    'كود القطعة',
+    'موديل الماكينة',
+    'سريال الماكينة',
+    'الضمان',
+    'ملاحظات'
+  ]
   
-  const cellStyle = "style=\"border:1px solid #e5e7eb;padding:6px;color:#111827;vertical-align:middle;\""
+  // Filter headers based on data availability
+  const filteredHeaders = PDF_HEADERS
+  
+  const cellStyle = "style=\"border:1px solid #d1d5db;padding:4px 2px;color:#111827;vertical-align:middle;word-wrap:break-word;overflow-wrap:break-word;font-size:9px;text-align:center;\""
 
   // Generate table content (grouped or ungrouped) with pagination
    let tableContent = ''
    
+   // Helper function to translate warranty type
+   const translateWarranty = (type: string | undefined): string => {
+     if (!type) return ''
+     const translations: Record<string, string> = {
+       'comprehensive': 'عقد شامل',
+       'warranty': 'ضمان',
+       'custody': 'عهدة',
+       'no_warranty': 'بدون ضمان'
+     }
+     return translations[type] || type
+   }
+
+   // Helper to truncate long text
+   const truncate = (text: string | undefined, maxLen: number = 20): string => {
+     if (!text) return ''
+     return text.length > maxLen ? text.substring(0, maxLen) + '...' : text
+   }
+
    if (groupedSections.length > 0) {
      // Grouped table content with page breaks
      tableContent = groupedSections.map((section, sectionIdx) => {
@@ -254,39 +287,25 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
          const cells = [
            `<td ${cellStyle}>${item.id ?? ''}</td>`,
            `<td ${cellStyle}>${new Date(item.date).toLocaleDateString('en-GB')}</td>`,
-           `<td ${cellStyle}>${item.productName ?? ''}</td>`,
-           `<td ${cellStyle}>${item.customerName ?? ''}</td>`,
-           `<td ${cellStyle}>${item.branch ?? ''}</td>`,
+           `<td ${cellStyle}>${truncate(item.productName, 25)}</td>`,
+           `<td ${cellStyle}>${truncate(item.customerName, 20)}</td>`,
+           `<td ${cellStyle}>${truncate(item.branch, 15)}</td>`,
            `<td ${cellStyle}>${item.quantity ?? ''}</td>`,
-           `<td ${cellStyle}>${item.engineer ?? ''}</td>`,
-           `<td ${cellStyle}>${item.category ?? ''}</td>`,
+           `<td ${cellStyle}>${truncate(item.engineer, 15)}</td>`,
            `<td ${cellStyle}>${item.itemCode ?? ''}</td>`,
-           `<td ${cellStyle}>${item.model ?? ''}</td>`,
-           `<td ${cellStyle}>${item.brand ?? ''}</td>`,
-           `<td ${cellStyle}>${item.warehouseName ?? ''}</td>`,
+           `<td ${cellStyle}>${truncate(item.model, 15)}</td>`,
            `<td ${cellStyle}>${item.serialNumber ?? ''}</td>`,
-           `<td ${cellStyle}>${item.warrantyType ?? ''}</td>`,
-           `<td ${cellStyle}>${item.invoiceNumber ?? ''}</td>`
+           `<td ${cellStyle}>${translateWarranty(item.warrantyType)}</td>`,
+           `<td ${cellStyle}>${truncate(item.notes, 20)}</td>`
          ]
          
-         if (hasPurchasePrices) {
-           const formattedPurchase = item.purchasePrice ? `${Number(item.purchasePrice).toLocaleString('ar-SA')} ريال` : ''
-           cells.push(`<td ${cellStyle}>${formattedPurchase}</td>`)
-         }
-         if (hasSellingPrices) {
-           const formattedSelling = item.sellingPrice ? `${Number(item.sellingPrice).toLocaleString('ar-SA')} ريال` : ''
-           cells.push(`<td ${cellStyle}>${formattedSelling}</td>`)
-         }
-         
-         cells.push(`<td ${cellStyle}>${item.notes ?? ''}</td>`)
-         
          const rowClass = needsPageBreak ? 'page-break avoid-break' : 'avoid-break'
-         return `<tr class="${rowClass}" style="background:${idx % 2 === 0 ? '#ffffff' : '#f1f5f9'};">${cells.join('')}</tr>`
+         return `<tr class="${rowClass}" style="background:${idx % 2 === 0 ? '#ffffff' : '#f8fafc'};">${cells.join('')}</tr>`
        }).join('')
        
        const sectionHeader = sectionIdx > 0 && sectionIdx % 3 === 0 ? 
-         `<tr class="page-break"><td colspan="${filteredHeaders.length}" style="background:#e0f2fe;padding:8px;font-weight:bold;text-align:center;border:1px solid #e5e7eb;">${section.title} (${section.data.length} عنصر)</td></tr>` :
-         `<tr><td colspan="${filteredHeaders.length}" style="background:#e0f2fe;padding:8px;font-weight:bold;text-align:center;border:1px solid #e5e7eb;">${section.title} (${section.data.length} عنصر)</td></tr>`
+         `<tr class="page-break"><td colspan="${filteredHeaders.length}" style="background:#dbeafe;padding:6px;font-weight:bold;text-align:center;border:1px solid #d1d5db;font-size:10px;">${section.title} (${section.data.length} عنصر)</td></tr>` :
+         `<tr><td colspan="${filteredHeaders.length}" style="background:#dbeafe;padding:6px;font-weight:bold;text-align:center;border:1px solid #d1d5db;font-size:10px;">${section.title} (${section.data.length} عنصر)</td></tr>`
        
        return `
          ${sectionHeader}
@@ -303,38 +322,23 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
       tableContent = chunks.map((chunk, chunkIdx) => {
         const chunkRows = chunk.map((item, idx) => {
           const globalIdx = chunkIdx * pageSize + idx
-       const cells = [
-         `<td ${cellStyle}>${item.id ?? ''}</td>`,
-         `<td ${cellStyle}>${new Date(item.date).toLocaleDateString('en-GB')}</td>`,
-         `<td ${cellStyle}>${item.productName ?? ''}</td>`,
-         `<td ${cellStyle}>${item.customerName ?? ''}</td>`,
-         `<td ${cellStyle}>${item.branch ?? ''}</td>`,
-         `<td ${cellStyle}>${item.quantity ?? ''}</td>`,
-         `<td ${cellStyle}>${item.engineer ?? ''}</td>`,
-         `<td ${cellStyle}>${item.category ?? ''}</td>`,
-         `<td ${cellStyle}>${item.itemCode ?? ''}</td>`,
-         `<td ${cellStyle}>${item.model ?? ''}</td>`,
-         `<td ${cellStyle}>${item.brand ?? ''}</td>`,
-         `<td ${cellStyle}>${item.warehouseName ?? ''}</td>`,
-         `<td ${cellStyle}>${item.serialNumber ?? ''}</td>`,
-         `<td ${cellStyle}>${item.warrantyType ?? ''}</td>`,
-         `<td ${cellStyle}>${item.invoiceNumber ?? ''}</td>`
-       ]
+          const cells = [
+            `<td ${cellStyle}>${item.id ?? ''}</td>`,
+            `<td ${cellStyle}>${new Date(item.date).toLocaleDateString('en-GB')}</td>`,
+            `<td ${cellStyle}>${truncate(item.productName, 25)}</td>`,
+            `<td ${cellStyle}>${truncate(item.customerName, 20)}</td>`,
+            `<td ${cellStyle}>${truncate(item.branch, 15)}</td>`,
+            `<td ${cellStyle}>${item.quantity ?? ''}</td>`,
+            `<td ${cellStyle}>${truncate(item.engineer, 15)}</td>`,
+            `<td ${cellStyle}>${item.itemCode ?? ''}</td>`,
+            `<td ${cellStyle}>${truncate(item.model, 15)}</td>`,
+            `<td ${cellStyle}>${item.serialNumber ?? ''}</td>`,
+            `<td ${cellStyle}>${translateWarranty(item.warrantyType)}</td>`,
+            `<td ${cellStyle}>${truncate(item.notes, 20)}</td>`
+          ]
       
-      // Add price columns only if they have data (with Arabic formatting)
-       if (hasPurchasePrices) {
-         const formattedPurchase = item.purchasePrice ? `${Number(item.purchasePrice).toLocaleString('ar-SA')} ريال` : ''
-         cells.push(`<td ${cellStyle}>${formattedPurchase}</td>`)
-       }
-       if (hasSellingPrices) {
-         const formattedSelling = item.sellingPrice ? `${Number(item.sellingPrice).toLocaleString('ar-SA')} ريال` : ''
-         cells.push(`<td ${cellStyle}>${formattedSelling}</td>`)
-       }
-      
-      cells.push(`<td ${cellStyle}>${item.notes ?? ''}</td>`)
-      
-      const rowClass = chunkIdx > 0 && idx === 0 ? 'page-break avoid-break' : 'avoid-break'
-          return `<tr class="${rowClass}" style="background:${globalIdx % 2 === 0 ? '#ffffff' : '#f1f5f9'};">${cells.join('')}</tr>`
+          const rowClass = chunkIdx > 0 && idx === 0 ? 'page-break avoid-break' : 'avoid-break'
+          return `<tr class="${rowClass}" style="background:${globalIdx % 2 === 0 ? '#ffffff' : '#f8fafc'};">${cells.join('')}</tr>`
         }).join('')
         
         return chunkRows
@@ -344,19 +348,23 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
   const tableHtml = `
     <style>
       @media print {
-      thead { display: table-header-group; }
-      tbody { display: table-row-group; }
-      tr { page-break-inside: avoid; }
-      th { page-break-after: avoid; }
-      .page-break { page-break-before: always; }
-      .avoid-break { page-break-inside: avoid; }
-      table { page-break-inside: auto; }
-    }
+        thead { display: table-header-group; }
+        tbody { display: table-row-group; }
+        tr { page-break-inside: avoid; }
+        th { page-break-after: avoid; }
+        .page-break { page-break-before: always; }
+        .avoid-break { page-break-inside: avoid; }
+        table { page-break-inside: auto; }
+      }
+      td, th {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
     </style>
-    <table style="width:100%;border-collapse:collapse;font-size:9px;border:1px solid #e5e7eb;table-layout:fixed;line-height:1.4;">
+    <table style="width:100%;border-collapse:collapse;font-size:9px;border:1px solid #d1d5db;table-layout:auto;line-height:1.3;">
       <thead style="display:table-header-group;">
         <tr>
-          ${filteredHeaders.map(h => `<th style='border:1px solid #e5e7eb;background:linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);color:#ffffff;padding:10px;text-align:center;font-weight:bold;page-break-after:avoid;text-shadow:0 1px 2px rgba(0,0,0,0.2);'>${h}</th>`).join('')}
+          ${filteredHeaders.map(h => `<th style='border:1px solid #d1d5db;background:linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);color:#ffffff;padding:6px 4px;text-align:center;font-weight:bold;font-size:9px;page-break-after:avoid;white-space:nowrap;'>${h}</th>`).join('')}
         </tr>
       </thead>
       <tbody style="display:table-row-group;">
@@ -378,24 +386,25 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
 
   const runCapture = () => html2canvas(container, { scale: 2, backgroundColor: '#ffffff', useCORS: true }).then(canvas => {
     const imgData = canvas.toDataURL('image/png')
-    const pdf = new jsPDF('p', 'mm', 'a4')
+    // Use landscape orientation for better table fit
+    const pdf = new jsPDF('l', 'mm', 'a4')
     const pageWidth = pdf.internal.pageSize.getWidth()
     const pageHeight = pdf.internal.pageSize.getHeight()
 
-    const imgWidth = pageWidth - 20
+    const imgWidth = pageWidth - 10
     const imgHeight = (canvas.height * imgWidth) / canvas.width
 
     let heightLeft = imgHeight
-    let position = 10
+    let position = 5
 
-    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight)
-    heightLeft -= (pageHeight - 20)
+    pdf.addImage(imgData, 'PNG', 5, position, imgWidth, imgHeight)
+    heightLeft -= (pageHeight - 10)
 
     while (heightLeft > 0) {
       pdf.addPage()
-      position = 10
-      pdf.addImage(imgData, 'PNG', 10, position - (imgHeight - heightLeft), imgWidth, imgHeight)
-      heightLeft -= (pageHeight - 20)
+      position = 5
+      pdf.addImage(imgData, 'PNG', 5, position - (imgHeight - heightLeft), imgWidth, imgHeight)
+      heightLeft -= (pageHeight - 10)
     }
 
     // Add page numbers footer
@@ -403,8 +412,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
     for (let i = 1; i <= pageCount; i++) {
       pdf.setPage(i)
       pdf.setFontSize(8)
-      // Use numbers-only to avoid glyph shaping issues with Arabic in jsPDF built-in fonts
-      pdf.text(`${i} / ${pageCount}`, pageWidth / 2, pageHeight - 8, { align: 'center' })
+      pdf.text(`${i} / ${pageCount}`, pageWidth / 2, pageHeight - 5, { align: 'center' })
     }
 
     pdf.save(`${filename}_${new Date().toISOString().split('T')[0]}.pdf`)
@@ -442,10 +450,23 @@ const TABLE_HEADERS = [
   'سريال الماكينة',
   'نوع الضمان',
   'رقم الفاتورة',
+  'قيمة الفاتورة',
   'سعر الشراء',
   'سعر البيع',
   'ملاحظات'
 ] as const
+
+// Helper to translate warranty type for exports
+const translateWarrantyType = (type: string | undefined): string => {
+  if (!type) return ''
+  const translations: Record<string, string> = {
+    'comprehensive': 'عقد شامل',
+    'warranty': 'ضمان',
+    'custody': 'عهدة',
+    'no_warranty': 'بدون ضمان'
+  }
+  return translations[type] || type
+}
 
 // Enhanced mapping with priority ordering and Arabic formatting
 const mapRowForStrings = (item: ExportData): string[] => [
@@ -462,8 +483,9 @@ const mapRowForStrings = (item: ExportData): string[] => [
   item.brand ?? '',
   item.warehouseName ?? '',
   item.serialNumber ?? '', // سريال الماكينة
-  item.warrantyType ?? '',
+  translateWarrantyType(item.warrantyType), // نوع الضمان مترجم
   item.invoiceNumber ?? '',
+  item.invoiceValue ?? '', // قيمة الفاتورة
   item.purchasePrice ? `${Number(item.purchasePrice).toLocaleString('ar-SA')} ريال` : '',
   item.sellingPrice ? `${Number(item.sellingPrice).toLocaleString('ar-SA')} ريال` : '',
   item.notes ?? ''
@@ -515,8 +537,9 @@ export function exportToExcel(options: ExportOptions): void {
     item.brand || '',
     item.warehouseName || '',
     item.serialNumber || '',
-    item.warrantyType || '',
+    translateWarrantyType(item.warrantyType), // نوع الضمان مترجم
     item.invoiceNumber || '',
+    item.invoiceValue || '', // قيمة الفاتورة
     item.purchasePrice || '',
     item.sellingPrice || '',
     item.notes || ''
@@ -681,28 +704,38 @@ export function validateExportData(data: any[]): { isValid: boolean; errors: str
     return { isValid: false, errors, data: [] }
   }
   
-  const validatedData = data.map(item => ({
-    id: item.id || 0,
-    date: item.date || item.created_at || new Date().toISOString(),
-    productName: item.productName || item.product_name || '',
-    category: item.productDetails?.category || item.category || '',
-    itemCode: item.itemCode || item.item_code || item.products?.item_code || '', // كود قطعة الغيار
-    partNumber: item.productDetails?.partNumber || item.part_number || '',
-    brand: item.productDetails?.brand || item.brand || '',
-    model: item.model || '', // موديل الماكينة من الإصدار (ليس من المنتج)
-    customerName: item.customerName || item.customer_name || '',
-    branch: item.branch || '',
-    warehouseId: item.warehouseId || item.warehouse_id || 0,
-    warehouseName: item.warehouseName || item.warehouse_name || '',
-    quantity: item.quantity || 0,
-    engineer: item.engineer || '',
-    serialNumber: item.serialNumber || item.serial_number || '', // سريال الماكينة
-    warrantyType: item.warrantyType || item.warranty_type || '',
-    invoiceNumber: item.invoiceNumber || item.invoice_number || '',
-    purchasePrice: item.purchasePrice || item.purchase_price || 0,
-    sellingPrice: item.sellingPrice || item.selling_price || 0,
-    notes: item.notes || ''
-  }))
+  const validatedData = data.map(item => {
+    // استخراج قيمة الفاتورة من الملاحظات إذا وجدت
+    const notesText = item.notes || ''
+    const invoiceValueMatch = notesText.match(/قيمة الفاتورة:\s*(\d+)/)
+    const extractedInvoiceValue = invoiceValueMatch ? invoiceValueMatch[1] : ''
+    // إزالة قيمة الفاتورة من الملاحظات لعرضها بشكل منفصل
+    const cleanNotes = notesText.replace(/\s*\|\s*قيمة الفاتورة:\s*\d+/, '').replace(/قيمة الفاتورة:\s*\d+\s*\|?\s*/, '').trim()
+    
+    return {
+      id: item.id || 0,
+      date: item.date || item.created_at || new Date().toISOString(),
+      productName: item.productName || item.product_name || '',
+      category: item.productDetails?.category || item.category || '',
+      itemCode: item.itemCode || item.item_code || item.products?.item_code || '', // كود قطعة الغيار
+      partNumber: item.productDetails?.partNumber || item.part_number || '',
+      brand: item.productDetails?.brand || item.brand || '',
+      model: item.model || '', // موديل الماكينة من الإصدار (ليس من المنتج)
+      customerName: item.customerName || item.customer_name || '',
+      branch: item.branch || '',
+      warehouseId: item.warehouseId || item.warehouse_id || 0,
+      warehouseName: item.warehouseName || item.warehouse_name || '',
+      quantity: item.quantity || 0,
+      engineer: item.engineer || '',
+      serialNumber: item.serialNumber || item.serial_number || '', // سريال الماكينة
+      warrantyType: item.warrantyType || item.warranty_type || '',
+      invoiceNumber: item.invoiceNumber || item.invoice_number || '',
+      invoiceValue: item.invoiceValue || extractedInvoiceValue, // قيمة الفاتورة
+      purchasePrice: item.purchasePrice || item.purchase_price || 0,
+      sellingPrice: item.sellingPrice || item.selling_price || 0,
+      notes: cleanNotes
+    }
+  })
   
   return { isValid: true, errors: [], data: validatedData }
 }
