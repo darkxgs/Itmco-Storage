@@ -45,8 +45,11 @@ export default function IssuancePage() {
   const [selectedWarehouse, setSelectedWarehouse] = useState("")
   const [engineer, setEngineer] = useState("")
   const [serialNumber, setSerialNumber] = useState('')
+  const [machineModel, setMachineModel] = useState('')
   const [warrantyType, setWarrantyType] = useState('')
   const [invoiceNumber, setInvoiceNumber] = useState('')
+  const [invoiceValue, setInvoiceValue] = useState('')
+  const [issuanceDate, setIssuanceDate] = useState(new Date().toISOString().split('T')[0])
   const [notes, setNotes] = useState('')
   const [editingIssuance, setEditingIssuance] = useState<any>(null)
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
@@ -222,7 +225,7 @@ export default function IssuancePage() {
           product_id: selectedProd.id,
           product_name: selectedProd.name,
           brand: selectedProd.brand,
-          model: selectedProd.model,
+          model: machineModel || selectedProd.model,
           quantity: selectedProd.quantity,
           customer_id: selectedCustomer ? Number.parseInt(selectedCustomer) : null,
           customer_name: finalCustomerName,
@@ -233,19 +236,19 @@ export default function IssuancePage() {
           serial_number: serialNumber,
           warranty_type: warrantyType,
           invoice_number: warrantyType === 'no_warranty' ? invoiceNumber : null,
-          notes,
-          issued_by: user.id,
-          date: new Date().toISOString().split('T')[0]
+          notes: warrantyType === 'no_warranty' && invoiceValue ? `${notes ? notes + ' | ' : ''}قيمة الفاتورة: ${invoiceValue}` : notes,
+          issued_by: user?.id || '',
+          date: issuanceDate
         }
 
         await createIssuance(issuanceData)
         
         // Log the activity
-        await logActivity(user.id, 'issuance_created', {
+        await logActivity(user?.id || '', user?.name || user?.email || '', 'issuance_created', 'issuance', JSON.stringify({
           product_name: selectedProd.name,
           quantity: selectedProd.quantity,
           customer: finalCustomerName
-        })
+        }))
       })
 
       await Promise.all(issuancePromises)
@@ -290,10 +293,15 @@ export default function IssuancePage() {
     setSelectedBranch(issuance.branch_id?.toString() || "")
     setSelectedWarehouse(issuance.warehouse_id?.toString() || "")
     setEngineer(issuance.engineer || "")
+    setMachineModel(issuance.model || "")
     setSerialNumber(issuance.serial_number || "")
     setWarrantyType(issuance.warranty_type || "")
     setInvoiceNumber(issuance.invoice_number || "")
-    setNotes(issuance.notes || "")
+    setIssuanceDate(issuance.date || new Date().toISOString().split('T')[0])
+    // Extract invoice value from notes if present
+    const notesMatch = issuance.notes?.match(/قيمة الفاتورة: (\d+)/)
+    setInvoiceValue(notesMatch ? notesMatch[1] : "")
+    setNotes(issuance.notes?.replace(/\s*\|\s*قيمة الفاتورة: \d+/, "") || "")
     setIsEditDialogOpen(true)
   }
 
@@ -313,25 +321,27 @@ export default function IssuancePage() {
       const updatedData = {
         product_id: Number.parseInt(selectedProduct),
         quantity,
+        model: machineModel,
         customer_id: selectedCustomer ? Number.parseInt(selectedCustomer) : null,
-        customer_name: selectedCustomer ? null : customerName,
+        customer_name: selectedCustomer ? undefined : customerName,
         branch_id: Number.parseInt(selectedBranch),
         warehouse_id: selectedWarehouse && selectedWarehouse !== "none" ? Number.parseInt(selectedWarehouse) : null,
         engineer,
         serial_number: serialNumber,
         warranty_type: warrantyType,
         invoice_number: warrantyType === 'no_warranty' ? invoiceNumber : null,
-        notes
+        date: issuanceDate,
+        notes: warrantyType === 'no_warranty' && invoiceValue ? `${notes ? notes + ' | ' : ''}قيمة الفاتورة: ${invoiceValue}` : notes
       }
 
-      await updateIssuance(editingIssuance.id, updatedData)
+      await updateIssuance(editingIssuance.id, updatedData, editingIssuance.quantity)
       
       // Log the activity
       const product = products.find(p => p.id.toString() === selectedProduct)
-      await logActivity(user.id, 'issuance_updated', {
+      await logActivity(user?.id || '', user?.name || user?.email || '', 'issuance_updated', 'issuance', JSON.stringify({
         issuance_id: editingIssuance.id,
         product_name: product?.name
-      })
+      }))
 
       toast({
         title: "نجح",
@@ -365,10 +375,10 @@ export default function IssuancePage() {
       await deleteIssuance(issuance.id)
       
       // Log the activity
-      await logActivity(user.id, 'issuance_deleted', {
+      await logActivity(user?.id || '', user?.name || user?.email || '', 'issuance_deleted', 'issuance', JSON.stringify({
         issuance_id: issuance.id,
         product_name: issuance.product_name
-      })
+      }))
 
       toast({
         title: "نجح",
@@ -400,9 +410,12 @@ export default function IssuancePage() {
     setSelectedBranch("")
     setSelectedWarehouse("")
     setEngineer("")
+    setMachineModel("")
     setSerialNumber("")
     setWarrantyType("")
     setInvoiceNumber("")
+    setInvoiceValue("")
+    setIssuanceDate(new Date().toISOString().split('T')[0])
     setNotes("")
     setSelectedProducts([])
     setProductCodeSearch("")
@@ -434,7 +447,7 @@ export default function IssuancePage() {
         model: product.model,
         quantity: quantity,
         stock: product.stock,
-        product_code: product.item_code
+        item_code: product.item_code
       }])
     }
 
@@ -1059,6 +1072,32 @@ export default function IssuancePage() {
                 </div>
 
                 <div className="grid gap-2">
+                  <Label htmlFor="issuanceDate" className="text-slate-300 text-right">
+                    تاريخ الإصدار
+                  </Label>
+                  <Input
+                    id="issuanceDate"
+                    type="date"
+                    value={issuanceDate}
+                    onChange={(e) => setIssuanceDate(e.target.value)}
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="machineModel" className="text-slate-300 text-right">
+                    موديل الماكينة
+                  </Label>
+                  <Input
+                    id="machineModel"
+                    value={machineModel}
+                    onChange={(e) => setMachineModel(e.target.value)}
+                    placeholder="أدخل موديل/نوع الماكينة"
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                  />
+                </div>
+
+                <div className="grid gap-2">
                   <Label htmlFor="serial" className="text-slate-300 text-right">
                     رقم سريال الماكينة
                   </Label>
@@ -1075,7 +1114,15 @@ export default function IssuancePage() {
                   <Label htmlFor="warranty" className="text-slate-300 text-right">
                     نوع الضمان
                   </Label>
-                  <Select value={warrantyType} onValueChange={setWarrantyType}>
+                  <Select value={warrantyType} onValueChange={(value) => {
+                    setWarrantyType(value)
+                    // Auto-set invoice value to 0 for warranty types other than no_warranty
+                    if (value !== 'no_warranty') {
+                      setInvoiceValue('0')
+                    } else {
+                      setInvoiceValue('')
+                    }
+                  }}>
                     <SelectTrigger className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors">
                       <SelectValue placeholder="اختر نوع الضمان" />
                     </SelectTrigger>
@@ -1089,18 +1136,33 @@ export default function IssuancePage() {
                 </div>
 
                 {warrantyType === 'no_warranty' && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="invoice" className="text-slate-300 text-right">
-                      رقم الفاتورة
-                    </Label>
-                    <Input
-                      id="invoice"
-                      value={invoiceNumber}
-                      onChange={(e) => setInvoiceNumber(e.target.value)}
-                      placeholder="رقم فاتورة قطع الغيار"
-                      className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
-                    />
-                  </div>
+                  <>
+                    <div className="grid gap-2">
+                      <Label htmlFor="invoice" className="text-slate-300 text-right">
+                        رقم الفاتورة
+                      </Label>
+                      <Input
+                        id="invoice"
+                        value={invoiceNumber}
+                        onChange={(e) => setInvoiceNumber(e.target.value)}
+                        placeholder="رقم فاتورة قطع الغيار"
+                        className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                      />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="invoiceValue" className="text-slate-300 text-right">
+                        قيمة الفاتورة
+                      </Label>
+                      <Input
+                        id="invoiceValue"
+                        type="number"
+                        value={invoiceValue}
+                        onChange={(e) => setInvoiceValue(e.target.value)}
+                        placeholder="أدخل قيمة الفاتورة"
+                        className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                      />
+                    </div>
+                  </>
                 )}
 
                 <div className="grid gap-2">

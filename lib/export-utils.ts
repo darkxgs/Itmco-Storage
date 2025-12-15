@@ -17,16 +17,16 @@ export interface ExportData {
   category?: string
   partNumber?: string
   brand?: string
-  model?: string
+  model?: string // موديل الماكينة من الإصدار
   customerName: string
   branch: string
   quantity: number
   engineer: string
-  serialNumber?: string
+  serialNumber?: string // سريال الماكينة
   notes?: string
   warrantyType?: string
   invoiceNumber?: string
-  itemCode?: string
+  itemCode?: string // كود قطعة الغيار
   warehouseId?: number
   warehouseName?: string
   purchasePrice?: number
@@ -253,7 +253,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
          const needsPageBreak = globalIdx > 0 && globalIdx % pageSize === 0
          const cells = [
            `<td ${cellStyle}>${item.id ?? ''}</td>`,
-           `<td ${cellStyle}>${new Date(item.date).toLocaleDateString('ar-SA', { year: 'numeric', month: 'long', day: 'numeric' })}</td>`,
+           `<td ${cellStyle}>${new Date(item.date).toLocaleDateString('en-GB')}</td>`,
            `<td ${cellStyle}>${item.productName ?? ''}</td>`,
            `<td ${cellStyle}>${item.customerName ?? ''}</td>`,
            `<td ${cellStyle}>${item.branch ?? ''}</td>`,
@@ -261,7 +261,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
            `<td ${cellStyle}>${item.engineer ?? ''}</td>`,
            `<td ${cellStyle}>${item.category ?? ''}</td>`,
            `<td ${cellStyle}>${item.itemCode ?? ''}</td>`,
-           `<td ${cellStyle}>${item.partNumber ?? ''}</td>`,
+           `<td ${cellStyle}>${item.model ?? ''}</td>`,
            `<td ${cellStyle}>${item.brand ?? ''}</td>`,
            `<td ${cellStyle}>${item.warehouseName ?? ''}</td>`,
            `<td ${cellStyle}>${item.serialNumber ?? ''}</td>`,
@@ -313,7 +313,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
          `<td ${cellStyle}>${item.engineer ?? ''}</td>`,
          `<td ${cellStyle}>${item.category ?? ''}</td>`,
          `<td ${cellStyle}>${item.itemCode ?? ''}</td>`,
-         `<td ${cellStyle}>${item.partNumber ?? ''}</td>`,
+         `<td ${cellStyle}>${item.model ?? ''}</td>`,
          `<td ${cellStyle}>${item.brand ?? ''}</td>`,
          `<td ${cellStyle}>${item.warehouseName ?? ''}</td>`,
          `<td ${cellStyle}>${item.serialNumber ?? ''}</td>`,
@@ -435,11 +435,11 @@ const TABLE_HEADERS = [
   'الكمية',
   'المهندس',
   'الفئة',
-  'كود المنتج',
-  'رقم القطعة',
+  'كود قطعة الغيار',
+  'موديل الماكينة',
   'الماركة',
   'المخزن',
-  'الرقم التسلسلي',
+  'سريال الماكينة',
   'نوع الضمان',
   'رقم الفاتورة',
   'سعر الشراء',
@@ -457,11 +457,11 @@ const mapRowForStrings = (item: ExportData): string[] => [
   `${item.quantity ?? ''}`,
   item.engineer ?? '',
   item.category ?? '',
-  item.itemCode ?? '',
-  item.partNumber ?? '',
+  item.itemCode ?? '', // كود قطعة الغيار
+  item.model ?? '', // موديل الماكينة (من الإصدار)
   item.brand ?? '',
   item.warehouseName ?? '',
-  item.serialNumber ?? '',
+  item.serialNumber ?? '', // سريال الماكينة
   item.warrantyType ?? '',
   item.invoiceNumber ?? '',
   item.purchasePrice ? `${Number(item.purchasePrice).toLocaleString('ar-SA')} ريال` : '',
@@ -511,7 +511,7 @@ export function exportToExcel(options: ExportOptions): void {
     item.engineer || '',
     item.category || '',
     item.itemCode || '',
-    item.partNumber || '',
+    item.model || '', // موديل الماكينة (من الإصدار)
     item.brand || '',
     item.warehouseName || '',
     item.serialNumber || '',
@@ -686,17 +686,17 @@ export function validateExportData(data: any[]): { isValid: boolean; errors: str
     date: item.date || item.created_at || new Date().toISOString(),
     productName: item.productName || item.product_name || '',
     category: item.productDetails?.category || item.category || '',
-    itemCode: item.itemCode || item.item_code || '',
+    itemCode: item.itemCode || item.item_code || item.products?.item_code || '', // كود قطعة الغيار
     partNumber: item.productDetails?.partNumber || item.part_number || '',
     brand: item.productDetails?.brand || item.brand || '',
-    model: item.productDetails?.model || item.model || '',
+    model: item.model || '', // موديل الماكينة من الإصدار (ليس من المنتج)
     customerName: item.customerName || item.customer_name || '',
     branch: item.branch || '',
     warehouseId: item.warehouseId || item.warehouse_id || 0,
     warehouseName: item.warehouseName || item.warehouse_name || '',
     quantity: item.quantity || 0,
     engineer: item.engineer || '',
-    serialNumber: item.serialNumber || item.serial_number || '',
+    serialNumber: item.serialNumber || item.serial_number || '', // سريال الماكينة
     warrantyType: item.warrantyType || item.warranty_type || '',
     invoiceNumber: item.invoiceNumber || item.invoice_number || '',
     purchasePrice: item.purchasePrice || item.purchase_price || 0,

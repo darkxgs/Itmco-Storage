@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
@@ -42,6 +43,9 @@ export default function ReportsPage() {
   const [customers, setCustomers] = useState([])
   const [warehouses, setWarehouses] = useState([])
   const [categories, setCategories] = useState<any[]>([])
+  
+  // Search states for dropdowns
+  const [branchSearch, setBranchSearch] = useState("")
 
   const [monthlyData, setMonthlyData] = useState([])
   const [productFrequency, setProductFrequency] = useState([])
@@ -311,11 +315,22 @@ export default function ReportsPage() {
                     <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
                       <SelectValue placeholder="اختر الفرع" />
                     </SelectTrigger>
-                    <SelectContent className="bg-slate-700 border-slate-600">
+                    <SelectContent className="bg-slate-700 border-slate-600 max-h-[300px]">
+                      <div className="p-2 sticky top-0 bg-slate-700 z-10">
+                        <Input
+                          placeholder="بحث في الفروع..."
+                          value={branchSearch}
+                          onChange={(e) => setBranchSearch(e.target.value)}
+                          className="bg-slate-600 border-slate-500 text-white text-sm"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
                       <SelectItem value="all">جميع الفروع</SelectItem>
-                      {branches.map(branch => (
-                        <SelectItem key={branch.id} value={branch.id.toString()}>{branch.name}</SelectItem>
-                      ))}
+                      {branches
+                        .filter(branch => !branchSearch || branch.name.toLowerCase().includes(branchSearch.toLowerCase()))
+                        .map(branch => (
+                          <SelectItem key={branch.id} value={branch.id.toString()}>{branch.name}</SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                 </div>
