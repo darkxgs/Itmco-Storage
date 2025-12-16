@@ -264,7 +264,19 @@ export async function deleteProduct(id: number) {
 // Enhanced issuances with better data mapping
 export async function getIssuances() {
   return withErrorHandling(async () => {
-    const { data, error } = await supabase.from("issuances").select("*").order("created_at", { ascending: false })
+    const { data, error } = await supabase
+      .from("issuances")
+      .select(`
+        *,
+        products(
+          id,
+          name,
+          brand,
+          model,
+          item_code
+        )
+      `)
+      .order("created_at", { ascending: false })
 
     if (error) throw error
 
@@ -276,7 +288,8 @@ export async function getIssuances() {
       customerName: item.customer_name,
       serialNumber: item.serial_number,
       issuedBy: item.issued_by,
-      date: item.created_at.split("T")[0], // Format date
+      date: item.date || item.created_at?.split("T")[0], // Use date field first, then fallback to created_at
+      item_code: item.products?.item_code || null,
     }))
   }, "Failed to fetch issuances")
 }
@@ -321,7 +334,7 @@ export async function createIssuance(issuance: IssuanceInsert) {
       customerName: data.customer_name,
       serialNumber: data.serial_number,
       issuedBy: data.issued_by,
-      date: data.created_at.split("T")[0],
+      date: data.date || data.created_at?.split("T")[0],
     }
   }, "Failed to create issuance")
 }
@@ -389,7 +402,7 @@ export async function updateIssuance(id: number, updates: Partial<IssuanceInsert
       customerName: data.customer_name,
       serialNumber: data.serial_number,
       issuedBy: data.issued_by,
-      date: data.created_at.split("T")[0],
+      date: data.date || data.created_at?.split("T")[0],
     }
   }, "Failed to update issuance")
 }
@@ -663,7 +676,8 @@ export async function getFilteredIssuances(filters: {
           brand,
           model,
           category,
-          description
+          description,
+          item_code
         )
       `)
       .order("created_at", { ascending: false })
@@ -766,7 +780,8 @@ export async function getFilteredIssuances(filters: {
       customerName: item.customer_name,
       serialNumber: item.serial_number,
       issuedBy: item.issued_by,
-      date: item.created_at.split("T")[0],
+      date: item.date || item.created_at?.split("T")[0],
+      item_code: item.products?.item_code || null,
       // Enhanced product information
       productDetails: {
         category: item.products?.category,

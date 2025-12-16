@@ -1450,14 +1450,15 @@ export default function IssuancePage() {
                 <TableHeader>
                   <TableRow className="border-slate-700">
                     <TableHead className="text-slate-300 text-right">التاريخ</TableHead>
+                    <TableHead className="text-slate-300 text-right">كود القطعة</TableHead>
                     <TableHead className="text-slate-300 text-right">المنتج</TableHead>
-                    <TableHead className="text-slate-300 text-right">العلامة/الموديل</TableHead>
+                    <TableHead className="text-slate-300 text-right">موديل الماكينة</TableHead>
                     <TableHead className="text-slate-300 text-center">الكمية</TableHead>
                     <TableHead className="text-slate-300 text-right">العميل</TableHead>
                     <TableHead className="text-slate-300 text-right">الفرع</TableHead>
                     <TableHead className="text-slate-300 text-right">المخزن</TableHead>
                     <TableHead className="text-slate-300 text-right">المهندس</TableHead>
-                    <TableHead className="text-slate-300 text-right">رقم سريال الماكينة</TableHead>
+                    <TableHead className="text-slate-300 text-right">سريال الماكينة</TableHead>
                     <TableHead className="text-slate-300 text-right">نوع الضمان</TableHead>
                     <TableHead className="text-slate-300 text-right">رقم الفاتورة</TableHead>
                     <TableHead className="text-slate-300 text-center">الإجراءات</TableHead>
@@ -1473,10 +1474,9 @@ export default function IssuancePage() {
                     return (
                       <TableRow key={issuance.id} className="border-slate-700">
                         <TableCell className="text-slate-300 text-right">{issuance.date}</TableCell>
+                        <TableCell className="text-blue-400 text-right font-mono text-sm">{issuance.item_code || product?.item_code || '-'}</TableCell>
                         <TableCell className="text-slate-300 text-right">{product?.name || 'غير محدد'}</TableCell>
-                        <TableCell className="text-slate-300 text-right">
-                          {product ? `${product.brand} ${product.model}` : 'غير محدد'}
-                        </TableCell>
+                        <TableCell className="text-slate-300 text-right">{issuance.model || '-'}</TableCell>
                         <TableCell className="text-slate-300 text-center">{issuance.quantity}</TableCell>
                         <TableCell className="text-slate-300 text-right">
                           {customer?.name || issuance.customer_name || 'غير محدد'}
@@ -1486,14 +1486,14 @@ export default function IssuancePage() {
                           {warehouse ? `${warehouse.name} - ${warehouse.warehouse_number}` : 'غير محدد'}
                         </TableCell>
                         <TableCell className="text-slate-300 text-right">{issuance.engineer || 'غير محدد'}</TableCell>
-                        <TableCell className="text-slate-300 text-right">{issuance.serial_number || 'غير محدد'}</TableCell>
+                        <TableCell className="text-slate-300 text-right">{issuance.serial_number || '-'}</TableCell>
                         <TableCell className="text-slate-300 text-right">
-                          {issuance.warranty_type === 'comprehensive' ? 'عقد شامل لقطع الغيار' :
+                          {issuance.warranty_type === 'comprehensive' ? 'عقد شامل' :
                            issuance.warranty_type === 'warranty' ? 'ضمان' :
                            issuance.warranty_type === 'custody' ? 'عهدة' :
-                           issuance.warranty_type === 'no_warranty' ? 'بدون ضمان' : 'غير محدد'}
+                           issuance.warranty_type === 'no_warranty' ? 'بدون ضمان' : '-'}
                         </TableCell>
-                        <TableCell className="text-slate-300 text-right">{issuance.invoice_number || 'غير محدد'}</TableCell>
+                        <TableCell className="text-slate-300 text-right">{issuance.invoice_number || '-'}</TableCell>
                         <TableCell className="text-center">
                           {canEditOrDelete(issuance) && (
                             <div className="flex justify-center gap-2">
@@ -1675,6 +1675,32 @@ export default function IssuancePage() {
               </div>
 
               <div className="grid gap-2">
+                <Label htmlFor="edit-issuanceDate" className="text-slate-300 text-right">
+                  تاريخ الإصدار
+                </Label>
+                <Input
+                    id="edit-issuanceDate"
+                    type="date"
+                    value={issuanceDate}
+                    onChange={(e) => setIssuanceDate(e.target.value)}
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                  />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="edit-machineModel" className="text-slate-300 text-right">
+                  موديل الماكينة
+                </Label>
+                <Input
+                    id="edit-machineModel"
+                    value={machineModel}
+                    onChange={(e) => setMachineModel(e.target.value)}
+                    placeholder="أدخل موديل/نوع الماكينة"
+                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                  />
+              </div>
+
+              <div className="grid gap-2">
                 <Label htmlFor="edit-serial" className="text-slate-300 text-right">
                   رقم سريال الماكينة
                 </Label>
@@ -1704,18 +1730,35 @@ export default function IssuancePage() {
                 </Select>
               </div>
 
-              <div className="grid gap-2">
-                <Label htmlFor="edit-invoice" className="text-slate-300 text-right">
-                  رقم الفاتورة
-                </Label>
-                <Input
-                    id="edit-invoice"
-                    value={invoiceNumber}
-                    onChange={(e) => setInvoiceNumber(e.target.value)}
-                    placeholder="أدخل رقم الفاتورة"
-                    className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
-                  />
-              </div>
+              {warrantyType === 'no_warranty' && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-invoice" className="text-slate-300 text-right">
+                      رقم الفاتورة
+                    </Label>
+                    <Input
+                        id="edit-invoice"
+                        value={invoiceNumber}
+                        onChange={(e) => setInvoiceNumber(e.target.value)}
+                        placeholder="أدخل رقم الفاتورة"
+                        className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                      />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-invoiceValue" className="text-slate-300 text-right">
+                      قيمة الفاتورة
+                    </Label>
+                    <Input
+                        id="edit-invoiceValue"
+                        type="number"
+                        value={invoiceValue}
+                        onChange={(e) => setInvoiceValue(e.target.value)}
+                        placeholder="أدخل قيمة الفاتورة"
+                        className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                      />
+                  </div>
+                </>
+              )}
 
               <div className="grid gap-2">
                 <Label htmlFor="edit-notes" className="text-slate-300 text-right">

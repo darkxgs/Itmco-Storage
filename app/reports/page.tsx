@@ -674,49 +674,64 @@ export default function ReportsPage() {
                       {
                         id: 1,
                         created_at: new Date().toISOString(),
+                        date: new Date().toISOString().split('T')[0],
                         product_name: "آلة عد النقود - Model A",
                         customer_name: "شركة ABC للتجارة",
                         branch: "الفرع الرئيسي - القاهرة",
                         quantity: 2,
-                        engineer: "أحمد محمد"
+                        engineer: "أحمد محمد",
+                        item_code: "ITM-01",
+                        model: "Model A"
                       },
                       {
                         id: 2,
                         created_at: new Date(Date.now() - 86400000).toISOString(),
+                        date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
                         product_name: "آلة ربط النقود - Model B",
                         customer_name: "مؤسسة XYZ المالية",
                         branch: "فرع الجيزة",
                         quantity: 1,
-                        engineer: "سارة أحمد"
+                        engineer: "سارة أحمد",
+                        item_code: "ITM-02",
+                        model: "Model B"
                       },
                       {
                         id: 3,
                         created_at: new Date(Date.now() - 172800000).toISOString(),
+                        date: new Date(Date.now() - 172800000).toISOString().split('T')[0],
                         product_name: "آلة فحص الشيكات - Model C",
                         customer_name: "بنك التنمية الوطني",
                         branch: "فرع الإسكندرية",
                         quantity: 3,
-                        engineer: "محمد علي"
+                        engineer: "محمد علي",
+                        item_code: "ITM-03",
+                        model: "Model C"
                       },
                       {
                         id: 4,
                         created_at: new Date(Date.now() - 259200000).toISOString(),
+                        date: new Date(Date.now() - 259200000).toISOString().split('T')[0],
                         product_name: "ساعة أمان - Model D",
                         customer_name: "شركة الأمان المتقدم",
                         branch: "فرع المنصورة",
                         quantity: 1,
-                        engineer: "فاطمة حسن"
+                        engineer: "فاطمة حسن",
+                        item_code: "ITM-04",
+                        model: "Model D"
                       },
                       {
                         id: 5,
                         created_at: new Date(Date.now() - 345600000).toISOString(),
+                        date: new Date(Date.now() - 345600000).toISOString().split('T')[0],
                         product_name: "نظام حضور وانصراف",
                         customer_name: "مجموعة الشركات المتحدة",
                         branch: "فرع طنطا",
                         quantity: 2,
-                        engineer: "خالد يوسف"
+                        engineer: "خالد يوسف",
+                        item_code: "ITM-05",
+                        model: "Model E"
                       }
-                    ]
+                    ] as any[]
                     
                     return tableData.length > 0 ? (
                       <div className="overflow-x-auto rounded-lg border border-slate-700">
@@ -724,12 +739,14 @@ export default function ReportsPage() {
                           <Table>
                             <TableHeader className="sticky top-0 bg-slate-800 z-10">
                               <TableRow className="border-slate-700 hover:bg-slate-700/50">
-                                <TableHead className="text-slate-300 font-semibold text-right">التاريخ</TableHead>
+                                <TableHead className="text-slate-300 font-semibold text-right w-[90px]">التاريخ</TableHead>
+                                <TableHead className="text-slate-300 font-semibold text-right w-[80px]">كود القطعة</TableHead>
                                 <TableHead className="text-slate-300 font-semibold text-right">المنتج</TableHead>
+                                <TableHead className="text-slate-300 font-semibold text-right w-[100px]">موديل الماكينة</TableHead>
                                 <TableHead className="text-slate-300 font-semibold text-right">العميل</TableHead>
-                                <TableHead className="text-slate-300 font-semibold text-right">الفرع</TableHead>
-                                <TableHead className="text-slate-300 font-semibold text-center">الكمية</TableHead>
-                                <TableHead className="text-slate-300 font-semibold text-right">المهندس</TableHead>
+                                <TableHead className="text-slate-300 font-semibold text-right w-[100px]">الفرع</TableHead>
+                                <TableHead className="text-slate-300 font-semibold text-center w-[60px]">الكمية</TableHead>
+                                <TableHead className="text-slate-300 font-semibold text-right w-[100px]">المهندس</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -741,23 +758,25 @@ export default function ReportsPage() {
                                   }`}
                                 >
                                   <TableCell className="text-slate-300 text-right font-mono text-sm">
-                                    {new Date(transaction.created_at).toLocaleDateString("ar-EG", {
-                                      year: 'numeric',
-                                      month: '2-digit',
-                                      day: '2-digit'
-                                    })}
+                                    {new Date(transaction.created_at || transaction.date).toLocaleDateString("en-GB")}
                                   </TableCell>
-                                  <TableCell className="text-white font-medium text-right max-w-[200px]">
+                                  <TableCell className="text-blue-400 text-right font-mono text-sm">
+                                    {transaction.item_code || transaction.products?.item_code || '-'}
+                                  </TableCell>
+                                  <TableCell className="text-white font-medium text-right max-w-[180px]">
                                     <div className="truncate" title={transaction.product_name || transaction.productName}>
                                       {transaction.product_name || transaction.productName}
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-slate-300 text-right max-w-[150px]">
+                                  <TableCell className="text-slate-300 text-right text-sm">
+                                    {transaction.model || '-'}
+                                  </TableCell>
+                                  <TableCell className="text-slate-300 text-right max-w-[130px]">
                                     <div className="truncate" title={transaction.customer_name || transaction.customerName}>
                                       {transaction.customer_name || transaction.customerName}
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-slate-300 text-right max-w-[120px]">
+                                  <TableCell className="text-slate-300 text-right max-w-[100px]">
                                     <div className="truncate" title={transaction.branch}>
                                       {transaction.branch}
                                     </div>
@@ -770,8 +789,8 @@ export default function ReportsPage() {
                                       {transaction.quantity}
                                     </Badge>
                                   </TableCell>
-                                  <TableCell className="text-slate-300 text-right">
-                                    {transaction.engineer}
+                                  <TableCell className="text-slate-300 text-right text-sm">
+                                    {transaction.engineer || '-'}
                                   </TableCell>
                                 </TableRow>
                               ))}

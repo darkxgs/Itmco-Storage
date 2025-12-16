@@ -30,6 +30,8 @@ interface ProfitMarginData {
   name: string
   brand: string
   category: string
+  item_code: string
+  description: string
   warehouse_name: string
   purchase_price: number
   selling_price: number
@@ -53,15 +55,11 @@ export default function ProfitMarginReportPage() {
   const [minMarginFilter, setMinMarginFilter] = useState("")
   const [maxMarginFilter, setMaxMarginFilter] = useState("")
 
-  const categories = [
-    "آلات عد النقود",
-    "آلات ربط النقود",
-    "آلات فحص الشيكات",
-    "ساعات الأمان",
-    "أنظمة الحضور والانصراف",
-    "ساعات السكرتارية",
-    "بوابات الأمان",
-  ]
+  // Get unique categories from products data
+  const categories = useMemo(() => {
+    const uniqueCategories = [...new Set(products.map(p => p.category).filter(Boolean))]
+    return uniqueCategories.sort((a, b) => a.localeCompare(b, 'ar'))
+  }, [products])
 
   useEffect(() => {
     loadData()
@@ -106,6 +104,8 @@ export default function ProfitMarginReportPage() {
           name: product.name,
           brand: product.brand || "-",
           category: product.category || "-",
+          item_code: product.item_code || "",
+          description: product.description || "",
           warehouse_name: warehouseMap.get(product.warehouse_id) || "غير محدد",
           purchase_price: purchasePrice,
           selling_price: sellingPrice,
@@ -185,25 +185,36 @@ export default function ProfitMarginReportPage() {
       "الوصف"
     ]
     
+    // Escape CSV values properly
+    const escapeCSV = (value: string | number) => {
+      const str = String(value)
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`
+      }
+      return str
+    }
+    
     const csvContent = [
-      headers.join(","),
+      headers.map(escapeCSV).join(","),
       ...sortedData.map(item => [
-        item.name,
-        item.brand,
-        item.category,
-        item.item_code || '',
-        item.warehouse_name,
+        escapeCSV(item.name),
+        escapeCSV(item.brand),
+        escapeCSV(item.category),
+        escapeCSV(item.item_code || ''),
+        escapeCSV(item.warehouse_name),
         item.purchase_price.toFixed(2),
         item.selling_price.toFixed(2),
         item.profit_margin.toFixed(2),
         item.profit_margin_percentage.toFixed(2),
         item.stock,
         item.total_profit_potential.toFixed(2),
-        item.description || ''
+        escapeCSV(item.description || '')
       ].join(","))
     ].join("\n")
     
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    // Add BOM for proper Arabic encoding in Excel
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvContent], { type: "text/csv;charset=utf-8;" })
     const link = document.createElement("a")
     const url = URL.createObjectURL(blob)
     link.setAttribute("href", url)
@@ -212,6 +223,11 @@ export default function ProfitMarginReportPage() {
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
+    
+    toast({
+      title: "تم التصدير بنجاح",
+      description: "تم تصدير تقرير هامش الربح إلى ملف CSV",
+    })
   }
 
   const getMarginBadgeColor = (percentage: number) => {
