@@ -55,7 +55,6 @@ export async function logActivity(userId: string, userName: string, action: stri
       action,
       module,
       details,
-      timestamp: new Date().toISOString(),
     })
   } catch (error) {
     console.error("Error logging activity:", error)

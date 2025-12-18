@@ -196,6 +196,9 @@ export async function updateProduct(id: number, updates: ProductUpdate & { minSt
     if (sanitizedUpdates.brand !== undefined) dbUpdates.brand = validateInput(sanitizedUpdates.brand)
     if (sanitizedUpdates.model !== undefined) dbUpdates.model = validateInput(sanitizedUpdates.model)
     if (sanitizedUpdates.category !== undefined) dbUpdates.category = validateInput(sanitizedUpdates.category)
+    if (sanitizedUpdates.item_code !== undefined) {
+      dbUpdates.item_code = sanitizedUpdates.item_code ? validateInput(sanitizedUpdates.item_code) : null
+    }
     if (sanitizedUpdates.stock !== undefined) dbUpdates.stock = Math.max(0, Number(sanitizedUpdates.stock))
     if (sanitizedUpdates.description !== undefined) {
       dbUpdates.description = sanitizedUpdates.description ? validateInput(sanitizedUpdates.description) : null

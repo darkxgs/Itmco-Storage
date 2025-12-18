@@ -244,7 +244,7 @@ export default function InventoryPage() {
 
       // Log activity
       await logActivity(
-        user!.id,
+        String(user!.id),
         user!.name || '',
         "إضافة منتج",
         "إدارة المخزون",
@@ -307,7 +307,7 @@ export default function InventoryPage() {
       setProducts(products.map((p) => (p.id === editingProduct.id ? updatedProduct : p)))
 
       // Log activity
-      await logActivity(user!.id, user!.name || '', "تعديل منتج", "إدارة المخزون", `تم تعديل المنتج: ${editingProduct.name}`)
+      await logActivity(String(user!.id), user!.name || '', "تعديل منتج", "إدارة المخزون", `تم تعديل المنتج: ${editingProduct.name}`)
 
       setEditingProduct(null)
       setIsEditDialogOpen(false)
@@ -348,7 +348,7 @@ export default function InventoryPage() {
       setSelectedProducts(selectedProducts.filter((pid) => pid !== id))
 
       // Log activity
-      await logActivity(user!.id, user!.name || '', "حذف منتج", "إدارة المخزون", `تم حذف المنتج: ${name}`)
+      await logActivity(String(user!.id), user!.name || '', "حذف منتج", "إدارة المخزون", `تم حذف المنتج: ${name}`)
 
       toast({
         title: "تم الحذف بنجاح",
@@ -388,7 +388,7 @@ export default function InventoryPage() {
       setProducts(products.filter((p) => !selectedProducts.includes(p.id)))
 
       // Log activity
-      await logActivity(user!.id, user!.name || '', "حذف متعدد", "إدارة المخزون", `تم حذف ${selectedProducts.length} منتج`)
+      await logActivity(String(user!.id), user!.name || '', "حذف متعدد", "إدارة المخزون", `تم حذف ${selectedProducts.length} منتج`)
 
       setSelectedProducts([])
       setIsBulkDeleteDialogOpen(false)
@@ -618,7 +618,7 @@ export default function InventoryPage() {
         
         // Log activity
         await logActivity(
-          user!.id,
+          String(user!.id),
           user!.name || '',
           "استيراد منتجات",
           "إدارة المخزون",
@@ -857,7 +857,8 @@ export default function InventoryPage() {
     }
     
     try {
-      const updatedProduct = await updateProduct(productId, { ...product, item_code: newItemCode })
+      // إرسال فقط item_code للتحديث
+      const updatedProduct = await updateProduct(productId, { item_code: newItemCode })
       setProducts(products.map((p) => (p.id === productId ? updatedProduct : p)))
       
       toast({
@@ -865,9 +866,9 @@ export default function InventoryPage() {
         description: `تم تحديث كود الصنف إلى: ${newItemCode}`,
       })
       
-      // Log activity
+      // Log activity - بدون انتظار لتجنب تأخير الواجهة
       if (user) {
-        await logActivity(user.id, user.name || '', "تعديل كود الصنف", "إدارة المخزون", `تم تعديل كود الصنف للمنتج: ${product.name} إلى ${newItemCode}`)
+        logActivity(String(user.id), user.name || '', "تعديل كود الصنف", "إدارة المخزون", `تم تعديل كود الصنف للمنتج: ${product.name} إلى ${newItemCode}`)
       }
     } catch (error: any) {
       console.error("Error updating item code:", error)

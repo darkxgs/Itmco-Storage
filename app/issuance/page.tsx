@@ -66,7 +66,7 @@ export default function IssuancePage() {
   const [formCustomerSearch, setFormCustomerSearch] = useState("")
   const [itemCodeSearch, setItemCodeSearch] = useState("")
   const [productCodeSearch, setProductCodeSearch] = useState("")
-  const [selectedProducts, setSelectedProducts] = useState<Array<{id: number, name: string, brand: string, model: string, quantity: number, stock: number, item_code?: string}>>([])  
+  const [selectedProducts, setSelectedProducts] = useState<Array<{id: number, name: string, brand: string, model: string, quantity: number, stock: number, item_code?: string, customPrice?: string}>>([])  
   const [itemSearchResults, setItemSearchResults] = useState<Product[]>([])
   const [isItemSearching, setIsItemSearching] = useState(false)
   const [showProductSearch, setShowProductSearch] = useState(false)
@@ -247,7 +247,7 @@ export default function IssuancePage() {
           serial_number: serialNumber,
           warranty_type: warrantyType,
           invoice_number: warrantyType === 'no_warranty' ? invoiceNumber : null,
-          notes: warrantyType === 'no_warranty' ? `${notes ? notes + ' | ' : ''}${invoiceValue ? 'قيمة الفاتورة: ' + invoiceValue : ''}${customSellingPrice ? ' | سعر البيع: ' + customSellingPrice : ''}`.replace(/^\s*\|\s*/, '').replace(/\s*\|\s*$/, '') : notes,
+          notes: warrantyType === 'no_warranty' ? `${notes ? notes + ' | ' : ''}${invoiceValue ? 'قيمة الفاتورة: ' + invoiceValue : ''}${selectedProd.customPrice ? ' | سعر البيع: ' + selectedProd.customPrice + ' | إجمالي: ' + (selectedProd.quantity * Number(selectedProd.customPrice)) : ''}`.replace(/^\s*\|\s*/, '').replace(/\s*\|\s*$/, '') : notes,
           issued_by: user?.id || '',
           date: issuanceDate
         }
@@ -488,6 +488,12 @@ export default function IssuancePage() {
     }
     setSelectedProducts(selectedProducts.map(p => 
       p.id === productId ? { ...p, quantity: newQuantity } : p
+    ))
+  }
+
+  const updateProductCustomPrice = (productId: number, price: string) => {
+    setSelectedProducts(selectedProducts.map(p => 
+      p.id === productId ? { ...p, customPrice: price } : p
     ))
   }
 
@@ -943,40 +949,73 @@ export default function IssuancePage() {
                     <Label className="text-slate-300 text-right">
                       المنتجات المضافة ({selectedProducts.length})
                     </Label>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
                       {selectedProducts.map((product) => (
-                        <div key={product.id} className="flex items-center justify-between bg-slate-700 p-3 rounded-lg border border-slate-600">
-                          <div className="flex-1 text-right">
-                            <div className="text-white text-sm font-medium">
-                              {product.name} - {product.brand} {product.model}
+                        <div key={product.id} className="bg-slate-700 p-3 rounded-lg border border-slate-600">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 text-right">
+                              <div className="text-white text-sm font-medium">
+                                {product.name} - {product.brand} {product.model}
+                              </div>
+                              {product.item_code && (
+                                <div className="text-xs text-slate-400">
+                                  كود: {product.item_code}
+                                </div>
+                              )}
                             </div>
-                            {product.item_code && (
-                            <div className="text-xs text-slate-400">
-                              كود: {product.item_code}
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number"
+                                min="1"
+                                max={product.stock}
+                                value={product.quantity}
+                                onChange={(e) => updateProductQuantity(product.id, Number.parseInt(e.target.value) || 1)}
+                                className="bg-slate-600/50 border-slate-500/50 text-white text-center w-16 focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                                title="الكمية"
+                              />
+                              <Button
+                                type="button"
+                                onClick={() => removeProductFromList(product.id)}
+                                variant="destructive"
+                                size="sm"
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                          {/* سعر البيع المخصص لكل منتج - يظهر فقط عند بدون ضمان */}
+                          {warrantyType === 'no_warranty' && (
+                            <div className="mt-2 pt-2 border-t border-slate-600/50">
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  value={product.customPrice || ''}
+                                  onChange={(e) => updateProductCustomPrice(product.id, e.target.value)}
+                                  placeholder="سعر البيع"
+                                  className="bg-slate-600/50 border-slate-500/50 text-white text-right w-28 focus:border-green-500/50 focus:ring-green-500/20 transition-colors text-sm"
+                                />
+                                <span className="text-slate-400 text-xs">ج.م</span>
+                                {product.customPrice && (
+                                  <div className="flex-1 text-left">
+                                    <span className="text-green-400 text-sm font-medium">
+                                      الإجمالي: {(product.quantity * Number(product.customPrice)).toLocaleString()} ج.م
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Input
-                              type="number"
-                              min="1"
-                              max={product.stock}
-                              value={product.quantity}
-                              onChange={(e) => updateProductQuantity(product.id, Number.parseInt(e.target.value) || 1)}
-                              className="bg-slate-700/50 border-slate-600/50 text-white text-center w-16 focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
-                            />
-                            <Button
-                              type="button"
-                              onClick={() => removeProductFromList(product.id)}
-                              variant="destructive"
-                              size="sm"
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
                         </div>
                       ))}
                     </div>
+                    {/* إجمالي كل المنتجات */}
+                    {warrantyType === 'no_warranty' && selectedProducts.some(p => p.customPrice) && (
+                      <div className="mt-2 p-3 bg-green-900/20 border border-green-700/50 rounded-lg">
+                        <div className="text-green-400 text-sm font-medium text-right">
+                          إجمالي جميع المنتجات: {selectedProducts.reduce((sum, p) => sum + (p.quantity * Number(p.customPrice || 0)), 0).toLocaleString()} ج.م
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1171,28 +1210,11 @@ export default function IssuancePage() {
                         className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                       />
                     </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor="customSellingPrice" className="text-slate-300 text-right">
-                        سعر البيع المخصص (اختياري)
-                      </Label>
-                      <Input
-                        id="customSellingPrice"
-                        type="number"
-                        value={customSellingPrice}
-                        onChange={(e) => setCustomSellingPrice(e.target.value)}
-                        placeholder="أدخل سعر البيع المخصص (إذا ترك فارغاً يستخدم سعر المنتج)"
-                        className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
-                      />
-                      {selectedProducts.length > 0 && customSellingPrice && (
-                        <div className="mt-2 p-3 bg-green-900/20 border border-green-700/50 rounded-lg">
-                          <div className="text-green-400 text-sm font-medium">
-                            إجمالي السعر: {(selectedProducts.reduce((sum, p) => sum + p.quantity, 0) * Number(customSellingPrice)).toLocaleString()} ج.م
-                          </div>
-                          <div className="text-slate-400 text-xs mt-1">
-                            ({selectedProducts.reduce((sum, p) => sum + p.quantity, 0)} قطعة × {Number(customSellingPrice).toLocaleString()} ج.م)
-                          </div>
-                        </div>
-                      )}
+                    {/* ملاحظة: سعر البيع المخصص موجود الآن بجانب كل منتج في قائمة المنتجات المضافة */}
+                    <div className="p-2 bg-blue-900/20 border border-blue-700/50 rounded-lg">
+                      <p className="text-blue-400 text-xs text-right">
+                        💡 يمكنك إضافة سعر بيع مخصص لكل منتج من قائمة "المنتجات المضافة" أعلاه
+                      </p>
                     </div>
                     <div className="grid gap-2">
                       <Label htmlFor="invoiceValue" className="text-slate-300 text-right">
