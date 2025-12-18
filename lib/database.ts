@@ -783,6 +783,10 @@ export async function getFilteredIssuances(filters: {
       }
     }
 
+    // Get warehouses to map warehouse_id to warehouse name
+    const { data: warehousesData } = await supabase.from("warehouses").select("id, name")
+    const warehouseMap = new Map((warehousesData || []).map(w => [w.id, w.name]))
+
     // Map to enhanced format with product details
     return results.map(item => ({
       ...item,
@@ -793,6 +797,8 @@ export async function getFilteredIssuances(filters: {
       issuedBy: item.issued_by,
       date: item.date || item.created_at?.split("T")[0],
       item_code: item.products?.item_code || null,
+      warehouseId: item.warehouse_id,
+      warehouseName: item.warehouse_id ? warehouseMap.get(item.warehouse_id) || '' : '',
       // Enhanced product information
       productDetails: {
         category: item.products?.category,
