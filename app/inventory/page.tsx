@@ -47,6 +47,7 @@ import { useAuth } from "@/hooks/use-auth"
 import { getProducts, createProduct, updateProduct, deleteProduct, getWarehouses, getCategories, searchByItemCode, generateNextItemCode } from "@/lib/database"
 import { logActivity } from "@/lib/auth"
 import { validateData, productSchema } from "@/lib/validation"
+import { Product } from "@/lib/supabase"
 import { Pagination } from "@/components/ui/pagination"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { StockEntriesDialog } from "@/components/stock-entries-dialog"
@@ -55,7 +56,7 @@ const ITEMS_PER_PAGE = 10
 
 export default function InventoryPage() {
   const { user, loading: authLoading } = useAuth()
-  const [products, setProducts] = useState([])
+  const [products, setProducts] = useState<Product[]>([])
   const [warehouses, setWarehouses] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -156,13 +157,13 @@ export default function InventoryPage() {
 
       const matchesCategory = categoryFilter === "all" || product.category === categoryFilter
 
-      const matchesWarehouse = warehouseFilter === "all" || product.warehouse_id === warehouseFilter
+      const matchesWarehouse = warehouseFilter === "all" || String(product.warehouse_id) === warehouseFilter
 
       const matchesStock =
         stockFilter === "all" ||
-        (stockFilter === "low" && product.stock <= (product.min_stock || product.minStock) && product.stock > 0) ||
+        (stockFilter === "low" && product.stock <= product.min_stock && product.stock > 0) ||
         (stockFilter === "out" && product.stock === 0) ||
-        (stockFilter === "available" && product.stock > (product.min_stock || product.minStock))
+        (stockFilter === "available" && product.stock > product.min_stock)
 
       return matchesSearch && matchesCategory && matchesWarehouse && matchesStock
     })
@@ -231,13 +232,20 @@ export default function InventoryPage() {
 
     setSubmitting(true)
     try {
-      const product = await createProduct(newProduct, user.id, user.name)
+      const productData = {
+        ...newProduct,
+        warehouse_id: newProduct.warehouse_id ? Number(newProduct.warehouse_id) : null,
+        purchase_price: newProduct.purchase_price ? Number(newProduct.purchase_price) : null,
+        selling_price: newProduct.selling_price ? Number(newProduct.selling_price) : null,
+        min_stock: newProduct.minStock,
+      }
+      const product = await createProduct(productData, user!.id, user!.name || '')
       setProducts([product, ...products])
 
       // Log activity
       await logActivity(
-        user.id,
-        user.name,
+        user!.id,
+        user!.name || '',
         "إضافة منتج",
         "إدارة المخزون",
         `تم إضافة المنتج: ${newProduct.name} - الكمية: ${newProduct.stock}`,
@@ -250,7 +258,8 @@ export default function InventoryPage() {
         category: "",
         item_code: "",
         warehouse_id: "",
-        price: "",
+        purchase_price: "",
+        selling_price: "",
         stock: 0,
         minStock: 5,
         description: "",
@@ -294,11 +303,11 @@ export default function InventoryPage() {
 
     setSubmitting(true)
     try {
-      const updatedProduct = await updateProduct(editingProduct.id, editingProduct, user.id)
+      const updatedProduct = await updateProduct(editingProduct.id, editingProduct)
       setProducts(products.map((p) => (p.id === editingProduct.id ? updatedProduct : p)))
 
       // Log activity
-      await logActivity(user.id, user.name, "تعديل منتج", "إدارة المخزون", `تم تعديل المنتج: ${editingProduct.name}`)
+      await logActivity(user!.id, user!.name || '', "تعديل منتج", "إدارة المخزون", `تم تعديل المنتج: ${editingProduct.name}`)
 
       setEditingProduct(null)
       setIsEditDialogOpen(false)
@@ -334,12 +343,12 @@ export default function InventoryPage() {
     }
 
     try {
-      await deleteProduct(id, user.id)
+      await deleteProduct(id)
       setProducts(products.filter((p) => p.id !== id))
       setSelectedProducts(selectedProducts.filter((pid) => pid !== id))
 
       // Log activity
-      await logActivity(user.id, user.name, "حذف منتج", "إدارة المخزون", `تم حذف المنتج: ${name}`)
+      await logActivity(user!.id, user!.name || '', "حذف منتج", "إدارة المخزون", `تم حذف المنتج: ${name}`)
 
       toast({
         title: "تم الحذف بنجاح",
@@ -375,11 +384,11 @@ export default function InventoryPage() {
     try {
       const deletedNames = selectedProducts.map((id) => products.find((p) => p.id === id)?.name).filter(Boolean)
 
-      await Promise.all(selectedProducts.map((id) => deleteProduct(id, user.id)))
+      await Promise.all(selectedProducts.map((id) => deleteProduct(id)))
       setProducts(products.filter((p) => !selectedProducts.includes(p.id)))
 
       // Log activity
-      await logActivity(user.id, user.name, "حذف متعدد", "إدارة المخزون", `تم حذف ${selectedProducts.length} منتج`)
+      await logActivity(user!.id, user!.name || '', "حذف متعدد", "إدارة المخزون", `تم حذف ${selectedProducts.length} منتج`)
 
       setSelectedProducts([])
       setIsBulkDeleteDialogOpen(false)
@@ -455,7 +464,7 @@ export default function InventoryPage() {
           item_code: product.item_code || '',
           warehouse_number: warehouse?.warehouse_number || '',
           stock: product.stock,
-          min_stock: product.min_stock || product.minStock || 0,
+          min_stock: product.min_stock || 0,
           purchase_price: product.purchase_price || '',
           selling_price: product.selling_price || '',
           description: product.description || '',
@@ -595,7 +604,7 @@ export default function InventoryPage() {
             productData.item_code = await generateNextItemCode()
           }
 
-          const newProduct = await createProduct(productData, user.id, user.name)
+          const newProduct = await createProduct(productData, user!.id, user!.name || '')
           importedProducts.push(newProduct)
 
         } catch (error: any) {
@@ -609,8 +618,8 @@ export default function InventoryPage() {
         
         // Log activity
         await logActivity(
-          user.id,
-          user.name,
+          user!.id,
+          user!.name || '',
           "استيراد منتجات",
           "إدارة المخزون",
           `تم استيراد ${importedProducts.length} منتج من ملف Excel`
@@ -727,8 +736,8 @@ export default function InventoryPage() {
       
       // Add data validation for categories (column D - الفئة)
       if (categoriesData && categoriesData.length > 0) {
-        const categoryNames = categoriesData.map(cat => cat.name).join(',')
-        worksheet.dataValidations.add('D2:D1000', {
+        const categoryNames = categoriesData.map(cat => cat.name).join(',');
+        (worksheet as any).dataValidations.add('D2:D1000', {
           type: 'list',
           allowBlank: true,
           formulae: [`"${categoryNames}"`],
@@ -740,8 +749,8 @@ export default function InventoryPage() {
       
       // Add data validation for warehouses (column F - المخزن)
       if (warehousesData && warehousesData.length > 0) {
-        const warehouseNames = warehousesData.map(warehouse => warehouse.name).join(',')
-        worksheet.dataValidations.add('F2:F1000', {
+        const warehouseNames = warehousesData.map(warehouse => warehouse.name).join(',');
+        (worksheet as any).dataValidations.add('F2:F1000', {
           type: 'list',
           allowBlank: true,
           formulae: [`"${warehouseNames}"`],
@@ -837,7 +846,7 @@ export default function InventoryPage() {
 
   // دالة لحفظ كود الصنف مباشرة (inline editing)
   const handleSaveItemCode = async (productId: number, newItemCode: string) => {
-    const product = products.find((p: any) => p.id === productId)
+    const product = products.find((p) => p.id === productId)
     if (!product) return
     
     // إذا لم يتغير الكود، لا نحفظ
@@ -848,8 +857,8 @@ export default function InventoryPage() {
     }
     
     try {
-      const updatedProduct = await updateProduct(productId, { ...product, item_code: newItemCode }, user?.id)
-      setProducts(products.map((p: any) => (p.id === productId ? updatedProduct : p)))
+      const updatedProduct = await updateProduct(productId, { ...product, item_code: newItemCode })
+      setProducts(products.map((p) => (p.id === productId ? updatedProduct : p)))
       
       toast({
         title: "تم التحديث",
@@ -981,7 +990,7 @@ export default function InventoryPage() {
               </CardHeader>
               <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
                 <div className="text-lg sm:text-xl lg:text-2xl font-bold text-white">
-                  {products.filter((p) => p.stock > (p.min_stock || p.minStock)).length}
+                  {products.filter((p) => p.stock > p.min_stock).length}
                 </div>
                 <p className="text-xs text-slate-400">في المخزون</p>
               </CardContent>
@@ -994,7 +1003,7 @@ export default function InventoryPage() {
               </CardHeader>
               <CardContent className="p-3 sm:p-4 lg:p-6 pt-0">
                 <div className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-400">
-                  {products.filter((p) => p.stock <= (p.min_stock || p.minStock) && p.stock > 0).length}
+                  {products.filter((p) => p.stock <= p.min_stock && p.stock > 0).length}
                 </div>
                 <p className="text-xs text-slate-400">يحتاج تجديد</p>
               </CardContent>
@@ -1499,7 +1508,7 @@ export default function InventoryPage() {
                       </TableRow>
                     ) : (
                       paginatedProducts.map((product) => {
-                        const status = getStockStatus(product.stock, product.min_stock || product.minStock)
+                        const status = getStockStatus(product.stock, product.min_stock)
                         const StatusIcon = status.icon
                         const warehouse = warehouses.find(w => w.id === product.warehouse_id)
                         return (
@@ -1582,7 +1591,7 @@ export default function InventoryPage() {
                             <TableCell className="text-center py-2 sm:py-4">
                               <div className="flex items-center justify-center gap-1 sm:gap-2">
                                 <span className={`${status.color} font-medium text-xs sm:text-sm`}>{product.stock.toLocaleString()}</span>
-                                {product.stock <= (product.min_stock || product.minStock) && product.stock > 0 && (
+                                {product.stock <= product.min_stock && product.stock > 0 && (
                                   <AlertTriangle className="w-3 h-3 sm:w-4 sm:h-4 text-orange-400" />
                                 )}
                               </div>
@@ -1606,7 +1615,7 @@ export default function InventoryPage() {
                                         onClick={() => {
                                           setEditingProduct({
                                             ...product,
-                                            minStock: product.minStock || product.min_stock || 5,
+                                            minStock: product.min_stock || 5,
                                             description: product.description || ""
                                           })
                                           setIsEditDialogOpen(true)

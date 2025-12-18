@@ -45,6 +45,19 @@
 
 ---
 
+## 5. إصلاح أخطاء TypeScript في صفحة المخزون ✅
+**المشكلة:** 117 خطأ TypeScript في app/inventory/page.tsx
+
+**الحل:**
+- [x] إضافة نوع `Product[]` للـ products state
+- [x] إصلاح `minStock` → `min_stock` (اسم العمود في قاعدة البيانات)
+- [x] إصلاح معاملات دوال `updateProduct` و `deleteProduct`
+- [x] إضافة فحص null للـ user
+- [x] تحويل `warehouse_id` من string إلى number
+- [x] إصلاح مشكلة `dataValidations` في ExcelJS
+
+---
+
 ## حالة التنفيذ:
 | المهمة | الحالة |
 |--------|--------|
@@ -52,6 +65,7 @@
 | إصلاح البحث | ✅ مكتمل |
 | عمود الربح في Excel | ✅ مكتمل |
 | إصلاح تعديل كود الصنف | ✅ مكتمل |
+| إصلاح أخطاء TypeScript | ✅ مكتمل |
 
 ---
 
