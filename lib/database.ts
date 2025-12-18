@@ -273,7 +273,10 @@ export async function getIssuances() {
           name,
           brand,
           model,
-          item_code
+          item_code,
+          purchase_price,
+          selling_price,
+          category
         )
       `)
       .order("created_at", { ascending: false })
@@ -290,6 +293,9 @@ export async function getIssuances() {
       issuedBy: item.issued_by,
       date: item.date || item.created_at?.split("T")[0], // Use date field first, then fallback to created_at
       item_code: item.products?.item_code || null,
+      purchase_price: item.products?.purchase_price || 0,
+      selling_price: item.products?.selling_price || 0,
+      category: item.products?.category || '',
     }))
   }, "Failed to fetch issuances")
 }
@@ -677,7 +683,9 @@ export async function getFilteredIssuances(filters: {
           model,
           category,
           description,
-          item_code
+          item_code,
+          purchase_price,
+          selling_price
         )
       `)
       .order("created_at", { ascending: false })

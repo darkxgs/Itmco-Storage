@@ -713,14 +713,18 @@ export function validateExportData(data: any[]): { isValid: boolean; errors: str
     // إزالة قيمة الفاتورة من الملاحظات لعرضها بشكل منفصل
     const cleanNotes = notesText.replace(/\s*\|\s*قيمة الفاتورة:\s*\d+/, '').replace(/قيمة الفاتورة:\s*\d+\s*\|?\s*/, '').trim()
     
+    // جلب الأسعار من المنتج إذا لم تكن موجودة في الإصدار
+    const purchasePrice = item.purchasePrice || item.purchase_price || item.products?.purchase_price || item.productDetails?.purchase_price || 0
+    const sellingPrice = item.sellingPrice || item.selling_price || item.products?.selling_price || item.productDetails?.selling_price || 0
+    
     return {
       id: item.id || 0,
       date: item.date || item.created_at || new Date().toISOString(),
       productName: item.productName || item.product_name || '',
-      category: item.productDetails?.category || item.category || '',
+      category: item.productDetails?.category || item.products?.category || item.category || '',
       itemCode: item.itemCode || item.item_code || item.products?.item_code || '', // كود قطعة الغيار
       partNumber: item.productDetails?.partNumber || item.part_number || '',
-      brand: item.productDetails?.brand || item.brand || '',
+      brand: item.productDetails?.brand || item.products?.brand || item.brand || '',
       model: item.model || '', // موديل الماكينة من الإصدار (ليس من المنتج)
       customerName: item.customerName || item.customer_name || '',
       branch: item.branch || '',
@@ -732,8 +736,8 @@ export function validateExportData(data: any[]): { isValid: boolean; errors: str
       warrantyType: item.warrantyType || item.warranty_type || '',
       invoiceNumber: item.invoiceNumber || item.invoice_number || '',
       invoiceValue: item.invoiceValue || extractedInvoiceValue, // قيمة الفاتورة
-      purchasePrice: item.purchasePrice || item.purchase_price || 0,
-      sellingPrice: item.sellingPrice || item.selling_price || 0,
+      purchasePrice: purchasePrice,
+      sellingPrice: sellingPrice,
       notes: cleanNotes
     }
   })
