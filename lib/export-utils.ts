@@ -32,6 +32,7 @@ export interface ExportData {
   warehouseName?: string
   purchasePrice?: number
   sellingPrice?: number
+  totalPrice?: number // إجمالي السعر (الكمية × سعر البيع)
 }
 
 export interface ExportOptions {
@@ -455,6 +456,7 @@ const TABLE_HEADERS = [
   'سعر الشراء',
   'سعر البيع',
   'الربح',
+  'الإجمالي',
   'ملاحظات'
 ] as const
 
@@ -475,6 +477,7 @@ const mapRowForStrings = (item: ExportData): string[] => {
   const purchasePrice = item.purchasePrice ? Number(item.purchasePrice) : 0
   const sellingPrice = item.sellingPrice ? Number(item.sellingPrice) : 0
   const profit = sellingPrice - purchasePrice
+  const totalPrice = item.totalPrice ? Number(item.totalPrice) : (sellingPrice > 0 ? item.quantity * sellingPrice : 0)
   
   return [
     `${item.id ?? ''}`,
@@ -496,6 +499,7 @@ const mapRowForStrings = (item: ExportData): string[] => {
     item.purchasePrice ? `${purchasePrice.toLocaleString('ar-SA')} ريال` : '',
     item.sellingPrice ? `${sellingPrice.toLocaleString('ar-SA')} ريال` : '',
     (purchasePrice > 0 || sellingPrice > 0) ? `${profit.toLocaleString('ar-SA')} ريال` : '', // الربح
+    totalPrice > 0 ? `${totalPrice}` : '', // الإجمالي - رقم فقط
     item.notes ?? ''
   ]
 }
@@ -536,6 +540,7 @@ export function exportToExcel(options: ExportOptions): void {
     const purchasePrice = item.purchasePrice ? Number(item.purchasePrice) : 0
     const sellingPrice = item.sellingPrice ? Number(item.sellingPrice) : 0
     const profit = sellingPrice - purchasePrice
+    const totalPrice = item.totalPrice ? Number(item.totalPrice) : (sellingPrice > 0 ? item.quantity * sellingPrice : 0)
     
     return [
       item.id,
@@ -557,6 +562,7 @@ export function exportToExcel(options: ExportOptions): void {
       item.purchasePrice || '',
       item.sellingPrice || '',
       (purchasePrice > 0 || sellingPrice > 0) ? profit : '', // الربح
+      totalPrice > 0 ? totalPrice : '', // الإجمالي - رقم فقط
       item.notes || ''
     ]
   })
@@ -577,11 +583,11 @@ export function exportToExcel(options: ExportOptions): void {
   // Force sheet Right-to-Left view for better Arabic UX
   ;(worksheet as any)['!sheetViews'] = [{ rightToLeft: true }]
 
-  // Column widths (include margin col A)
+  // Column widths (include margin col A + الإجمالي column)
   const columnWidths = [
     { wch: 3 }, { wch: 12 }, { wch: 15 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 },
     { wch: 15 }, { wch: 25 }, { wch: 20 }, { wch: 15 }, { wch: 10 }, { wch: 20 }, { wch: 20 },
-    { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 30 }
+    { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 30 }
   ]
   worksheet['!cols'] = columnWidths
 
@@ -721,25 +727,32 @@ export function validateExportData(data: any[]): { isValid: boolean; errors: str
   }
   
   const validatedData = data.map(item => {
-    // استخراج قيمة الفاتورة وسعر البيع المخصص من الملاحظات إذا وجدت
+    // استخراج قيمة الفاتورة وسعر البيع المخصص والإجمالي من الملاحظات إذا وجدت
     const notesText = item.notes || ''
     const invoiceValueMatch = notesText.match(/قيمة الفاتورة:\s*(\d+(?:\.\d+)?)/)
     const extractedInvoiceValue = invoiceValueMatch ? invoiceValueMatch[1] : ''
     const sellingPriceMatch = notesText.match(/سعر البيع:\s*(\d+(?:\.\d+)?)/)
     const extractedSellingPrice = sellingPriceMatch ? Number(sellingPriceMatch[1]) : 0
+    const totalPriceMatch = notesText.match(/إجمالي:\s*(\d+(?:\.\d+)?)/)
+    const extractedTotalPrice = totalPriceMatch ? Number(totalPriceMatch[1]) : 0
     
-    // إزالة قيمة الفاتورة وسعر البيع من الملاحظات لعرضها بشكل منفصل
+    // إزالة قيمة الفاتورة وسعر البيع والإجمالي من الملاحظات لعرضها بشكل منفصل
     const cleanNotes = notesText
       .replace(/\s*\|\s*قيمة الفاتورة:\s*\d+(?:\.\d+)?/g, '')
       .replace(/قيمة الفاتورة:\s*\d+(?:\.\d+)?\s*\|?\s*/g, '')
       .replace(/\s*\|\s*سعر البيع:\s*\d+(?:\.\d+)?/g, '')
       .replace(/سعر البيع:\s*\d+(?:\.\d+)?\s*\|?\s*/g, '')
+      .replace(/\s*\|\s*إجمالي:\s*\d+(?:\.\d+)?/g, '')
+      .replace(/إجمالي:\s*\d+(?:\.\d+)?\s*\|?\s*/g, '')
       .trim()
     
     // جلب الأسعار من المنتج إذا لم تكن موجودة في الإصدار
     const purchasePrice = item.purchasePrice || item.purchase_price || item.products?.purchase_price || item.productDetails?.purchase_price || 0
     // استخدام سعر البيع المخصص من الملاحظات أولاً، ثم من الإصدار، ثم من المنتج
     const sellingPrice = extractedSellingPrice || item.sellingPrice || item.selling_price || item.products?.selling_price || item.productDetails?.selling_price || 0
+    // حساب الإجمالي: من الملاحظات أولاً، أو الكمية × سعر البيع
+    const quantity = item.quantity || 0
+    const totalPrice = extractedTotalPrice || (sellingPrice > 0 ? quantity * sellingPrice : 0)
     
     return {
       id: item.id || 0,
@@ -754,7 +767,7 @@ export function validateExportData(data: any[]): { isValid: boolean; errors: str
       branch: item.branch || '',
       warehouseId: item.warehouseId || item.warehouse_id || 0,
       warehouseName: item.warehouseName || item.warehouse_name || '',
-      quantity: item.quantity || 0,
+      quantity: quantity,
       engineer: item.engineer || '',
       serialNumber: item.serialNumber || item.serial_number || '', // سريال الماكينة
       warrantyType: item.warrantyType || item.warranty_type || '',
@@ -762,6 +775,7 @@ export function validateExportData(data: any[]): { isValid: boolean; errors: str
       invoiceValue: item.invoiceValue || extractedInvoiceValue, // قيمة الفاتورة
       purchasePrice: purchasePrice,
       sellingPrice: sellingPrice,
+      totalPrice: totalPrice, // الإجمالي
       notes: cleanNotes
     }
   })
