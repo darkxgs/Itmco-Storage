@@ -90,6 +90,8 @@ export default function InventoryPage() {
   const [importing, setImporting] = useState(false)
   const [isStockEntriesDialogOpen, setIsStockEntriesDialogOpen] = useState(false)
   const [selectedProductForHistory, setSelectedProductForHistory] = useState<any>(null)
+  const [editingItemCodeId, setEditingItemCodeId] = useState<number | null>(null)
+  const [editingItemCodeValue, setEditingItemCodeValue] = useState("")
   const { toast } = useToast()
 
   // Simple role-based access check
@@ -833,6 +835,44 @@ export default function InventoryPage() {
     }
   }
 
+  // دالة لحفظ كود الصنف مباشرة (inline editing)
+  const handleSaveItemCode = async (productId: number, newItemCode: string) => {
+    const product = products.find((p: any) => p.id === productId)
+    if (!product) return
+    
+    // إذا لم يتغير الكود، لا نحفظ
+    if (product.item_code === newItemCode) {
+      setEditingItemCodeId(null)
+      setEditingItemCodeValue("")
+      return
+    }
+    
+    try {
+      const updatedProduct = await updateProduct(productId, { ...product, item_code: newItemCode }, user?.id)
+      setProducts(products.map((p: any) => (p.id === productId ? updatedProduct : p)))
+      
+      toast({
+        title: "تم التحديث",
+        description: `تم تحديث كود الصنف إلى: ${newItemCode}`,
+      })
+      
+      // Log activity
+      if (user) {
+        await logActivity(user.id, user.name || '', "تعديل كود الصنف", "إدارة المخزون", `تم تعديل كود الصنف للمنتج: ${product.name} إلى ${newItemCode}`)
+      }
+    } catch (error: any) {
+      console.error("Error updating item code:", error)
+      toast({
+        title: "فشل في التحديث",
+        description: error.message || "حدث خطأ أثناء تحديث كود الصنف",
+        variant: "destructive",
+      })
+    } finally {
+      setEditingItemCodeId(null)
+      setEditingItemCodeValue("")
+    }
+  }
+
   const getStockStatus = (stock: number, minStock: number) => {
     if (stock === 0)
       return {
@@ -1491,7 +1531,37 @@ export default function InventoryPage() {
                               </div>
                             </TableCell>
                             <TableCell className="text-slate-300 text-right py-2 sm:py-4 hidden sm:table-cell">
-                              <span className="font-mono text-blue-400 text-xs sm:text-sm">{product.item_code || '-'}</span>
+                              {editingItemCodeId === product.id ? (
+                                <Input
+                                  value={editingItemCodeValue}
+                                  onChange={(e) => setEditingItemCodeValue(e.target.value)}
+                                  onBlur={() => handleSaveItemCode(product.id, editingItemCodeValue)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleSaveItemCode(product.id, editingItemCodeValue)
+                                    } else if (e.key === 'Escape') {
+                                      setEditingItemCodeId(null)
+                                      setEditingItemCodeValue("")
+                                    }
+                                  }}
+                                  autoFocus
+                                  className="bg-slate-700/50 border-blue-500/50 text-blue-400 text-xs sm:text-sm font-mono h-7 w-24 text-center focus:ring-blue-500/20"
+                                  placeholder="ITM-XX"
+                                />
+                              ) : (
+                                <span 
+                                  className="font-mono text-blue-400 text-xs sm:text-sm cursor-pointer hover:bg-slate-700/50 px-2 py-1 rounded transition-colors"
+                                  onClick={() => {
+                                    if (canEditProduct(product)) {
+                                      setEditingItemCodeId(product.id)
+                                      setEditingItemCodeValue(product.item_code || "")
+                                    }
+                                  }}
+                                  title={canEditProduct(product) ? "انقر للتعديل" : ""}
+                                >
+                                  {product.item_code || '-'}
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell className="text-slate-300 text-right py-2 sm:py-4 hidden md:table-cell text-xs sm:text-sm">{product.brand}</TableCell>
                             <TableCell className="text-slate-300 text-right py-2 sm:py-4 hidden lg:table-cell text-xs sm:text-sm">{product.model}</TableCell>

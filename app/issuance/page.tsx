@@ -49,6 +49,7 @@ export default function IssuancePage() {
   const [warrantyType, setWarrantyType] = useState('')
   const [invoiceNumber, setInvoiceNumber] = useState('')
   const [invoiceValue, setInvoiceValue] = useState('')
+  const [customSellingPrice, setCustomSellingPrice] = useState('')
   const [issuanceDate, setIssuanceDate] = useState(new Date().toISOString().split('T')[0])
   const [notes, setNotes] = useState('')
   const [editingIssuance, setEditingIssuance] = useState<any>(null)
@@ -76,10 +77,18 @@ export default function IssuancePage() {
   // Filter issuances based on search criteria
   const filteredIssuances = useMemo(() => {
     return issuances.filter((issuance) => {
-      const matchesSearch = !searchTerm || 
-        (issuance.customer_name || issuance.customerName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (issuance.engineer || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (issuance.serial_number || issuance.serialNumber || "").toLowerCase().includes(searchTerm.toLowerCase())
+      // البحث في اسم العميل، المهندس، أو رقم السريال
+      const customerName = (issuance.customer_name || issuance.customerName || "").toLowerCase()
+      const engineerName = (issuance.engineer || "").toLowerCase()
+      const serialNum = (issuance.serial_number || issuance.serialNumber || "").toLowerCase()
+      const productName = (issuance.product_name || issuance.productName || "").toLowerCase()
+      const searchLower = searchTerm.toLowerCase().trim()
+      
+      const matchesSearch = !searchTerm || searchLower === "" ||
+        customerName.includes(searchLower) ||
+        engineerName.includes(searchLower) ||
+        serialNum.includes(searchLower) ||
+        productName.includes(searchLower)
       
       const matchesBranch = !filterBranch || filterBranch === "all" || issuance.branch_id?.toString() === filterBranch
       const matchesCustomer = !filterCustomer || filterCustomer === "all" || issuance.customer_id?.toString() === filterCustomer
@@ -87,8 +96,10 @@ export default function IssuancePage() {
       
       // Find the product associated with this issuance to check item_code
       const product = products.find(p => p.id === issuance.product_id)
-      const matchesItemCode = !itemCodeSearch || 
-        (product?.item_code || "").toLowerCase().includes(itemCodeSearch.toLowerCase())
+      const productItemCode = (product?.item_code || issuance.item_code || "").toLowerCase()
+      const itemCodeSearchLower = itemCodeSearch.toLowerCase().trim()
+      const matchesItemCode = !itemCodeSearch || itemCodeSearchLower === "" ||
+        productItemCode.includes(itemCodeSearchLower)
       
       return matchesSearch && matchesBranch && matchesCustomer && matchesWarehouse && matchesItemCode
     })
@@ -236,7 +247,7 @@ export default function IssuancePage() {
           serial_number: serialNumber,
           warranty_type: warrantyType,
           invoice_number: warrantyType === 'no_warranty' ? invoiceNumber : null,
-          notes: warrantyType === 'no_warranty' && invoiceValue ? `${notes ? notes + ' | ' : ''}قيمة الفاتورة: ${invoiceValue}` : notes,
+          notes: warrantyType === 'no_warranty' ? `${notes ? notes + ' | ' : ''}${invoiceValue ? 'قيمة الفاتورة: ' + invoiceValue : ''}${customSellingPrice ? ' | سعر البيع: ' + customSellingPrice : ''}`.replace(/^\s*\|\s*/, '').replace(/\s*\|\s*$/, '') : notes,
           issued_by: user?.id || '',
           date: issuanceDate
         }
@@ -298,10 +309,20 @@ export default function IssuancePage() {
     setWarrantyType(issuance.warranty_type || "")
     setInvoiceNumber(issuance.invoice_number || "")
     setIssuanceDate(issuance.date || new Date().toISOString().split('T')[0])
-    // Extract invoice value from notes if present
-    const notesMatch = issuance.notes?.match(/قيمة الفاتورة: (\d+)/)
-    setInvoiceValue(notesMatch ? notesMatch[1] : "")
-    setNotes(issuance.notes?.replace(/\s*\|\s*قيمة الفاتورة: \d+/, "") || "")
+    // Extract invoice value and selling price from notes if present
+    const notesText = issuance.notes || ""
+    const invoiceMatch = notesText.match(/قيمة الفاتورة:\s*(\d+)/)
+    const sellingPriceMatch = notesText.match(/سعر البيع:\s*(\d+)/)
+    setInvoiceValue(invoiceMatch ? invoiceMatch[1] : "")
+    setCustomSellingPrice(sellingPriceMatch ? sellingPriceMatch[1] : "")
+    // Clean notes from extracted values
+    const cleanNotes = notesText
+      .replace(/\s*\|\s*قيمة الفاتورة:\s*\d+/g, "")
+      .replace(/قيمة الفاتورة:\s*\d+\s*\|?\s*/g, "")
+      .replace(/\s*\|\s*سعر البيع:\s*\d+/g, "")
+      .replace(/سعر البيع:\s*\d+\s*\|?\s*/g, "")
+      .trim()
+    setNotes(cleanNotes)
     setIsEditDialogOpen(true)
   }
 
@@ -331,7 +352,7 @@ export default function IssuancePage() {
         warranty_type: warrantyType,
         invoice_number: warrantyType === 'no_warranty' ? invoiceNumber : null,
         date: issuanceDate,
-        notes: warrantyType === 'no_warranty' && invoiceValue ? `${notes ? notes + ' | ' : ''}قيمة الفاتورة: ${invoiceValue}` : notes
+        notes: warrantyType === 'no_warranty' ? `${notes ? notes + ' | ' : ''}${invoiceValue ? 'قيمة الفاتورة: ' + invoiceValue : ''}${customSellingPrice ? ' | سعر البيع: ' + customSellingPrice : ''}`.replace(/^\s*\|\s*/, '').replace(/\s*\|\s*$/, '') : notes
       }
 
       await updateIssuance(editingIssuance.id, updatedData, editingIssuance.quantity)
@@ -415,6 +436,7 @@ export default function IssuancePage() {
     setWarrantyType("")
     setInvoiceNumber("")
     setInvoiceValue("")
+    setCustomSellingPrice("")
     setIssuanceDate(new Date().toISOString().split('T')[0])
     setNotes("")
     setSelectedProducts([])
@@ -1150,6 +1172,29 @@ export default function IssuancePage() {
                       />
                     </div>
                     <div className="grid gap-2">
+                      <Label htmlFor="customSellingPrice" className="text-slate-300 text-right">
+                        سعر البيع المخصص (اختياري)
+                      </Label>
+                      <Input
+                        id="customSellingPrice"
+                        type="number"
+                        value={customSellingPrice}
+                        onChange={(e) => setCustomSellingPrice(e.target.value)}
+                        placeholder="أدخل سعر البيع المخصص (إذا ترك فارغاً يستخدم سعر المنتج)"
+                        className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                      />
+                      {selectedProducts.length > 0 && customSellingPrice && (
+                        <div className="mt-2 p-3 bg-green-900/20 border border-green-700/50 rounded-lg">
+                          <div className="text-green-400 text-sm font-medium">
+                            إجمالي السعر: {(selectedProducts.reduce((sum, p) => sum + p.quantity, 0) * Number(customSellingPrice)).toLocaleString()} ج.م
+                          </div>
+                          <div className="text-slate-400 text-xs mt-1">
+                            ({selectedProducts.reduce((sum, p) => sum + p.quantity, 0)} قطعة × {Number(customSellingPrice).toLocaleString()} ج.م)
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="grid gap-2">
                       <Label htmlFor="invoiceValue" className="text-slate-300 text-right">
                         قيمة الفاتورة
                       </Label>
@@ -1743,6 +1788,29 @@ export default function IssuancePage() {
                         placeholder="أدخل رقم الفاتورة"
                         className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
                       />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="edit-customSellingPrice" className="text-slate-300 text-right">
+                      سعر البيع المخصص (اختياري)
+                    </Label>
+                    <Input
+                        id="edit-customSellingPrice"
+                        type="number"
+                        value={customSellingPrice}
+                        onChange={(e) => setCustomSellingPrice(e.target.value)}
+                        placeholder="أدخل سعر البيع المخصص"
+                        className="bg-slate-700/50 border-slate-600/50 text-white text-right focus:border-blue-500/50 focus:ring-blue-500/20 transition-colors"
+                      />
+                    {quantity > 0 && customSellingPrice && (
+                      <div className="mt-2 p-3 bg-green-900/20 border border-green-700/50 rounded-lg">
+                        <div className="text-green-400 text-sm font-medium">
+                          إجمالي السعر: {(quantity * Number(customSellingPrice)).toLocaleString()} ج.م
+                        </div>
+                        <div className="text-slate-400 text-xs mt-1">
+                          ({quantity} قطعة × {Number(customSellingPrice).toLocaleString()} ج.م)
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="edit-invoiceValue" className="text-slate-300 text-right">

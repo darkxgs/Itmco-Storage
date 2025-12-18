@@ -74,7 +74,7 @@ export function exportToCSV(options: ExportOptions): void {
 
   const finalCsvData = [
     [title],
-    [`تاريخ التصدير: ${new Date().toLocaleDateString('ar-SA')}`],
+    [`تاريخ التصدير: ${new Date().toLocaleDateString('en-GB')}`],
     [`عدد السجلات: ${data.length}`],
     ...(filterInfo.length > 0 ? [['الفلاتر المطبقة:'], ...filterInfo.map(f => [f])] : []),
     [''], // Empty row
@@ -159,7 +159,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
     </div>
     <div style="font-size:11px;margin-bottom:12px;background:#f8fafc;padding:8px;border-radius:4px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-        <span><strong>تاريخ التصدير:</strong> ${new Date().toLocaleDateString('ar-SA')}</span>
+        <span><strong>تاريخ التصدير:</strong> ${new Date().toLocaleDateString('en-GB')}</span>
         <span><strong>عدد السجلات:</strong> ${stats.totalRecords}</span>
       </div>
       <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
@@ -454,6 +454,7 @@ const TABLE_HEADERS = [
   'قيمة الفاتورة',
   'سعر الشراء',
   'سعر البيع',
+  'الربح',
   'ملاحظات'
 ] as const
 
@@ -470,27 +471,34 @@ const translateWarrantyType = (type: string | undefined): string => {
 }
 
 // Enhanced mapping with priority ordering and Arabic formatting
-const mapRowForStrings = (item: ExportData): string[] => [
-  `${item.id ?? ''}`,
-  new Date(item.date).toLocaleDateString('en-GB'), // تاريخ ميلادي
-  item.productName ?? '',
-  item.customerName ?? '',
-  item.branch ?? '',
-  `${item.quantity ?? ''}`,
-  item.engineer ?? '',
-  item.category ?? '',
-  item.itemCode ?? '', // كود قطعة الغيار
-  item.model ?? '', // موديل الماكينة (من الإصدار)
-  item.brand ?? '',
-  item.warehouseName ?? '',
-  item.serialNumber ?? '', // سريال الماكينة
-  translateWarrantyType(item.warrantyType), // نوع الضمان مترجم
-  item.invoiceNumber ?? '',
-  item.invoiceValue ?? '', // قيمة الفاتورة
-  item.purchasePrice ? `${Number(item.purchasePrice).toLocaleString('ar-SA')} ريال` : '',
-  item.sellingPrice ? `${Number(item.sellingPrice).toLocaleString('ar-SA')} ريال` : '',
-  item.notes ?? ''
-]
+const mapRowForStrings = (item: ExportData): string[] => {
+  const purchasePrice = item.purchasePrice ? Number(item.purchasePrice) : 0
+  const sellingPrice = item.sellingPrice ? Number(item.sellingPrice) : 0
+  const profit = sellingPrice - purchasePrice
+  
+  return [
+    `${item.id ?? ''}`,
+    new Date(item.date).toLocaleDateString('en-GB'), // تاريخ ميلادي
+    item.productName ?? '',
+    item.customerName ?? '',
+    item.branch ?? '',
+    `${item.quantity ?? ''}`,
+    item.engineer ?? '',
+    item.category ?? '',
+    item.itemCode ?? '', // كود قطعة الغيار
+    item.model ?? '', // موديل الماكينة (من الإصدار)
+    item.brand ?? '',
+    item.warehouseName ?? '',
+    item.serialNumber ?? '', // سريال الماكينة
+    translateWarrantyType(item.warrantyType), // نوع الضمان مترجم
+    item.invoiceNumber ?? '',
+    item.invoiceValue ?? '', // قيمة الفاتورة
+    item.purchasePrice ? `${purchasePrice.toLocaleString('ar-SA')} ريال` : '',
+    item.sellingPrice ? `${sellingPrice.toLocaleString('ar-SA')} ريال` : '',
+    (purchasePrice > 0 || sellingPrice > 0) ? `${profit.toLocaleString('ar-SA')} ريال` : '', // الربح
+    item.notes ?? ''
+  ]
+}
 
 export function exportToExcel(options: ExportOptions): void {
   const { data, title = 'تقرير الإصدارات', filename, filters } = options
@@ -502,7 +510,7 @@ export function exportToExcel(options: ExportOptions): void {
     ['ITMCO - نظام إدارة المخزون'],
     [title],
     [''],
-    [`تاريخ التصدير: ${new Date().toLocaleDateString('ar-SA')}`],
+    [`تاريخ التصدير: ${new Date().toLocaleDateString('en-GB')}`],
     [`عدد السجلات: ${data.length}`],
     ['']
   ]
@@ -524,27 +532,34 @@ export function exportToExcel(options: ExportOptions): void {
   // removed local mapRowForStrings (now shared at top-level)
 
   // Build rows - الترتيب الصحيح حسب الهيدر
-  const tableData = data.map(item => [
-    item.id,
-    new Date(item.date).toLocaleDateString('en-GB'), // تاريخ ميلادي
-    item.productName || '',
-    item.customerName || '',
-    item.branch || '',
-    item.quantity,
-    item.engineer || '',
-    item.category || '',
-    item.itemCode || '',
-    item.model || '', // موديل الماكينة (من الإصدار)
-    item.brand || '',
-    item.warehouseName || '',
-    item.serialNumber || '',
-    translateWarrantyType(item.warrantyType), // نوع الضمان مترجم
-    item.invoiceNumber || '',
-    item.invoiceValue || '', // قيمة الفاتورة
-    item.purchasePrice || '',
-    item.sellingPrice || '',
-    item.notes || ''
-  ])
+  const tableData = data.map(item => {
+    const purchasePrice = item.purchasePrice ? Number(item.purchasePrice) : 0
+    const sellingPrice = item.sellingPrice ? Number(item.sellingPrice) : 0
+    const profit = sellingPrice - purchasePrice
+    
+    return [
+      item.id,
+      new Date(item.date).toLocaleDateString('en-GB'), // تاريخ ميلادي
+      item.productName || '',
+      item.customerName || '',
+      item.branch || '',
+      item.quantity,
+      item.engineer || '',
+      item.category || '',
+      item.itemCode || '',
+      item.model || '', // موديل الماكينة (من الإصدار)
+      item.brand || '',
+      item.warehouseName || '',
+      item.serialNumber || '',
+      translateWarrantyType(item.warrantyType), // نوع الضمان مترجم
+      item.invoiceNumber || '',
+      item.invoiceValue || '', // قيمة الفاتورة
+      item.purchasePrice || '',
+      item.sellingPrice || '',
+      (purchasePrice > 0 || sellingPrice > 0) ? profit : '', // الربح
+      item.notes || ''
+    ]
+  })
 
   // Add left margin column (column A) for better visual spacing in RTL
   const headerInfoWithMargin = headerInfo.map(r => ['', ...r])
@@ -706,16 +721,25 @@ export function validateExportData(data: any[]): { isValid: boolean; errors: str
   }
   
   const validatedData = data.map(item => {
-    // استخراج قيمة الفاتورة من الملاحظات إذا وجدت
+    // استخراج قيمة الفاتورة وسعر البيع المخصص من الملاحظات إذا وجدت
     const notesText = item.notes || ''
-    const invoiceValueMatch = notesText.match(/قيمة الفاتورة:\s*(\d+)/)
+    const invoiceValueMatch = notesText.match(/قيمة الفاتورة:\s*(\d+(?:\.\d+)?)/)
     const extractedInvoiceValue = invoiceValueMatch ? invoiceValueMatch[1] : ''
-    // إزالة قيمة الفاتورة من الملاحظات لعرضها بشكل منفصل
-    const cleanNotes = notesText.replace(/\s*\|\s*قيمة الفاتورة:\s*\d+/, '').replace(/قيمة الفاتورة:\s*\d+\s*\|?\s*/, '').trim()
+    const sellingPriceMatch = notesText.match(/سعر البيع:\s*(\d+(?:\.\d+)?)/)
+    const extractedSellingPrice = sellingPriceMatch ? Number(sellingPriceMatch[1]) : 0
+    
+    // إزالة قيمة الفاتورة وسعر البيع من الملاحظات لعرضها بشكل منفصل
+    const cleanNotes = notesText
+      .replace(/\s*\|\s*قيمة الفاتورة:\s*\d+(?:\.\d+)?/g, '')
+      .replace(/قيمة الفاتورة:\s*\d+(?:\.\d+)?\s*\|?\s*/g, '')
+      .replace(/\s*\|\s*سعر البيع:\s*\d+(?:\.\d+)?/g, '')
+      .replace(/سعر البيع:\s*\d+(?:\.\d+)?\s*\|?\s*/g, '')
+      .trim()
     
     // جلب الأسعار من المنتج إذا لم تكن موجودة في الإصدار
     const purchasePrice = item.purchasePrice || item.purchase_price || item.products?.purchase_price || item.productDetails?.purchase_price || 0
-    const sellingPrice = item.sellingPrice || item.selling_price || item.products?.selling_price || item.productDetails?.selling_price || 0
+    // استخدام سعر البيع المخصص من الملاحظات أولاً، ثم من الإصدار، ثم من المنتج
+    const sellingPrice = extractedSellingPrice || item.sellingPrice || item.selling_price || item.products?.selling_price || item.productDetails?.selling_price || 0
     
     return {
       id: item.id || 0,
