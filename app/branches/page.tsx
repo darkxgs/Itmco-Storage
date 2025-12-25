@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,13 +11,14 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
-import { Plus, Edit, Trash2, Building2, Search, AlertTriangle, RefreshCw } from "lucide-react"
+import { Plus, Edit, Trash2, Building2, Search, AlertTriangle, RefreshCw, Upload, FileSpreadsheet, Download } from "lucide-react"
 import { getBranches, createBranch, updateBranch, deleteBranch, getCustomers } from "@/lib/database"
 import type { Branch, BranchInsert, Customer } from "@/lib/supabase"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sidebar } from "@/components/sidebar"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { useAuth } from "@/hooks/use-auth"
+import * as XLSX from 'xlsx'
 
 interface BranchFormData {
   name: string
@@ -50,6 +51,12 @@ export default function BranchesPage() {
     is_active: true
   })
 
+  // Import state
+  const [importDialogOpen, setImportDialogOpen] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [importPreview, setImportPreview] = useState<any[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
     if (user) {
       loadBranches()
@@ -80,11 +87,15 @@ export default function BranchesPage() {
   const handleBranchSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
+      const branchData = {
+        ...branchForm,
+        customer_id: branchForm.customer_id ? parseInt(branchForm.customer_id) : null
+      }
       if (editingBranch) {
-        await updateBranch(editingBranch.id, branchForm)
+        await updateBranch(editingBranch.id, branchData)
         toast.success("تم تحديث الفرع بنجاح")
       } else {
-        await createBranch(branchForm as BranchInsert)
+        await createBranch(branchData as BranchInsert)
         toast.success("تم إضافة الفرع بنجاح")
       }
       setBranchDialogOpen(false)
@@ -140,6 +151,149 @@ export default function BranchesPage() {
       is_active: true
     })
     setEditingBranch(null)
+  }
+
+  // Handle Excel file import
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      const data = await file.arrayBuffer()
+      const workbook = XLSX.read(data)
+      const sheetName = workbook.SheetNames[0]
+      const worksheet = workbook.Sheets[sheetName]
+      const jsonData = XLSX.utils.sheet_to_json(worksheet)
+
+      console.log('Excel data:', jsonData) // للتصحيح
+      console.log('Available customers:', customers) // للتصحيح
+
+      // Map Excel columns to branch fields
+      const mappedData = jsonData.map((row: any) => {
+        // Find customer by name if provided - البحث بطرق متعددة
+        const customerName = row['العميل'] || row['اسم العميل'] || row['customer'] || row['Customer'] || ''
+        const customerNameStr = customerName.toString().trim()
+        
+        // البحث عن العميل بعدة طرق:
+        // 1. مطابقة كاملة (case-insensitive)
+        // 2. البحث إذا كان اسم العميل يحتوي على النص المدخل
+        // 3. البحث إذا كان النص المدخل يحتوي على اسم العميل
+        let customer = null
+        if (customerNameStr) {
+          const searchName = customerNameStr.toLowerCase()
+          customer = customers.find(c => {
+            const cName = c.name.toLowerCase().trim()
+            return cName === searchName || 
+                   cName.includes(searchName) || 
+                   searchName.includes(cName)
+          })
+          
+          console.log(`Searching for customer: "${customerNameStr}", Found:`, customer) // للتصحيح
+        }
+
+        return {
+          name: row['اسم الفرع'] || row['الفرع'] || row['name'] || row['Name'] || '',
+          code: row['كود الفرع'] || row['الكود'] || row['code'] || row['Code'] || '',
+          address: row['العنوان'] || row['address'] || row['Address'] || '',
+          phone: row['الهاتف'] || row['رقم الهاتف'] || row['phone'] || row['Phone'] || '',
+          manager_name: row['المدير'] || row['اسم المدير'] || row['manager'] || row['Manager'] || '',
+          customer_id: customer?.id?.toString() || '',
+          customer_name: customerNameStr,
+          customer_found: !!customer, // لعرض حالة العثور على العميل
+          is_active: true
+        }
+      }).filter((item: any) => item.name) // Filter out empty rows
+
+      setImportPreview(mappedData)
+      setImportDialogOpen(true)
+    } catch (error) {
+      console.error('Error reading Excel file:', error)
+      toast.error('فشل في قراءة ملف Excel')
+    }
+
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  // Import branches from preview
+  const handleImportBranches = async () => {
+    if (importPreview.length === 0) {
+      toast.error('لا توجد بيانات للاستيراد')
+      return
+    }
+
+    setImporting(true)
+    let successCount = 0
+    let errorCount = 0
+
+    try {
+      for (const branch of importPreview) {
+        try {
+          await createBranch({
+            name: branch.name,
+            code: branch.code || `BR-${Date.now()}`,
+            address: branch.address,
+            phone: branch.phone,
+            manager_name: branch.manager_name,
+            customer_id: branch.customer_id ? parseInt(branch.customer_id) : null,
+            is_active: true
+          } as BranchInsert)
+          successCount++
+        } catch (err) {
+          console.error('Error importing branch:', branch.name, err)
+          errorCount++
+        }
+      }
+
+      if (successCount > 0) {
+        toast.success(`تم استيراد ${successCount} فرع بنجاح`)
+        loadBranches()
+      }
+      if (errorCount > 0) {
+        toast.error(`فشل استيراد ${errorCount} فرع`)
+      }
+
+      setImportDialogOpen(false)
+      setImportPreview([])
+    } catch (error) {
+      console.error('Error importing branches:', error)
+      toast.error('فشل في استيراد الفروع')
+    } finally {
+      setImporting(false)
+    }
+  }
+
+  // Download Excel template
+  const downloadTemplate = () => {
+    const templateData = [
+      {
+        'اسم الفرع': 'فرع القاهرة',
+        'كود الفرع': 'CAI-001',
+        'العنوان': 'شارع التحرير، القاهرة',
+        'الهاتف': '0123456789',
+        'المدير': 'أحمد محمد',
+        'العميل': 'شركة ABC'
+      }
+    ]
+
+    const worksheet = XLSX.utils.json_to_sheet(templateData)
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'الفروع')
+    
+    // Set column widths
+    worksheet['!cols'] = [
+      { wch: 20 }, // اسم الفرع
+      { wch: 15 }, // كود الفرع
+      { wch: 30 }, // العنوان
+      { wch: 15 }, // الهاتف
+      { wch: 20 }, // المدير
+      { wch: 20 }, // العميل
+    ]
+
+    XLSX.writeFile(workbook, 'قالب_استيراد_الفروع.xlsx')
+    toast.success('تم تحميل القالب بنجاح')
   }
 
   // Filter branches based on search term
@@ -224,7 +378,37 @@ export default function BranchesPage() {
                   </CardTitle>
                   <CardDescription className="text-slate-400">إدارة جميع فروع الشركة ({filteredBranches.length} فرع)</CardDescription>
                 </div>
-                <Dialog open={branchDialogOpen} onOpenChange={setBranchDialogOpen}>
+                <div className="flex items-center gap-2">
+                  {/* Hidden file input */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileSelect}
+                    accept=".xlsx,.xls"
+                    className="hidden"
+                  />
+                  
+                  {/* Download Template Button */}
+                  <Button
+                    variant="outline"
+                    onClick={downloadTemplate}
+                    className="border-slate-600 text-slate-300 hover:bg-slate-700 hover:text-white"
+                  >
+                    <Download className="h-4 w-4 ml-2" />
+                    تحميل القالب
+                  </Button>
+                  
+                  {/* Import Button */}
+                  <Button
+                    variant="outline"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-green-600 text-green-400 hover:bg-green-600/20 hover:text-green-300"
+                  >
+                    <Upload className="h-4 w-4 ml-2" />
+                    استيراد من Excel
+                  </Button>
+                  
+                  <Dialog open={branchDialogOpen} onOpenChange={setBranchDialogOpen}>
                   <DialogTrigger asChild>
                     <Button 
                       onClick={resetBranchForm}
@@ -356,7 +540,8 @@ export default function BranchesPage() {
                 </form>
               </DialogContent>
             </Dialog>
-          </div>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -431,6 +616,95 @@ export default function BranchesPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Import Preview Dialog */}
+          <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+            <DialogContent className="max-w-4xl bg-slate-800 border-slate-700 max-h-[80vh] overflow-hidden flex flex-col">
+              <DialogHeader className="border-b border-slate-700 pb-4">
+                <DialogTitle className="text-xl font-bold text-white flex items-center gap-2">
+                  <FileSpreadsheet className="w-5 h-5 text-green-400" />
+                  معاينة البيانات قبل الاستيراد
+                </DialogTitle>
+                <DialogDescription className="text-slate-400 mt-2">
+                  تم العثور على {importPreview.length} فرع. راجع البيانات قبل الاستيراد.
+                  {importPreview.some(b => b.customer_name && !b.customer_found) && (
+                    <span className="block mt-1 text-yellow-400">
+                      ⚠️ بعض أسماء العملاء غير موجودة في النظام - سيتم إضافة الفروع بدون ربط بعميل
+                    </span>
+                  )}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="flex-1 overflow-auto py-4">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-slate-700">
+                      <TableHead className="text-slate-300 text-right">اسم الفرع</TableHead>
+                      <TableHead className="text-slate-300 text-right">الكود</TableHead>
+                      <TableHead className="text-slate-300 text-right">العنوان</TableHead>
+                      <TableHead className="text-slate-300 text-right">الهاتف</TableHead>
+                      <TableHead className="text-slate-300 text-right">المدير</TableHead>
+                      <TableHead className="text-slate-300 text-right">العميل</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {importPreview.map((branch, index) => (
+                      <TableRow key={index} className="border-b border-slate-700/30">
+                        <TableCell className="text-white">{branch.name}</TableCell>
+                        <TableCell className="text-slate-300">{branch.code || '-'}</TableCell>
+                        <TableCell className="text-slate-300">{branch.address || '-'}</TableCell>
+                        <TableCell className="text-slate-300">{branch.phone || '-'}</TableCell>
+                        <TableCell className="text-slate-300">{branch.manager_name || '-'}</TableCell>
+                        <TableCell className="text-slate-300">
+                          {branch.customer_found ? (
+                            <Badge className="bg-green-600/20 text-green-400 border border-green-600/30">
+                              ✓ {customers.find(c => c.id.toString() === branch.customer_id)?.name}
+                            </Badge>
+                          ) : branch.customer_name ? (
+                            <Badge className="bg-yellow-600/20 text-yellow-400 border border-yellow-600/30">
+                              ⚠️ {branch.customer_name} (غير موجود)
+                            </Badge>
+                          ) : (
+                            <span className="text-slate-500">-</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <DialogFooter className="border-t border-slate-700 pt-4 gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setImportDialogOpen(false)
+                    setImportPreview([])
+                  }}
+                  className="border-slate-600 text-slate-300 hover:bg-slate-700"
+                >
+                  إلغاء
+                </Button>
+                <Button
+                  onClick={handleImportBranches}
+                  disabled={importing || importPreview.length === 0}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {importing ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 ml-2 animate-spin" />
+                      جاري الاستيراد...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-4 w-4 ml-2" />
+                      استيراد {importPreview.length} فرع
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

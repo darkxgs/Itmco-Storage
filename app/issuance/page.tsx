@@ -198,6 +198,16 @@ export default function IssuancePage() {
       return
     }
 
+    // التحقق من اختيار نوع الضمان
+    if (!warrantyType) {
+      toast({
+        title: "خطأ",
+        description: "يرجى اختيار نوع الضمان",
+        variant: "destructive",
+      })
+      return
+    }
+
     setSubmitting(true)
     try {
       const branch = branches.find(b => b.id.toString() === selectedBranch)
