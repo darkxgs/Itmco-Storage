@@ -1,0 +1,375 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Responsive Design Utilities */
+@layer utilities {
+  /* Container utilities for responsive layouts */
+  .container-responsive {
+    @apply w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+  
+  /* Responsive grid utilities */
+  .grid-responsive {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6;
+  }
+  
+  .grid-responsive-2 {
+    @apply grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6;
+  }
+  
+  .grid-responsive-cards {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+  }
+  
+  /* Responsive text utilities */
+  .text-responsive-sm {
+    @apply text-xs sm:text-sm;
+  }
+  
+  .text-responsive-base {
+    @apply text-sm sm:text-base;
+  }
+  
+  .text-responsive-lg {
+    @apply text-base sm:text-lg lg:text-xl;
+  }
+  
+  .text-responsive-xl {
+    @apply text-lg sm:text-xl lg:text-2xl xl:text-3xl;
+  }
+  
+  /* Responsive spacing utilities */
+  .spacing-responsive {
+    @apply p-4 sm:p-6 lg:p-8;
+  }
+  
+  .spacing-responsive-sm {
+    @apply p-2 sm:p-4 lg:p-6;
+  }
+  
+  /* Auto zoom-out for content overflow */
+  .auto-zoom-container {
+    @apply min-w-0 overflow-x-auto;
+    transform-origin: top left;
+  }
+  
+  /* Ensure content fits by allowing horizontal scroll and zoom */
+  .fit-content {
+    @apply min-w-fit;
+  }
+  
+  /* Responsive table utilities */
+  .table-responsive {
+    @apply w-full overflow-x-auto;
+  }
+  
+  .table-responsive table {
+    @apply min-w-full;
+  }
+  
+  /* Mobile-first responsive utilities */
+  .mobile-stack {
+    @apply flex flex-col sm:flex-row;
+  }
+  
+  /* RTL support for mobile stack */
+  [dir="rtl"] .mobile-stack {
+    @apply sm:flex-row-reverse;
+  }
+  
+  .mobile-full {
+    @apply w-full sm:w-auto;
+  }
+  
+  /* Responsive sidebar utilities */
+  .sidebar-responsive {
+    @apply w-full sm:w-64 lg:w-72;
+  }
+  
+  /* Responsive card utilities */
+  .card-responsive {
+    @apply w-full max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-xl;
+  }
+  
+  /* Responsive form utilities */
+  .form-responsive {
+    @apply w-full max-w-md mx-auto;
+  }
+  
+  .form-group-responsive {
+    @apply flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4;
+  }
+  
+  /* Responsive button utilities */
+  .btn-responsive {
+    @apply w-full sm:w-auto px-4 py-2 text-sm sm:text-base;
+  }
+  
+  /* Responsive chart utilities */
+  .chart-responsive {
+    @apply w-full h-64 sm:h-80 lg:h-96;
+  }
+  
+  /* Responsive modal utilities */
+  .modal-responsive {
+    @apply w-full max-w-sm sm:max-w-md lg:max-w-lg xl:max-w-2xl mx-4;
+  }
+}
+
+/* Custom media queries for specific device targeting */
+@media (max-width: 480px) {
+  /* iPhone and small mobile devices */
+  .mobile-compact {
+    padding: 0.5rem;
+  }
+  
+  .mobile-text-sm {
+    font-size: 0.75rem;
+  }
+  
+  .mobile-hide {
+    display: none;
+  }
+  
+  /* Fix layout issues on small screens */
+  body {
+    overflow-x: hidden;
+  }
+  
+  .flex {
+    min-width: 0;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  /* iPad portrait and large mobile devices */
+  .tablet-compact {
+    padding: 1rem;
+  }
+  
+  /* Ensure proper flex behavior for mobile layouts */
+  .mobile-layout .flex {
+    min-width: 0;
+  }
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  /* iPad landscape and small laptops */
+  .laptop-compact {
+    padding: 1.5rem;
+  }
+  
+  /* Ensure proper flex behavior for tablet layouts */
+  .tablet-layout .flex {
+    min-width: 0;
+  }
+}
+
+@media (min-width: 1025px) and (max-width: 1440px) {
+  /* Standard laptops */
+  .laptop-standard {
+    max-width: 100%;
+  }
+}
+
+@media (min-width: 1441px) {
+  /* Desktop and large screens */
+  .desktop-expanded {
+    max-width: 1400px;
+    margin: 0 auto;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    overflow-x: hidden;
+    min-height: 100vh;
+    min-width: 320px;
+  }
+  
+  /* Fix flex container issues for specific layouts */
+  .flex-container {
+    min-width: 0;
+  }
+  
+  .sidebar-layout .flex {
+    min-width: 0;
+  }
+  
+  /* Ensure proper responsive behavior */
+  .flex-1 {
+    min-width: 0;
+    flex: 1 1 0%;
+  }
+  
+  /* Fix container overflow issues */
+  .container {
+    width: 100%;
+    max-width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* RTL Support */
+[dir="rtl"] {
+  direction: rtl;
+}
+
+[dir="rtl"] .space-x-reverse > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-x-reverse: 1;
+}
+
+/* Custom scrollbar - scoped to specific containers */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #475569;
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #64748b;
+}
+
+/* Apply to main content areas */
+.main-content,
+.sidebar,
+.table-container {
+  @apply custom-scrollbar;
+}
+
+/* Loading animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Switch component fixes */
+.switch-root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 44px;
+  height: 24px;
+  background-color: #374151;
+  border-radius: 12px;
+  transition: background-color 0.2s;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.switch-root[data-state="checked"] {
+  background-color: #3b82f6;
+}
+
+.switch-root:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.switch-thumb {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.2s;
+  transform: translateX(2px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+[dir="rtl"] .switch-thumb {
+  transform: translateX(-2px);
+}
+
+.switch-root[data-state="checked"] .switch-thumb {
+  transform: translateX(20px);
+}
+
+[dir="rtl"] .switch-root[data-state="checked"] .switch-thumb {
+  transform: translateX(-20px);
+}
+
+/* Auto zoom-out for pages that don't fit (use transform scaling on .page-container only to prevent double-scaling) */
+/* Removed body zoom rules to avoid compounding with .page-container scaling */
+
+
+
+/* Responsive layout utilities - prefer Tailwind breakpoints over scaling */
+.dashboard-container {
+  @apply w-full max-w-7xl mx-auto;
+}
+
+/* Only apply minimal scaling to complex dashboard tables if absolutely needed */
+@media screen and (max-width: 768px) {
+  .complex-table {
+    transform: scale(0.9);
+    transform-origin: top left;
+    width: 111.11%;
+  }
+}
+
+@media screen and (max-width: 480px) {
+  .complex-table {
+    transform: scale(0.85);
+    transform-origin: top left;
+    width: 117.65%;
+  }
+}
+
+
+
+.switch-root:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
