@@ -890,10 +890,10 @@ export default function IssuancePage() {
                                         </div>
                                         <div className="text-left ml-3">
                                           <div className={`text-xs px-2 py-1 rounded-full ${product.stock > 10
-                                              ? 'bg-green-500/20 text-green-400'
-                                              : product.stock > 0
-                                                ? 'bg-yellow-500/20 text-yellow-400'
-                                                : 'bg-red-500/20 text-red-400'
+                                            ? 'bg-green-500/20 text-green-400'
+                                            : product.stock > 0
+                                              ? 'bg-yellow-500/20 text-yellow-400'
+                                              : 'bg-red-500/20 text-red-400'
                                             }`}>
                                             {product.stock} قطعة
                                           </div>
@@ -1389,8 +1389,8 @@ export default function IssuancePage() {
                                 <div
                                   key={product.id}
                                   className={`p-4 cursor-pointer transition-all duration-150 border-b border-slate-700/50 last:border-b-0 ${index === selectedIndex
-                                      ? 'bg-blue-600/20 border-blue-500/30'
-                                      : 'hover:bg-slate-700/50'
+                                    ? 'bg-blue-600/20 border-blue-500/30'
+                                    : 'hover:bg-slate-700/50'
                                     }`}
                                   onClick={() => selectItemByCode(product)}
                                 >
@@ -1561,9 +1561,9 @@ export default function IssuancePage() {
 
                     return (
                       <TableRow key={issuance.id} className="border-slate-700 hover:bg-slate-700/30 transition-colors">
-                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 whitespace-nowrap">{issuance.date}</TableCell>
-                        <TableCell className="text-blue-400 text-right font-mono text-xs py-2 px-2">{issuance.item_code || product?.item_code || '-'}</TableCell>
-                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 max-w-[150px] truncate" title={product?.name}>{product?.name || 'غير محدد'}</TableCell>
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 whitespace-nowr ap">{issuance.date}</TableCell>
+                        <TableCell className="text-blue-400 text-right font-mono text-xs py-2 px-2 max-w-[100px]">{issuance.item_code || product?.item_code || '-'}</TableCell>
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 max-w-[200px] truncate" title={product?.name}>{product?.name || 'غير محدد'}</TableCell>
                         <TableCell className="text-slate-300 text-right text-xs py-2 px-2 max-w-[120px] truncate" title={issuance.model}>{issuance.model || '-'}</TableCell>
                         <TableCell className="text-slate-300 text-center text-xs py-2 px-2">{issuance.quantity}</TableCell>
                         <TableCell className="text-slate-300 text-right text-xs py-2 px-2 max-w-[150px] truncate" title={customer?.name || issuance.customer_name}>
@@ -1574,7 +1574,7 @@ export default function IssuancePage() {
                           {warehouse ? `${warehouse.name} - ${warehouse.warehouse_number}` : 'غير محدد'}
                         </TableCell>
                         <TableCell className="text-slate-300 text-right text-xs py-2 px-2 max-w-[100px] truncate" title={issuance.engineer}>{issuance.engineer || 'غير محدد'}</TableCell>
-                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 font-mono">{issuance.serial_number || '-'}</TableCell>
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 max-w-[120px] truncate">{issuance.serial_number || '-'}</TableCell>
                         <TableCell className="text-slate-300 text-right text-xs py-2 px-2 whitespace-nowrap">
                           {issuance.warranty_type === 'comprehensive' ? 'عقد شامل' :
                             issuance.warranty_type === 'warranty' ? 'ضمان' :
