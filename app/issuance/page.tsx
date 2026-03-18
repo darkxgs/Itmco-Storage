@@ -1536,20 +1536,20 @@ export default function IssuancePage() {
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="border-slate-700">
-                    <TableHead className="text-slate-300 text-right">التاريخ</TableHead>
-                    <TableHead className="text-slate-300 text-right">كود القطعة</TableHead>
-                    <TableHead className="text-slate-300 text-right">المنتج</TableHead>
-                    <TableHead className="text-slate-300 text-right">موديل الماكينة</TableHead>
-                    <TableHead className="text-slate-300 text-center">الكمية</TableHead>
-                    <TableHead className="text-slate-300 text-right">العميل</TableHead>
-                    <TableHead className="text-slate-300 text-right">الفرع</TableHead>
-                    <TableHead className="text-slate-300 text-right">المخزن</TableHead>
-                    <TableHead className="text-slate-300 text-right">المهندس</TableHead>
-                    <TableHead className="text-slate-300 text-right">سريال الماكينة</TableHead>
-                    <TableHead className="text-slate-300 text-right">نوع الضمان</TableHead>
-                    <TableHead className="text-slate-300 text-right">رقم الفاتورة</TableHead>
-                    <TableHead className="text-slate-300 text-center">الإجراءات</TableHead>
+                  <TableRow className="border-slate-700 bg-slate-900/50">
+                    <TableHead className="text-slate-300 text-right text-xs py-2 px-2">التاريخ</TableHead>
+                    <TableHead className="text-slate-300 text-right text-xs py-2 px-2">كود القطعة</TableHead>
+                    <TableHead className="text-slate-300 text-right text-xs py-2 px-2">المنتج</TableHead>
+                    <TableHead className="text-slate-300 text-right text-xs py-2 px-2">موديل الماكينة</TableHead>
+                    <TableHead className="text-slate-300 text-center text-xs py-2 px-2">الكمية</TableHead>
+                    <TableHead className="text-slate-300 text-right text-xs py-2 px-2">العميل</TableHead>
+                    <TableHead className="text-slate-300 text-right text-xs py-2 px-2">الفرع</TableHead>
+                    <TableHead className="text-slate-300 text-right text-xs py-2 px-2">المخزن</TableHead>
+                    <TableHead className="text-slate-300 text-right text-xs py-2 px-2">المهندس</TableHead>
+                    <TableHead className="text-slate-300 text-right text-xs py-2 px-2 whitespace-nowrap">سريال الماكينة</TableHead>
+                    <TableHead className="text-slate-300 text-right text-xs py-2 px-2">نوع الضمان</TableHead>
+                    <TableHead className="text-slate-300 text-right text-xs py-2 px-2">رقم الفاتورة</TableHead>
+                    <TableHead className="text-slate-300 text-center text-xs py-2 px-2">الإجراءات</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1560,45 +1560,45 @@ export default function IssuancePage() {
                     const warehouse = warehouses.find(w => w.id === issuance.warehouse_id)
 
                     return (
-                      <TableRow key={issuance.id} className="border-slate-700">
-                        <TableCell className="text-slate-300 text-right">{issuance.date}</TableCell>
-                        <TableCell className="text-blue-400 text-right font-mono text-sm">{issuance.item_code || product?.item_code || '-'}</TableCell>
-                        <TableCell className="text-slate-300 text-right">{product?.name || 'غير محدد'}</TableCell>
-                        <TableCell className="text-slate-300 text-right">{issuance.model || '-'}</TableCell>
-                        <TableCell className="text-slate-300 text-center">{issuance.quantity}</TableCell>
-                        <TableCell className="text-slate-300 text-right">
+                      <TableRow key={issuance.id} className="border-slate-700 hover:bg-slate-700/30 transition-colors">
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 whitespace-nowrap">{issuance.date}</TableCell>
+                        <TableCell className="text-blue-400 text-right font-mono text-xs py-2 px-2">{issuance.item_code || product?.item_code || '-'}</TableCell>
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 max-w-[150px] truncate" title={product?.name}>{product?.name || 'غير محدد'}</TableCell>
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 max-w-[120px] truncate" title={issuance.model}>{issuance.model || '-'}</TableCell>
+                        <TableCell className="text-slate-300 text-center text-xs py-2 px-2">{issuance.quantity}</TableCell>
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 max-w-[150px] truncate" title={customer?.name || issuance.customer_name}>
                           {customer?.name || issuance.customer_name || 'غير محدد'}
                         </TableCell>
-                        <TableCell className="text-slate-300 text-right">{branch?.name || 'غير محدد'}</TableCell>
-                        <TableCell className="text-slate-300 text-right">
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 max-w-[120px] truncate" title={branch?.name}>{branch?.name || 'غير محدد'}</TableCell>
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 max-w-[120px] truncate" title={warehouse ? `${warehouse.name} - ${warehouse.warehouse_number}` : 'غير محدد'}>
                           {warehouse ? `${warehouse.name} - ${warehouse.warehouse_number}` : 'غير محدد'}
                         </TableCell>
-                        <TableCell className="text-slate-300 text-right">{issuance.engineer || 'غير محدد'}</TableCell>
-                        <TableCell className="text-slate-300 text-right">{issuance.serial_number || '-'}</TableCell>
-                        <TableCell className="text-slate-300 text-right">
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 max-w-[100px] truncate" title={issuance.engineer}>{issuance.engineer || 'غير محدد'}</TableCell>
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 font-mono">{issuance.serial_number || '-'}</TableCell>
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 whitespace-nowrap">
                           {issuance.warranty_type === 'comprehensive' ? 'عقد شامل' :
                             issuance.warranty_type === 'warranty' ? 'ضمان' :
                               issuance.warranty_type === 'custody' ? 'عهدة' :
                                 issuance.warranty_type === 'no_warranty' ? 'بدون ضمان' : '-'}
                         </TableCell>
-                        <TableCell className="text-slate-300 text-right">{issuance.invoice_number || '-'}</TableCell>
-                        <TableCell className="text-center">
+                        <TableCell className="text-slate-300 text-right text-xs py-2 px-2 font-mono">{issuance.invoice_number || '-'}</TableCell>
+                        <TableCell className="py-2 px-2 text-center">
                           {canEditOrDelete(issuance) && (
-                            <div className="flex justify-center gap-2">
+                            <div className="flex justify-center gap-1">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleEditIssuance(issuance)}
-                                className="bg-blue-900/20 border-blue-700/50 text-blue-400 hover:bg-blue-900/30 hover:border-blue-600/50 hover:text-blue-300 transition-all duration-200"
+                                className="h-7 w-7 p-0 bg-blue-900/20 border-blue-700/50 text-blue-400 hover:bg-blue-900/30 hover:border-blue-600/50 hover:text-blue-300 transition-all duration-200"
                               >
-                                <Edit className="w-4 h-4" />
+                                <Edit className="w-3.5 h-3.5" />
                               </Button>
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
                                   <Button
                                     variant="outline"
                                     size="sm"
-                                    className="bg-red-900/20 border-red-700/50 text-red-400 hover:bg-red-900/30 hover:border-red-600/50 hover:text-red-300 transition-all duration-200"
+                                    className="h-7 w-7 p-0 bg-red-900/20 border-red-700/50 text-red-400 hover:bg-red-900/30 hover:border-red-600/50 hover:text-red-300 transition-all duration-200"
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </Button>
