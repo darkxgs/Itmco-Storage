@@ -112,9 +112,13 @@ export function sanitizeInput(input: string): string {
   return sanitized.trim()
 }
 
-export function validateInput(input: any, config: SecurityConfig = defaultSecurityConfig): string {
+export function validateInput(input: any, config: SecurityConfig = defaultSecurityConfig): any {
   if (input === null || input === undefined) {
-    return ''
+    return input
+  }
+  
+  if (typeof input === 'boolean' || typeof input === 'number') {
+    return input
   }
   
   const stringInput = String(input)

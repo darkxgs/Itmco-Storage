@@ -1167,7 +1167,7 @@ export async function createStockEntry(entry: {
     return {
       ...stockEntry,
       entryDateFormatted: formatDate(stockEntry.entry_date),
-      entryTimeFormatted: stockEntry.entry_time,
+      entryTimeFormatted: formatTimeOnly(stockEntry.entry_time),
       entryDateTimeFormatted: formatDateTime(stockEntry.entry_datetime)
     }
   }, "Failed to create stock entry")
@@ -1249,6 +1249,34 @@ export async function getStockEntriesSummary(productId: number, startDate?: stri
 }
 
 // Utility functions
+export function parseSafeDate(dateStr: string | Date): Date {
+  if (!dateStr) return new Date()
+  if (dateStr instanceof Date) return dateStr
+  
+  // Replace dashes with slashes for Safari compatibility
+  const formattedStr = typeof dateStr === 'string' 
+    ? dateStr.replace(/-/g, '/') 
+    : dateStr
+    
+  const parsed = new Date(formattedStr)
+  if (isNaN(parsed.getTime())) {
+    if (typeof dateStr === 'string') {
+      const parts = dateStr.split(/[-/T :]/)
+      if (parts.length >= 3) {
+        const year = parseInt(parts[0])
+        const month = parseInt(parts[1]) - 1
+        const day = parseInt(parts[2])
+        const hours = parts.length > 3 ? parseInt(parts[3]) : 0
+        const minutes = parts.length > 4 ? parseInt(parts[4]) : 0
+        const seconds = parts.length > 5 ? parseInt(parts[5]) : 0
+        return new Date(year, month, day, hours, minutes, seconds)
+      }
+    }
+    return new Date()
+  }
+  return parsed
+}
+
 export function formatCurrency(amount: number): string {
   return new Intl.NumberFormat("ar-SA", {
     style: "currency",
@@ -1257,7 +1285,7 @@ export function formatCurrency(amount: number): string {
 }
 
 export function formatDate(date: string | Date): string {
-  return new Date(date).toLocaleDateString("en-US", {
+  return parseSafeDate(date).toLocaleDateString("en-US", {
     year: "numeric",
     month: "long",
     day: "numeric",
@@ -1265,7 +1293,7 @@ export function formatDate(date: string | Date): string {
 }
 
 export function formatDateTime(dateTime: string | Date): string {
-  return new Date(dateTime).toLocaleString("en-US", {
+  return parseSafeDate(dateTime).toLocaleString("en-US", {
     timeZone: "Africa/Cairo",
     year: "numeric",
     month: "long",
@@ -1277,7 +1305,7 @@ export function formatDateTime(dateTime: string | Date): string {
 }
 
 export function formatDateOnly(date: string | Date): string {
-  return new Date(date).toLocaleDateString("en-US", {
+  return parseSafeDate(date).toLocaleDateString("en-US", {
     year: "numeric",
     month: "numeric",
     day: "numeric",
@@ -1286,6 +1314,7 @@ export function formatDateOnly(date: string | Date): string {
 
 export function formatTimeOnly(time: string): string {
   try {
+    if (!time) return '-'
     // إذا كان الوقت يحتوي على ثواني وميكروثانية، نقوم بتنظيفه
     const timeParts = time.split(':')
     if (timeParts.length >= 2) {

@@ -342,13 +342,13 @@ export function StockEntriesDialog({
                           <TableCell className="text-white">
                             <div className="flex items-center gap-2">
                               <Calendar className="w-4 h-4 text-blue-400" />
-                              {formatDateOnly(entry.entry_date)}
+                              {entry.entryDateFormatted || formatDateOnly(entry.entry_date)}
                             </div>
                           </TableCell>
                           <TableCell className="text-slate-300">
                             <div className="flex items-center gap-2">
                               <Clock className="w-4 h-4 text-green-400" />
-                              {formatTimeOnly(entry.entry_time)}
+                              {entry.entryTimeFormatted || formatTimeOnly(entry.entry_time)}
                             </div>
                           </TableCell>
                           <TableCell>
