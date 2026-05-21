@@ -26,7 +26,7 @@ export default function FixPoliciesPage() {
         setPolicies(data || [])
         setStatus(`Found ${data?.length || 0} policies for issuances table`)
       }
-    } catch (error) {
+    } catch (error: any) {
       setStatus(`Error: ${error.message}`)
     }
     
@@ -53,7 +53,7 @@ export default function FixPoliciesPage() {
       } else {
         setStatus("✅ Delete operation completed successfully")
       }
-    } catch (error) {
+    } catch (error: any) {
       setStatus(`Error during test: ${error.message}`)
     }
     

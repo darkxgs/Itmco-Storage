@@ -98,7 +98,7 @@ export default function SearchPage() {
     setLoading(true)
     try {
       let query
-      let data
+      let data: any[] = []
 
       if (searchType === "products") {
         const { data: productsData, error } = await supabase
@@ -161,7 +161,7 @@ export default function SearchPage() {
         if (error) throw error
         data = issuancesData
       } else if (searchType === "users") {
-        if (user.role !== "admin") {
+        if (!user || user.role !== "admin") {
           toast({
             title: "خطأ",
             description: "ليس لديك صلاحية للبحث في المستخدمين",

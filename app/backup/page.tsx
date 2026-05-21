@@ -39,7 +39,7 @@ export default function BackupPage() {
   const [loading, setLoading] = useState(false)
   const [restoreFile, setRestoreFile] = useState<File | null>(null)
   const [restoreData, setRestoreData] = useState<any>(null)
-  const [backupHistory, setBackupHistory] = useState([])
+  const [backupHistory, setBackupHistory] = useState<any[]>([])
   const [autoBackupEnabled, setAutoBackupEnabled] = useState(false)
   const { toast } = useToast()
 
@@ -116,7 +116,7 @@ export default function BackupPage() {
         title: "تم إنشاء النسخة الاحتياطية",
         description: "تم تحميل ملف النسخة الاحتياطية بنجاح",
       })
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "خطأ في النسخ الاحتياطي",
         description: error.message,
@@ -182,7 +182,7 @@ export default function BackupPage() {
           variant: "destructive",
         })
       }
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "خطأ في الاستعادة",
         description: error.message,
@@ -438,7 +438,7 @@ export default function BackupPage() {
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary">{backup.type}</Badge>
                       <div className="text-slate-400 text-sm">
-                        {Object.values(backup.recordCounts).reduce((a: number, b: number) => a + b, 0)} سجل
+                        {(Object.values(backup.recordCounts || {}) as number[]).reduce((a: number, b: number) => a + b, 0)} سجل
                       </div>
                     </div>
                   </div>

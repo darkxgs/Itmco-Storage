@@ -39,19 +39,19 @@ export default function ReportsPage() {
   })
 
   // New state for dynamic data
-  const [branches, setBranches] = useState([])
-  const [customers, setCustomers] = useState([])
-  const [warehouses, setWarehouses] = useState([])
+  const [branches, setBranches] = useState<any[]>([])
+  const [customers, setCustomers] = useState<any[]>([])
+  const [warehouses, setWarehouses] = useState<any[]>([])
   const [categories, setCategories] = useState<any[]>([])
   
   // Search states for dropdowns
   const [branchSearch, setBranchSearch] = useState("")
 
-  const [monthlyData, setMonthlyData] = useState([])
-  const [productFrequency, setProductFrequency] = useState([])
-  const [branchData, setBranchData] = useState([])
-  const [recentTransactions, setRecentTransactions] = useState([])
-  const [allTransactions, setAllTransactions] = useState([])
+  const [monthlyData, setMonthlyData] = useState<any[]>([])
+  const [productFrequency, setProductFrequency] = useState<any[]>([])
+  const [branchData, setBranchData] = useState<any[]>([])
+  const [recentTransactions, setRecentTransactions] = useState<any[]>([])
+  const [allTransactions, setAllTransactions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [exporting, setExporting] = useState(false)
@@ -72,7 +72,7 @@ export default function ReportsPage() {
       const [branchesData, customersData, warehousesData, categoriesData] = await Promise.all([
         getBranches(),
         getCustomers(),
-        getWarehouses(userId),
+        getWarehouses(),
         getCategories()
       ])
       
@@ -97,8 +97,8 @@ export default function ReportsPage() {
       
       const [monthly, frequency, branch, filtered, recent] = await Promise.all([
         getMonthlyIssuances(),
-        getProductFrequency(filterParams.startDate, filterParams.endDate, filterParams.branch, filterParams.category),
-        getBranchPerformance(filterParams.startDate, filterParams.endDate, filterParams.category, filterParams.productName),
+        getProductFrequency(filterParams),
+        getBranchPerformance(filterParams),
         getFilteredIssuances(filterParams),
         getFilteredIssuances({ ...filterParams, limit: 10 })
       ])
@@ -625,7 +625,7 @@ export default function ReportsPage() {
                                 outerRadius={100}
                                 innerRadius={40}
                                 dataKey="count"
-                                label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                                label={({ percent }) => percent ? `${(percent * 100).toFixed(0)}%` : "0%"}
                                 labelLine={false}
                               >
                                 {chartData.map((entry, index) => (

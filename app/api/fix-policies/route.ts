@@ -38,7 +38,7 @@ export async function POST() {
       deletePolicyError: deletePolicyError?.message || null
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fixing policies:', error)
     return NextResponse.json(
       {

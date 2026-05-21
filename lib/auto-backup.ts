@@ -160,7 +160,7 @@ export async function createAutoBackup(): Promise<BackupResult> {
       recordCounts,
       size
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Auto backup failed:', error)
     
     // Log the failure

@@ -77,13 +77,16 @@ export async function markAllNotificationsAsRead(userId: string) {
 // Auto-generate notifications for low stock
 export async function checkLowStockAndNotify() {
   try {
-    const { data: products } = await supabase
+    const { data: products, error: productsError } = await supabase
       .from("products")
       .select("id, name, stock, min_stock")
-      .lte("stock", supabase.sql`min_stock`)
       .gt("stock", 0)
 
+    if (productsError) throw productsError
     if (!products || products.length === 0) return
+
+    const lowStockProducts = products.filter((p) => p.stock <= p.min_stock)
+    if (lowStockProducts.length === 0) return
 
     // Get admin users to notify
     const { data: admins } = await supabase

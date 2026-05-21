@@ -16,7 +16,7 @@ export async function GET() {
       database: "connected",
       environment: process.env.NODE_ENV,
     })
-  } catch (error) {
+  } catch (error: any) {
     return NextResponse.json(
       {
         status: "unhealthy",

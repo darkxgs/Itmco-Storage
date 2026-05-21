@@ -30,7 +30,7 @@ const roles = [
 
 export default function UsersPage() {
   const { user, loading: authLoading } = useAuth()
-  const [users, setUsers] = useState([])
+  const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -133,6 +133,7 @@ export default function UsersPage() {
   }
 
   const handleAddUser = async () => {
+    if (!user) return
     if (!validateUserForm(newUser)) return
 
     try {
@@ -203,6 +204,7 @@ export default function UsersPage() {
   }
 
   const handleEditUser = async () => {
+    if (!user) return
     if (!validateUserForm(editingUser, true)) return
 
     try {
@@ -225,7 +227,7 @@ export default function UsersPage() {
         return
       }
 
-      const updateData = {
+      const updateData: any = {
         name: editingUser.name.trim(),
         email: editingUser.email.toLowerCase().trim(),
         role: editingUser.role,
@@ -271,6 +273,7 @@ export default function UsersPage() {
   }
 
   const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!user) return
     if (userId === user.id) {
       toast({
         title: "عملية غير مسموحة",
@@ -309,6 +312,7 @@ export default function UsersPage() {
   }
 
   const toggleUserStatus = async (userId: string, currentStatus: boolean, userName: string) => {
+    if (!user) return
     if (userId === user.id) {
       toast({
         title: "عملية غير مسموحة",

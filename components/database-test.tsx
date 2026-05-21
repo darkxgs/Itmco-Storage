@@ -32,7 +32,7 @@ export function DatabaseTest() {
         status: error ? "error" : "success",
         message: error ? error.message : "Users table accessible",
       })
-    } catch (error) {
+    } catch (error: any) {
       testResults.push({
         name: "Users Table",
         status: "error",
@@ -48,7 +48,7 @@ export function DatabaseTest() {
         status: error ? "error" : "success",
         message: error ? error.message : "Products table accessible",
       })
-    } catch (error) {
+    } catch (error: any) {
       testResults.push({
         name: "Products Table",
         status: "error",
@@ -64,7 +64,7 @@ export function DatabaseTest() {
         status: error ? "error" : "success",
         message: error ? error.message : "Issuances table accessible",
       })
-    } catch (error) {
+    } catch (error: any) {
       testResults.push({
         name: "Issuances Table",
         status: "error",
@@ -80,7 +80,7 @@ export function DatabaseTest() {
         status: error ? "error" : "success",
         message: error ? error.message : "Activity logs table accessible",
       })
-    } catch (error) {
+    } catch (error: any) {
       testResults.push({
         name: "Activity Logs Table",
         status: "error",
@@ -96,7 +96,7 @@ export function DatabaseTest() {
         status: error ? "error" : data && data.length > 0 ? "success" : "warning",
         message: error ? error.message : data && data.length > 0 ? "Sample data found" : "No sample data found",
       })
-    } catch (error) {
+    } catch (error: any) {
       testResults.push({
         name: "Sample Data",
         status: "error",

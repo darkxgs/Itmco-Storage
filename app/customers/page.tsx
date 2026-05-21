@@ -170,10 +170,10 @@ export default function CustomersPage() {
           fgColor: { argb: index % 2 === 0 ? 'F0F8FF' : 'FFFFFF' }
         }
         row.alignment = { horizontal: 'right', vertical: 'middle' }
-      })
+      });
       
       // Set column widths
-      worksheet.columns = [
+      (worksheet as any).columns = [
         { width: 30 }, // اسم العميل
         { width: 15 }, // كود العميل
         { width: 25 }, // البريد الإلكتروني
@@ -181,10 +181,10 @@ export default function CustomersPage() {
         { width: 35 }, // العنوان
         { width: 20 }, // الشخص المسؤول
         { width: 12 }  // الحالة
-      ]
+      ];
       
       // Add data validation for "الحالة" column (column G)
-      worksheet.dataValidations.add('G2:G1000', {
+      (worksheet as any).dataValidations.add('G2:G1000', {
         type: 'list',
         allowBlank: false,
         formulae: ['"نشط,غير نشط"'],
@@ -512,7 +512,7 @@ export default function CustomersPage() {
   // Filter customers based on search term
   const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.code.toLowerCase().includes(searchTerm.toLowerCase())
+    (customer.code && customer.code.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
   if (authLoading || !user) {

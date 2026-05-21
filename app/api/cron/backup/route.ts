@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       error: backupResult.error,
       timestamp: backupResult.timestamp
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Cron backup error:', error)
     
     return NextResponse.json(

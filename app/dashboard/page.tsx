@@ -30,12 +30,12 @@ export default function DashboardPage() {
     todayIssuances: 0,
     lowStockCount: 0,
   })
-  const [monthlyStockData, setMonthlyStockData] = useState([])
-  const [weeklyIssuanceData, setWeeklyIssuanceData] = useState([])
-  const [monthlyData, setMonthlyData] = useState([])
-  const [productData, setProductData] = useState([])
-  const [branchData, setBranchData] = useState([])
-  const [recentActivity, setRecentActivity] = useState([])
+  const [monthlyStockData, setMonthlyStockData] = useState<any[]>([])
+  const [weeklyIssuanceData, setWeeklyIssuanceData] = useState<any[]>([])
+  const [monthlyData, setMonthlyData] = useState<any[]>([])
+  const [productData, setProductData] = useState<any[]>([])
+  const [branchData, setBranchData] = useState<any[]>([])
+  const [recentActivity, setRecentActivity] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)

@@ -80,7 +80,7 @@ export async function POST() {
       categories: categories || []
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating categories table:', error)
     return NextResponse.json(
       {

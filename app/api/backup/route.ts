@@ -44,7 +44,7 @@ export async function GET() {
         "Content-Type": "application/json",
       },
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Backup error:", error)
     return NextResponse.json(
       {
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
     })
 
     return NextResponse.json(backupData)
-  } catch (error) {
+  } catch (error: any) {
     console.error("Custom backup error:", error)
     
     if (error instanceof SecurityError) {

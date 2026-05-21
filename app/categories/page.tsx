@@ -98,7 +98,7 @@ export default function CategoriesPage() {
       setIsDialogOpen(false)
       resetForm()
       loadCategories()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving category:', error)
       toast({
         title: "خطأ",
@@ -167,7 +167,7 @@ export default function CategoriesPage() {
       resetForm()
       setEditingCategory(null)
       loadCategories()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating category:', error)
       toast({
         title: "خطأ",
@@ -189,7 +189,7 @@ export default function CategoriesPage() {
       })
       
       loadCategories()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error deleting category:', error)
       toast({
         title: "خطأ",

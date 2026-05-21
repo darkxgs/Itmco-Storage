@@ -41,17 +41,17 @@ export function LoginTest() {
 
     for (const account of testAccounts) {
       try {
-        const { user, error } = await signIn(account.email, account.password)
+        const result = await signIn(account.email, account.password)
 
         testResults.push({
           name: account.name,
           email: account.email,
           role: account.role,
-          status: error ? "error" : "success",
-          message: error || "تم تسجيل الدخول بنجاح",
-          user: user,
+          status: result.success ? "success" : "error",
+          message: result.message || "تم تسجيل الدخول بنجاح",
+          user: result.user,
         })
-      } catch (error) {
+      } catch (error: any) {
         testResults.push({
           name: account.name,
           email: account.email,
@@ -76,14 +76,14 @@ export function LoginTest() {
     }
 
     try {
-      const { user, error } = await signIn(manualTest.email, manualTest.password)
+      const result = await signIn(manualTest.email, manualTest.password)
 
       setManualResult({
-        status: error ? "error" : "success",
-        message: error || "تم تسجيل الدخول بنجاح",
-        user: user,
+        status: result.success ? "success" : "error",
+        message: result.message || "تم تسجيل الدخول بنجاح",
+        user: result.user,
       })
-    } catch (error) {
+    } catch (error: any) {
       setManualResult({
         status: "error",
         message: error.message || "خطأ غير متوقع",

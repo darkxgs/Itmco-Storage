@@ -11,7 +11,7 @@ export async function POST(request: Request) {
     }
 
     const { metadata, data } = backupData
-    const results = {
+    const results: any = {
       restored: {},
       errors: {},
       summary: {
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
           results.summary.successfulTables++
           results.summary.restoredRecords += (tableData as any[]).length
         }
-      } catch (error) {
+      } catch (error: any) {
         results.errors[tableName] = {
           error: error.message,
           records: (tableData as any[]).length,
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
         originalBackup: metadata,
       },
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Restore error:", error)
     return NextResponse.json(
       {
