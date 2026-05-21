@@ -5,7 +5,8 @@ import type {
   Branch, BranchInsert, BranchUpdate,
   Customer, CustomerInsert, CustomerUpdate,
   Warehouse, WarehouseInsert, WarehouseUpdate,
-  ReleaseItem, ReleaseItemInsert, ReleaseItemUpdate
+  ReleaseItem, ReleaseItemInsert, ReleaseItemUpdate,
+  StockEntryInsert
 } from "./supabase"
 import { validateInput, validateObject, createSecureQuery, SecurityError } from "./security"
 import { 
@@ -22,7 +23,7 @@ async function withErrorHandling<T>(operation: () => Promise<T>, errorMessage: s
     return await operation()
   } catch (error) {
     console.error(`Database error: ${errorMessage}`, error)
-    throw new Error(`${errorMessage}: ${error.message || "Unknown error"}`)
+    throw new Error(`${errorMessage}: ${(error as any).message || "Unknown error"}`)
   }
 }
 
@@ -101,6 +102,7 @@ export async function createProduct(product: ProductInsert & { minStock?: number
       itemCode = await generateNextItemCode()
     }
 
+    const initialStock = Math.max(0, Number(sanitizedProduct.stock) || 0)
     // Map minStock to min_stock for database
     const dbProduct: ProductInsert = {
       name: validateInput(sanitizedProduct.name),
@@ -111,7 +113,7 @@ export async function createProduct(product: ProductInsert & { minStock?: number
       warehouse_id: sanitizedProduct.warehouse_id ? Number(sanitizedProduct.warehouse_id) : null,
       purchase_price: sanitizedProduct.purchase_price ? Number(sanitizedProduct.purchase_price) : null,
       selling_price: sanitizedProduct.selling_price ? Number(sanitizedProduct.selling_price) : null,
-      stock: Math.max(0, Number(sanitizedProduct.stock) || 0),
+      stock: initialStock,
       min_stock: Math.max(0, Number(sanitizedProduct.minStock) || 0),
       description: sanitizedProduct.description ? validateInput(sanitizedProduct.description) : null,
     }
@@ -121,14 +123,14 @@ export async function createProduct(product: ProductInsert & { minStock?: number
     if (error) throw error
 
     // Create initial stock entry if stock > 0
-    if (dbProduct.stock > 0) {
+    if (initialStock > 0) {
       const stockEntryData: StockEntryInsert = {
         product_id: data.id,
         product_name: data.name,
         item_code: data.item_code,
-        quantity_added: dbProduct.stock,
+        quantity_added: initialStock,
         previous_stock: 0,
-        new_stock: dbProduct.stock,
+        new_stock: initialStock,
         notes: "إدخال أولي عند إنشاء المنتج",
         entered_by: userName || "النظام",
         user_id: userId || null,
@@ -545,7 +547,7 @@ export async function getDashboardStats(userId?: string) {
     // If userId is provided, filter by user's accessible warehouses
     if (userId) {
       const accessibleWarehouses = await getUserAccessibleWarehouses(userId)
-      const warehouseIds = accessibleWarehouses.map(w => w.id)
+      const warehouseIds = accessibleWarehouses
       
       if (warehouseIds.length > 0) {
         productsQuery = productsQuery.in("warehouse_id", warehouseIds)
@@ -603,7 +605,7 @@ export async function getMonthlyStockData(userId?: string) {
     
     if (userId) {
       const accessibleWarehouses = await getUserAccessibleWarehouses(userId)
-      const warehouseIds = accessibleWarehouses.map(w => w.id)
+      const warehouseIds = accessibleWarehouses
       
       if (warehouseIds.length > 0) {
         productsQuery = productsQuery.in("warehouse_id", warehouseIds)
@@ -674,7 +676,7 @@ export async function getWeeklyIssuanceData(userId?: string) {
     // Filter by user's warehouses if userId provided
     if (userId) {
       const accessibleWarehouses = await getUserAccessibleWarehouses(userId)
-      const warehouseIds = accessibleWarehouses.map(w => w.id)
+      const warehouseIds = accessibleWarehouses
       
       if (warehouseIds.length > 0) {
         query = query.in("warehouse_id", warehouseIds)
@@ -805,20 +807,22 @@ export async function getFilteredIssuances(filters: {
       results = results.filter(item => item.products?.category === filters.category)
     }
 
-    if (filters.productName) {
+    const productName = filters.productName
+    if (productName) {
       results = results.filter(item => 
-        item.product_name?.toLowerCase().includes(filters.productName.toLowerCase()) ||
-        item.products?.name?.toLowerCase().includes(filters.productName.toLowerCase())
+        item.product_name?.toLowerCase().includes(productName.toLowerCase()) ||
+        item.products?.name?.toLowerCase().includes(productName.toLowerCase())
       )
     }
 
     // Apply item code filter (both database and client-side)
-    if (filters.itemCode) {
+    const itemCode = filters.itemCode
+    if (itemCode) {
       // First try database-level filtering for better performance
       const itemCodeQuery = supabase
         .from("products")
         .select("id")
-        .ilike("item_code", `%${filters.itemCode}%`)
+        .ilike("item_code", `%${itemCode}%`)
       
       const { data: productIds } = await itemCodeQuery
       
@@ -826,12 +830,12 @@ export async function getFilteredIssuances(filters: {
         const ids = productIds.map(p => p.id)
         results = results.filter(item => 
           ids.includes(item.product_id) ||
-          item.products?.item_code?.toLowerCase().includes(filters.itemCode.toLowerCase())
+          item.products?.item_code?.toLowerCase().includes(itemCode.toLowerCase())
         )
       } else {
         // Fallback to client-side filtering
         results = results.filter(item => 
-          item.products?.item_code?.toLowerCase().includes(filters.itemCode.toLowerCase())
+          item.products?.item_code?.toLowerCase().includes(itemCode.toLowerCase())
         )
       }
     }
@@ -1830,7 +1834,7 @@ export async function createCategory(category: { name: string; description?: str
       .single()
 
     if (existingCategory) {
-      throw new SecurityError("Category with this name already exists", "DUPLICATE_ENTRY")
+      throw new Error("Category with this name already exists")
     }
 
     const { data, error } = await supabase
@@ -1868,7 +1872,7 @@ export async function updateCategory(id: number, updates: { name?: string; descr
         .single()
 
       if (existingCategory) {
-        throw new SecurityError("Category with this name already exists", "DUPLICATE_ENTRY")
+        throw new Error("Category with this name already exists")
       }
     }
 
@@ -1904,7 +1908,7 @@ export async function deleteCategory(id: number) {
       .limit(1)
 
     if (productsUsingCategory && productsUsingCategory.length > 0) {
-      throw new SecurityError("Cannot delete category that is being used by products", "CONSTRAINT_VIOLATION")
+      throw new Error("Cannot delete category that is being used by products")
     }
 
     const { error } = await supabase
