@@ -15,6 +15,17 @@ import { Plus, Edit, Trash2, UserCheck, Search, AlertTriangle, RefreshCw, Upload
 import { getCustomers, createCustomer, updateCustomer, deleteCustomer } from "@/lib/database"
 import type { Customer, CustomerInsert } from "@/lib/supabase"
 import { Sidebar } from "@/components/sidebar"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { useAuth } from "@/hooks/use-auth"
 
@@ -110,15 +121,13 @@ export default function CustomersPage() {
   }
 
   const handleDeleteCustomer = async (id: number) => {
-    if (confirm("هل أنت متأكد من حذف هذا العميل؟")) {
-      try {
-        await deleteCustomer(id)
-        toast.success("تم حذف العميل بنجاح")
-        loadCustomers()
-      } catch (error) {
-        console.error("Error deleting customer:", error)
-        toast.error("فشل في حذف العميل")
-      }
+    try {
+      await deleteCustomer(id)
+      toast.success("تم حذف العميل بنجاح")
+      loadCustomers()
+    } catch (error) {
+      console.error("Error deleting customer:", error)
+      toast.error("فشل في حذف العميل")
     }
   }
 
@@ -833,14 +842,34 @@ export default function CustomersPage() {
                                >
                                  <Edit className="h-4 w-4" />
                                </Button>
-                               <Button
-                                 variant="outline"
-                                 size="sm"
-                                 onClick={() => handleDeleteCustomer(customer.id)}
-                                 className="border-red-500/30 text-red-400 hover:bg-red-500/20 hover:border-red-500/50 transition-all duration-200"
-                               >
-                                 <Trash2 className="h-4 w-4" />
-                               </Button>
+                               <AlertDialog>
+                                 <AlertDialogTrigger asChild>
+                                   <Button
+                                     variant="outline"
+                                     size="sm"
+                                     className="border-red-500/30 text-red-400 hover:bg-red-500/20 hover:border-red-500/50 transition-all duration-200"
+                                   >
+                                     <Trash2 className="h-4 w-4" />
+                                   </Button>
+                                 </AlertDialogTrigger>
+                                 <AlertDialogContent className="bg-slate-800 border-slate-700 text-white">
+                                   <AlertDialogHeader>
+                                     <AlertDialogTitle className="text-right">تأكيد الحذف</AlertDialogTitle>
+                                     <AlertDialogDescription className="text-slate-300 text-right">
+                                       هل أنت متأكد من حذف العميل "{customer.name}"؟ لا يمكن التراجع عن هذا الإجراء.
+                                     </AlertDialogDescription>
+                                   </AlertDialogHeader>
+                                   <AlertDialogFooter className="flex-row-reverse justify-end gap-2">
+                                     <AlertDialogCancel className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600">إلغاء</AlertDialogCancel>
+                                     <AlertDialogAction
+                                       onClick={() => handleDeleteCustomer(customer.id)}
+                                       className="bg-red-600 hover:bg-red-700"
+                                     >
+                                       حذف
+                                     </AlertDialogAction>
+                                   </AlertDialogFooter>
+                                 </AlertDialogContent>
+                               </AlertDialog>
                              </div>
                            </TableCell>
                          </TableRow>

@@ -14,6 +14,17 @@ import { toast } from "sonner"
 import { Plus, Edit, Trash2, Warehouse, Search, Package } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { useAuth } from "@/hooks/use-auth"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { getWarehouses, createWarehouse, updateWarehouse, deleteWarehouse } from "@/lib/database"
 import { getUserAccessibleWarehousesWithData } from "@/lib/warehouse-permissions"
 import type { Warehouse as WarehouseType, WarehouseInsert } from "@/lib/supabase"
@@ -98,15 +109,13 @@ export default function WarehousesPage() {
   }
 
   const handleDelete = async (id: number) => {
-    if (confirm("هل أنت متأكد من حذف هذا المخزن؟ سيؤثر هذا على جميع المنتجات المرتبطة به.")) {
-      try {
-        await deleteWarehouse(id)
-        toast.success("تم حذف المخزن بنجاح")
-        loadWarehouses()
-      } catch (error) {
-        console.error("Error deleting warehouse:", error)
-        toast.error("فشل في حذف المخزن")
-      }
+    try {
+      await deleteWarehouse(id)
+      toast.success("تم حذف المخزن بنجاح")
+      loadWarehouses()
+    } catch (error) {
+      console.error("Error deleting warehouse:", error)
+      toast.error("فشل في حذف المخزن")
     }
   }
 
@@ -364,14 +373,34 @@ export default function WarehousesPage() {
                                   >
                                     <Edit className="h-4 w-4" />
                                   </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDelete(warehouse.id)}
-                                    className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/20"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent className="bg-slate-800 border-slate-700 text-white">
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle className="text-right">تأكيد الحذف</AlertDialogTitle>
+                                        <AlertDialogDescription className="text-slate-300 text-right">
+                                          هل أنت متأكد من حذف هذا المخزن؟ سيؤثر هذا على جميع المنتجات المرتبطة به. لا يمكن التراجع عن هذا الإجراء.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter className="flex-row-reverse justify-end gap-2">
+                                        <AlertDialogCancel className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600">إلغاء</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => handleDelete(warehouse.id)}
+                                          className="bg-red-600 hover:bg-red-700"
+                                        >
+                                          حذف
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
                                 </>
                               ) : (
                                 <span className="text-slate-500 text-sm">عرض فقط</span>

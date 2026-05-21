@@ -16,6 +16,17 @@ import { getBranches, createBranch, updateBranch, deleteBranch, getCustomers } f
 import type { Branch, BranchInsert, Customer } from "@/lib/supabase"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Sidebar } from "@/components/sidebar"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { useAuth } from "@/hooks/use-auth"
 import * as XLSX from 'xlsx'
@@ -122,20 +133,18 @@ export default function BranchesPage() {
   }
 
   const handleDeleteBranch = async (id: number) => {
-    if (confirm("هل أنت متأكد من حذف هذا الفرع؟")) {
-      try {
-        await deleteBranch(id)
-        toast.success("تم حذف الفرع بنجاح")
-        loadBranches()
-      } catch (error) {
-        console.error("Error deleting branch:", error)
-        const errorMessage = error instanceof Error ? error.message : "فشل في حذف الفرع"
-        
-        if (errorMessage.includes("issuances associated with this branch")) {
-          toast.error("لا يمكن حذف الفرع: يوجد إصدارات مرتبطة بهذا الفرع. يرجى إعادة تعيين أو حذف الإصدارات أولاً")
-        } else {
-          toast.error("فشل في حذف الفرع")
-        }
+    try {
+      await deleteBranch(id)
+      toast.success("تم حذف الفرع بنجاح")
+      loadBranches()
+    } catch (error) {
+      console.error("Error deleting branch:", error)
+      const errorMessage = error instanceof Error ? error.message : "فشل في حذف الفرع"
+      
+      if (errorMessage.includes("issuances associated with this branch")) {
+        toast.error("لا يمكن حذف الفرع: يوجد إصدارات مرتبطة بهذا الفرع. يرجى إعادة تعيين أو حذف الإصدارات أولاً")
+      } else {
+        toast.error("فشل في حذف الفرع")
       }
     }
   }
@@ -586,14 +595,34 @@ export default function BranchesPage() {
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteBranch(branch.id)}
-                              className="h-8 w-8 p-0 border-slate-600 hover:border-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 border-slate-600 hover:border-red-500 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="bg-slate-800 border-slate-700 text-white">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="text-right">تأكيد الحذف</AlertDialogTitle>
+                                  <AlertDialogDescription className="text-slate-300 text-right">
+                                    هل أنت متأكد من حذف الفرع "{branch.name}"؟ لا يمكن التراجع عن هذا الإجراء.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter className="flex-row-reverse justify-end gap-2">
+                                  <AlertDialogCancel className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600">إلغاء</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteBranch(branch.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    حذف
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </div>
                         </TableCell>
                       </TableRow>

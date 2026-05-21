@@ -338,10 +338,6 @@ export default function InventoryPage() {
   }
 
   const handleDeleteProduct = async (id: number, name: string) => {
-    if (!confirm(`هل أنت متأكد من حذف المنتج "${name}"؟`)) {
-      return
-    }
-
     try {
       await deleteProduct(id)
       setProducts(products.filter((p) => p.id !== id))
@@ -1882,14 +1878,34 @@ export default function InventoryPage() {
                                 </Button>
                                 
                                 {canEditProduct(product) && (
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleDeleteProduct(product.id, product.name)}
-                                    className="bg-red-900/20 border-red-700/50 text-red-400 hover:bg-red-900/30 hover:text-red-300 hover:border-red-600/50 transition-colors h-6 w-6 sm:h-8 sm:w-8 p-0"
-                                  >
-                                    <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
-                                  </Button>
+                                  <AlertDialog>
+                                    <AlertDialogTrigger asChild>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="bg-red-900/20 border-red-700/50 text-red-400 hover:bg-red-900/30 hover:text-red-300 hover:border-red-600/50 transition-colors h-6 w-6 sm:h-8 sm:w-8 p-0"
+                                      >
+                                        <Trash2 className="w-3 h-3 sm:w-4 sm:h-4" />
+                                      </Button>
+                                    </AlertDialogTrigger>
+                                    <AlertDialogContent className="bg-slate-800 border-slate-700 text-white">
+                                      <AlertDialogHeader>
+                                        <AlertDialogTitle className="text-right">تأكيد الحذف</AlertDialogTitle>
+                                        <AlertDialogDescription className="text-slate-300 text-right">
+                                          هل أنت متأكد من حذف المنتج "{product.name}"؟ لا يمكن التراجع عن هذا الإجراء.
+                                        </AlertDialogDescription>
+                                      </AlertDialogHeader>
+                                      <AlertDialogFooter className="flex-row-reverse justify-end gap-2">
+                                        <AlertDialogCancel className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600">إلغاء</AlertDialogCancel>
+                                        <AlertDialogAction
+                                          onClick={() => handleDeleteProduct(product.id, product.name)}
+                                          className="bg-red-600 hover:bg-red-700"
+                                        >
+                                          حذف
+                                        </AlertDialogAction>
+                                      </AlertDialogFooter>
+                                    </AlertDialogContent>
+                                  </AlertDialog>
                                 )}
                                 {!canEditProduct(product) && (
                                   <span className="text-slate-500 text-xs sm:text-sm">عرض فقط</span>

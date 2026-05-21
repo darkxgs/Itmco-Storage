@@ -16,6 +16,17 @@ import { SimpleRTLSwitch } from "@/components/ui/simple-rtl-switch"
 import { Plus, Search, Edit, Trash2, Users, UserCheck, UserX, Shield, Loader2 } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { useAuth } from "@/hooks/use-auth"
 import { supabase } from "@/lib/supabase"
 import { logActivity, hashPassword } from "@/lib/auth"
@@ -280,10 +291,6 @@ export default function UsersPage() {
         description: "لا يمكنك حذف حسابك الخاص",
         variant: "destructive",
       })
-      return
-    }
-
-    if (!confirm(`هل أنت متأكد من حذف المستخدم "${userName}"؟`)) {
       return
     }
 
@@ -744,16 +751,36 @@ export default function UsersPage() {
                                   </div>
                                 </DialogContent>
                               </Dialog>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDeleteUser(u.id, u.name)}
-                                className="text-red-400 hover:text-white hover:bg-red-600 border-slate-600 disabled:opacity-50"
-                                disabled={u.id === user.id}
-                                title={u.id === user.id ? "لا يمكن حذف حسابك الخاص" : "حذف المستخدم"}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="text-red-400 hover:text-white hover:bg-red-600 border-slate-600 disabled:opacity-50"
+                                    disabled={u.id === user.id}
+                                    title={u.id === user.id ? "لا يمكن حذف حسابك الخاص" : "حذف المستخدم"}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent className="bg-slate-800 border-slate-700 text-white">
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle className="text-right">تأكيد الحذف</AlertDialogTitle>
+                                    <AlertDialogDescription className="text-slate-300 text-right">
+                                      هل أنت متأكد من حذف المستخدم "{u.name}"؟ لا يمكن التراجع عن هذا الإجراء.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter className="flex-row-reverse justify-end gap-2">
+                                    <AlertDialogCancel className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600">إلغاء</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleDeleteUser(u.id, u.name)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      حذف
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
                             </div>
                           </TableCell>
                         </TableRow>

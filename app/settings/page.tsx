@@ -14,6 +14,17 @@ import { Settings, Bell, Shield, Database, Globe, Save, RefreshCw, AlertTriangle
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { validateData, settingsSchema } from "@/lib/validation"
 
 export default function SettingsPage() {
@@ -116,10 +127,8 @@ export default function SettingsPage() {
   }
 
   const handleResetSettings = () => {
-    if (confirm("هل أنت متأكد من إعادة تعيين جميع الإعدادات؟")) {
-      localStorage.removeItem("system_settings")
-      window.location.reload()
-    }
+    localStorage.removeItem("system_settings")
+    window.location.reload()
   }
 
   const handleTestNotification = async () => {
@@ -639,9 +648,30 @@ export default function SettingsPage() {
                   </>
                 )}
               </Button>
-              <Button variant="outline" onClick={handleResetSettings} className="bg-transparent">
-                إعادة تعيين
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="outline" className="bg-transparent text-slate-300 hover:text-white border-slate-600 hover:bg-slate-700">
+                    إعادة تعيين
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent className="bg-slate-800 border-slate-700 text-white">
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="text-right">تأكيد إعادة التعيين</AlertDialogTitle>
+                    <AlertDialogDescription className="text-slate-300 text-right">
+                      هل أنت متأكد من إعادة تعيين جميع الإعدادات إلى القيم الافتراضية؟ لا يمكن التراجع عن هذا الإجراء وسيتم إعادة تحميل الصفحة.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter className="flex-row-reverse justify-end gap-2">
+                    <AlertDialogCancel className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600">إلغاء</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleResetSettings}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      إعادة تعيين
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </div>
             {hasChanges && (
               <p className="text-xs text-slate-400 mt-2 flex items-center">
