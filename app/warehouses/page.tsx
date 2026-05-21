@@ -86,7 +86,7 @@ export default function WarehousesPage() {
     }
   }
 
-  const handleEdit = (warehouse: Warehouse) => {
+  const handleEdit = (warehouse: WarehouseType) => {
     setEditingWarehouse(warehouse)
     setForm({
       name: warehouse.name,
