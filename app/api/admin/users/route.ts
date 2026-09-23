@@ -26,9 +26,13 @@ function checkFields(body: any, { requirePassword }: { requirePassword: boolean 
     if (emailError) throw new HttpError(400, emailError)
   }
   if (body.role !== undefined && !ROLES.includes(body.role)) throw new HttpError(400, "دور غير صالح")
-  if (requirePassword || body.password) {
+  if (requirePassword) {
     const passwordError = validatePassword(String(body.password || ""))
     if (passwordError) throw new HttpError(400, passwordError)
+  } else if (body.password && String(body.password).length < 6) {
+    // Editing keeps the old behaviour (any password the admin chooses), down to
+    // Supabase Auth's own minimum of 6 characters
+    throw new HttpError(400, "كلمة المرور يجب أن تكون 6 أحرف على الأقل")
   }
 }
 

@@ -744,13 +744,17 @@ export function validateExportData(data: any[]): { isValid: boolean; errors: str
       .replace(/إجمالي:\s*\d+(?:\.\d+)?\s*\|?\s*/g, '')
       .trim()
     
-    // جلب الأسعار من المنتج إذا لم تكن موجودة في الإصدار
-    const purchasePrice = item.purchasePrice || item.purchase_price || item.products?.purchase_price || item.productDetails?.purchase_price || 0
-    // استخدام سعر البيع المخصص من الملاحظات أولاً، ثم من الإصدار، ثم من المنتج
-    const sellingPrice = extractedSellingPrice || item.sellingPrice || item.selling_price || item.products?.selling_price || item.productDetails?.selling_price || 0
-    // حساب الإجمالي: من الملاحظات أولاً، أو الكمية × سعر البيع
+    // الأسعار المسجلة على الإصدار وقت الصرف (unit_price / unit_cost) لها الأولوية، حتى لا تتغير
+    // التقارير القديمة عند تعديل سعر المنتج. السجلات الأقدم: من الملاحظات، ثم سعر المنتج الحالي
+    const recordedPrice = item.unit_price != null ? Number(item.unit_price) : null
+    const recordedCost = item.unit_cost != null ? Number(item.unit_cost) : null
+    const purchasePrice = recordedCost ?? (item.purchasePrice || item.purchase_price || item.products?.purchase_price || item.productDetails?.purchase_price || 0)
+    const sellingPrice = recordedPrice ?? (extractedSellingPrice || item.sellingPrice || item.selling_price || item.products?.selling_price || item.productDetails?.selling_price || 0)
+    // الإجمالي = الكمية × سعر البيع (السجلات القديمة: الإجمالي المكتوب في الملاحظات إن وجد)
     const quantity = item.quantity || 0
-    const totalPrice = extractedTotalPrice || (sellingPrice > 0 ? quantity * sellingPrice : 0)
+    const totalPrice = recordedPrice != null
+      ? quantity * sellingPrice
+      : extractedTotalPrice || (sellingPrice > 0 ? quantity * sellingPrice : 0)
     
     return {
       id: item.id || 0,

@@ -1,3 +1,7 @@
+-- ⚠️  WARNING: these seed users have publicly known passwords.
+-- Only for a local/test database. Never run on production; if you did, change every password.
+-- تحذير: كلمات مرور المستخدمين هنا معروفة. للتجربة فقط، ولا تشغله على قاعدة البيانات الحقيقية.
+
 -- Production seed data for ITMCO Inventory Management System
 -- This file contains only essential data needed for production
 

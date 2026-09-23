@@ -28,7 +28,8 @@ import {
   getStockEntriesSummary,
   formatDateOnly,
   formatDateTime,
-  formatTimeOnly
+  formatTimeOnly,
+  errorDetail
 } from "@/lib/database"
 
 interface StockEntriesDialogProps {
@@ -148,7 +149,7 @@ export function StockEntriesDialog({
     } catch (error: any) {
       toast({
         title: "فشل في إضافة الكمية",
-        description: error.message || "حدث خطأ أثناء إضافة الكمية",
+        description: errorDetail(error, "حدث خطأ أثناء إضافة الكمية"),
         variant: "destructive",
       })
     } finally {
@@ -348,7 +349,7 @@ export function StockEntriesDialog({
                           <TableCell className="text-slate-300">
                             <div className="flex items-center gap-2">
                               <Clock className="w-4 h-4 text-green-400" />
-                              {entry.entryTimeFormatted || formatTimeOnly(entry.entry_time)}
+                              {entry.entryTimeFormatted || formatTimeOnly(entry.entry_time, entry.entry_date)}
                             </div>
                           </TableCell>
                           <TableCell>

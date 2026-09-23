@@ -15,7 +15,7 @@ import { Plus, Edit, Trash2, Loader2, Search, Tag } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { getCategories, createCategory, updateCategory, deleteCategory } from "@/lib/database"
+import { getCategories, createCategory, updateCategory, deleteCategory, errorDetail } from "@/lib/database"
 
 type Category = {
   id: number
@@ -193,7 +193,7 @@ export default function CategoriesPage() {
       console.error('Error deleting category:', error)
       toast({
         title: "خطأ",
-        description: error.message || "حدث خطأ في حذف الفئة",
+        description: errorDetail(error, "حدث خطأ في حذف الفئة"),
         variant: "destructive",
       })
     }

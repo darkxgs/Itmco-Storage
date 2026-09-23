@@ -219,6 +219,8 @@ export type Database = {
           item_code: string | null
           warehouse_id: number | null
           date: string
+          unit_price: number | null
+          unit_cost: number | null
           created_at: string
         }
         Insert: {
@@ -241,6 +243,8 @@ export type Database = {
           item_code?: string | null
           warehouse_id?: number | null
           date: string
+          unit_price?: number | null
+          unit_cost?: number | null
           created_at?: string
         }
         Update: {
@@ -263,6 +267,8 @@ export type Database = {
           item_code?: string | null
           warehouse_id?: number | null
           date?: string
+          unit_price?: number | null
+          unit_cost?: number | null
           created_at?: string
         }
       }

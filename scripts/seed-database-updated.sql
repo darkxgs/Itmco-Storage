@@ -1,3 +1,7 @@
+-- ⚠️  WARNING: these seed users have publicly known passwords.
+-- Only for a local/test database. Never run on production; if you did, change every password.
+-- تحذير: كلمات مرور المستخدمين هنا معروفة. للتجربة فقط، ولا تشغله على قاعدة البيانات الحقيقية.
+
 -- Insert default users with the actual hashed passwords
 INSERT INTO users (email, name, role, password_hash) VALUES
 ('itmcoadmin@gmail.com', 'مدير النظام', 'admin', '$2b$10$UQWLCOX4ITXd.ekx3YXW/ukQy8mU.CuRwJuTRF8PQj6Wk0mh1NYfW'),

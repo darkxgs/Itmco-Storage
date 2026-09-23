@@ -13,9 +13,10 @@ export function formatCurrency(amount: number): string {
   }).format(amount)
 }
 
+// Day/month/year, like the Excel exports
 export function formatDate(date: string | Date): string {
   const d = new Date(date)
-  return d.toLocaleDateString("en-US", {
+  return d.toLocaleDateString("en-GB", {
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
@@ -24,7 +25,9 @@ export function formatDate(date: string | Date): string {
 
 export function formatDateTime(date: string | Date): string {
   const d = new Date(date)
-  return d.toLocaleString("ar-SA", {
+  // ar-SA would render Hijri dates; this app works in Gregorian, Cairo time
+  return d.toLocaleString("en-GB", {
+    timeZone: "Africa/Cairo",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",

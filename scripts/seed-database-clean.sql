@@ -1,3 +1,7 @@
+-- ⚠️  WARNING: these seed users have publicly known passwords.
+-- Only for a local/test database. Never run on production; if you did, change every password.
+-- تحذير: كلمات مرور المستخدمين هنا معروفة. للتجربة فقط، ولا تشغله على قاعدة البيانات الحقيقية.
+
 -- Clean seed database script without hardcoded sample data
 -- This script only creates essential users and sample products
 

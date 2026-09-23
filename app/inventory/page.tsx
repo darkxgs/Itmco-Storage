@@ -44,7 +44,7 @@ import {
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { getProducts, createProduct, updateProduct, deleteProduct, getWarehouses, getCategories, searchByItemCode, generateNextItemCode } from "@/lib/database"
+import { getProducts, createProduct, updateProduct, deleteProduct, getWarehouses, getCategories, searchByItemCode, generateNextItemCode, errorDetail, getCurrentEgyptTime } from "@/lib/database"
 import { logActivity } from "@/lib/auth"
 import { validateData, productSchema } from "@/lib/validation"
 import { Product } from "@/lib/supabase"
@@ -303,7 +303,10 @@ export default function InventoryPage() {
 
     setSubmitting(true)
     try {
-      const updatedProduct = await updateProduct(editingProduct.id, editingProduct)
+      // originalStock: what the dialog showed; the stock change is refused if it moved since
+      const updatedProduct = await updateProduct(editingProduct.id, editingProduct, {
+        expectedStock: editingProduct.originalStock,
+      })
       setProducts(products.map((p) => (p.id === editingProduct.id ? updatedProduct : p)))
 
       // Log activity
@@ -323,8 +326,8 @@ export default function InventoryPage() {
       
       if (error.message && error.message.includes("Access denied: You don't have edit permission for this warehouse")) {
         errorMessage = "ليس لديك صلاحية تعديل المنتجات في هذا المخزن. يرجى التواصل مع المدير لمنحك الصلاحيات المطلوبة."
-      } else if (error.message) {
-        errorMessage = error.message
+      } else {
+        errorMessage = errorDetail(error, errorMessage)
       }
       
       toast({
@@ -952,16 +955,7 @@ export default function InventoryPage() {
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4 text-green-400" />
                 <span className="text-slate-400 text-sm">
-                  التوقيت المصري: {(() => {
-                    const now = new Date()
-                    // إضافة 3 ساعات للتوقيت المصري
-                    const egyptTime = new Date(now.getTime() + (3 * 60 * 60 * 1000))
-                    return egyptTime.toLocaleString("en-US", {
-                      hour: "numeric",
-                      minute: "2-digit",
-                      hour12: true
-                    })
-                  })()}
+                  التوقيت المصري: {getCurrentEgyptTime()}
                 </span>
               </div>
             </div>
@@ -1612,6 +1606,7 @@ export default function InventoryPage() {
                                         onClick={() => {
                                           setEditingProduct({
                                             ...product,
+                                            originalStock: product.stock,
                                             minStock: product.min_stock || 5,
                                             description: product.description || ""
                                           })

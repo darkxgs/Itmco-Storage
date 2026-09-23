@@ -25,47 +25,40 @@ export async function getUserWarehousePermissions(userId: string): Promise<UserW
   return data || []
 }
 
+type WarehouseAction = 'view' | 'add' | 'edit' | 'delete'
+
+const ACTION_COLUMN: Record<WarehouseAction, 'can_view' | 'can_add' | 'can_edit' | 'can_delete'> = {
+  view: 'can_view',
+  add: 'can_add',
+  edit: 'can_edit',
+  delete: 'can_delete',
+}
+
 /**
- * Check if user has permission to access a specific warehouse
+ * Check if user has permission to access a specific warehouse. System admins may do
+ * everything; permission_level 'admin' grants every action on that one warehouse.
  */
 export async function hasWarehousePermission(
   userId: string,
   warehouseId: number,
-  action: 'view' | 'add' | 'edit' | 'delete' = 'view'
+  action: WarehouseAction = 'view'
 ): Promise<boolean> {
-  // Check if user is admin first
-  const adminStatus = await isWarehouseAdmin(userId)
-  
-  if (adminStatus) {
-    // Admin users have all permissions for all warehouses
+  if (await isWarehouseAdmin(userId)) {
     return true
   }
 
-  // For non-admin users, check specific permissions
   const { data, error } = await supabase
     .from('user_warehouse_permissions')
     .select('*')
     .eq('user_id', userId)
     .eq('warehouse_id', warehouseId)
-    .single()
+    .maybeSingle()
 
   if (error || !data) {
     return false
   }
 
-  // Check specific permission based on action
-  switch (action) {
-    case 'view':
-      return data.can_view
-    case 'add':
-      return data.can_add
-    case 'edit':
-      return data.can_edit
-    case 'delete':
-      return data.can_delete
-    default:
-      return false
-  }
+  return data.permission_level === 'admin' || !!data[ACTION_COLUMN[action]]
 }
 
 /**
@@ -73,48 +66,28 @@ export async function hasWarehousePermission(
  */
 export async function getUserAccessibleWarehouses(
   userId: string,
-  action: 'view' | 'add' | 'edit' | 'delete' = 'view'
+  action: WarehouseAction = 'view'
 ): Promise<number[]> {
-  // Check if user is admin first
-  const adminStatus = await isWarehouseAdmin(userId)
-  
-  if (adminStatus) {
-    // Admin users have access to all warehouses
+  if (await isWarehouseAdmin(userId)) {
+    // System admins have access to all warehouses
     const { data: allWarehouses, error: warehouseError } = await supabase
       .from('warehouses')
       .select('id')
-    
+
     if (warehouseError) {
       console.error('Error fetching all warehouses for admin:', warehouseError)
       throw warehouseError
     }
-    
+
     return allWarehouses?.map(warehouse => warehouse.id) || []
   }
 
-  // For non-admin users, check specific permissions
-  let query = supabase
+  // Warehouses where the user has this action, or is admin of that warehouse
+  const { data, error } = await supabase
     .from('user_warehouse_permissions')
     .select('warehouse_id')
     .eq('user_id', userId)
-
-  // Filter by specific permission
-  switch (action) {
-    case 'view':
-      query = query.eq('can_view', true)
-      break
-    case 'add':
-      query = query.eq('can_add', true)
-      break
-    case 'edit':
-      query = query.eq('can_edit', true)
-      break
-    case 'delete':
-      query = query.eq('can_delete', true)
-      break
-  }
-
-  const { data, error } = await query
+    .or(`permission_level.eq.admin,${ACTION_COLUMN[action]}.eq.true`)
 
   if (error) {
     console.error('Error fetching accessible warehouses:', error)
@@ -125,10 +98,11 @@ export async function getUserAccessibleWarehouses(
 }
 
 /**
- * Check if user has admin permission on any warehouse
+ * Whether the user is a system admin (users.role = 'admin'), who manages warehouse
+ * permissions and can act on every warehouse. A permission_level of 'admin' on one
+ * warehouse only covers that warehouse (see hasWarehousePermission).
  */
 export async function isWarehouseAdmin(userId: string): Promise<boolean> {
-  // First check if user is admin in users table
   const { data: userData, error: userError } = await supabase
     .from('users')
     .select('role')
@@ -140,25 +114,7 @@ export async function isWarehouseAdmin(userId: string): Promise<boolean> {
     return false
   }
 
-  // If user is admin, they have access to warehouse permissions
-  if (userData?.role === 'admin') {
-    return true
-  }
-
-  // Otherwise check warehouse-specific admin permissions
-  const { data, error } = await supabase
-    .from('user_warehouse_permissions')
-    .select('permission_level')
-    .eq('user_id', userId)
-    .eq('permission_level', 'admin')
-    .limit(1)
-
-  if (error) {
-    console.error('Error checking admin permission:', error)
-    return false
-  }
-
-  return (data?.length || 0) > 0
+  return userData?.role === 'admin'
 }
 
 /**
@@ -242,15 +198,6 @@ export async function checkWarehousePermission(
     throw new Error('User not authenticated')
   }
 
-  // Check if user is admin first
-  const adminStatus = await isWarehouseAdmin(userId)
-  
-  if (adminStatus) {
-    // Admin users have all permissions
-    return true
-  }
-
-  // For non-admin users, check specific permissions
   const hasPermission = await hasWarehousePermission(userId, warehouseId, action)
   
   if (!hasPermission) {
@@ -263,19 +210,23 @@ export async function checkWarehousePermission(
 /**
  * Filter query results to only include warehouses user has access to
  */
-export async function filterByUserWarehouses<T extends { warehouse_id: number }>(
+export async function filterByUserWarehouses<T extends { warehouse_id: number | null }>(
   items: T[],
-  action: 'view' | 'add' | 'edit' | 'delete' = 'view'
+  action: WarehouseAction = 'view'
 ): Promise<T[]> {
   const userId = await getCurrentUserId()
-  
+
   if (!userId) {
     return []
   }
 
-  const accessibleWarehouses = await getUserAccessibleWarehouses(userId, action)
-  
-  return items.filter(item => accessibleWarehouses.includes(item.warehouse_id))
+  if (await isWarehouseAdmin(userId)) {
+    return items
+  }
+
+  // Items without a warehouse aren't restricted to anyone (they used to vanish for everybody)
+  const accessibleWarehouses = new Set(await getUserAccessibleWarehouses(userId, action))
+  return items.filter(item => item.warehouse_id == null || accessibleWarehouses.has(item.warehouse_id))
 }
 
 /**

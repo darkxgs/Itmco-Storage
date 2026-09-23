@@ -1,3 +1,9 @@
+-- ⚠️  WARNING: for a brand-new, empty database only.
+-- This script creates wide-open RLS policies (USING (true)) or policies written for the old
+-- localStorage login. Running it on the live database re-opens every table to anyone holding
+-- the public anon key. After a fresh setup, run supabase/migrations/20260923120000_auth_rls_lockdown.sql.
+-- تحذير: لقاعدة بيانات جديدة فاضية فقط. تشغيله على قاعدة البيانات الحالية بيفتح كل الجداول لأي حد.
+
 -- Database Updates for Enhanced Inventory Management System
 -- This script adds new tables and updates existing ones
 

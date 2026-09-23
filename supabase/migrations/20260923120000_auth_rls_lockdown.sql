@@ -8,14 +8,22 @@
 --
 -- ORDER MATTERS (see SECURITY_MIGRATION.md):
 --   1. node scripts/migrate-users-to-supabase-auth.mjs   (copies logins into Supabase Auth)
---   2. deploy the new app version                        (logs in through Supabase Auth)
---   3. run this file in the Supabase SQL Editor
--- Running it before step 2 locks the currently deployed app out of the database.
+--   2. 20260923110000_stock_functions.sql               (adds app_role() and the stock functions)
+--   3. deploy the new app version                        (logs in through Supabase Auth)
+--   4. run this file in the Supabase SQL Editor
+-- Running it before step 3 locks the currently deployed app out of the database.
 --
 -- Safe to run more than once. Tables that don't exist in this database are skipped.
 -- =====================================================================
 
 begin;
+
+do $$
+begin
+  if to_regprocedure('public.app_role()') is null or to_regprocedure('public.issue_products(jsonb)') is null then
+    raise exception 'Run supabase/migrations/20260923110000_stock_functions.sql first';
+  end if;
+end $$;
 
 -- ---------------------------------------------------------------------
 -- 1. Remove the arbitrary-SQL RPC that /api/fix-policies used to call
@@ -38,16 +46,7 @@ end $$;
 alter table public.users alter column password_hash drop not null;
 
 -- ---------------------------------------------------------------------
--- 3. Role of the signed-in user; null for anonymous, unknown or inactive accounts.
---    security definer so it can read users regardless of the caller's policies.
--- ---------------------------------------------------------------------
-create or replace function public.app_role() returns text
-language sql stable security definer set search_path = public as $$
-  select role::text from public.users where id = auth.uid() and is_active is true
-$$;
-
--- ---------------------------------------------------------------------
--- 4. After a restore re-inserts rows with their original ids, move each id
+-- 3. After a restore re-inserts rows with their original ids, move each id
 --    sequence past the highest id. Only the server (service role) may call it.
 -- ---------------------------------------------------------------------
 create or replace function public.reset_id_sequences() returns void
@@ -69,7 +68,7 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
--- 5. Drop every existing policy on the app tables (they were all USING (true))
+-- 4. Drop every existing policy on the app tables (they were all USING (true))
 -- ---------------------------------------------------------------------
 do $$
 declare r record;
@@ -86,11 +85,13 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
--- 6. New policies. (select public.app_role()) is evaluated once per statement.
+-- 5. New policies. (select public.app_role()) is evaluated once per statement.
 --    Roles: admin > inventory_manager > engineer. Mirrors what each role's pages do:
---      engineer          – issuances (own rows), stock changes those cause
+--      engineer          – reads; issues through issue_products()/update_issuance()/delete_issuance()
 --      inventory_manager – + products, stock entries, warehouses, categories
 --      admin             – everything, including users, customers, branches, permissions
+--    Issuances and stock changes are written only through the functions in
+--    20260923110000_stock_functions.sql, which keep stock and issuances in step.
 -- ---------------------------------------------------------------------
 do $$
 declare
@@ -121,27 +122,10 @@ begin
   -- users: admins only (account creation goes through /api/admin/users with the service role)
   execute format('create policy "admins write" on public.users for all to authenticated using (%s) with check (%s)', is_admin, is_admin);
 
-  -- products: managers add/remove; any user may update, because issuing and deleting
-  -- an issuance adjusts products.stock from the browser
-  execute format('create policy "managers insert" on public.products for insert to authenticated with check (%s)', is_manager);
-  execute format('create policy "users update" on public.products for update to authenticated using (%s) with check (%s)', is_user, is_user);
-  execute format('create policy "managers delete" on public.products for delete to authenticated using (%s)', is_manager);
-
-  -- issuances: anyone may issue, recorded as themselves; only the issuer or an admin may
-  -- edit/delete (same rule as the UI)
-  execute format('create policy "users insert" on public.issuances for insert to authenticated with check (%s and issued_by = auth.uid())', is_user);
-  execute format('create policy "issuer or admin update" on public.issuances for update to authenticated using (%s or issued_by = auth.uid()) with check (%s or issued_by = auth.uid())', is_admin, is_admin);
-  execute format('create policy "issuer or admin delete" on public.issuances for delete to authenticated using (%s or issued_by = auth.uid())', is_admin);
-
-  -- stock entries
-  if to_regclass('public.stock_entries') is not null then
-    execute format('create policy "users insert" on public.stock_entries for insert to authenticated with check (%s)', is_user);
-    execute format('create policy "managers update" on public.stock_entries for update to authenticated using (%s) with check (%s)', is_manager, is_manager);
-    execute format('create policy "managers delete" on public.stock_entries for delete to authenticated using (%s)', is_manager);
-  end if;
-
-  -- warehouses, categories: managers
-  foreach t in array array['warehouses', 'categories']
+  -- products: managers. Engineers change stock only by issuing (through the functions).
+  -- issuances: no direct writes at all, only issue_products()/update_issuance()/delete_issuance().
+  -- stock entries, warehouses, categories: managers
+  foreach t in array array['products', 'stock_entries', 'warehouses', 'categories']
   loop
     if to_regclass('public.' || t) is not null then
       execute format('create policy "managers write" on public.%I for all to authenticated using (%s) with check (%s)', t, is_manager, is_manager);
@@ -169,16 +153,19 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------
--- 7. Privileges (defense in depth on top of RLS)
+-- 6. Privileges (defense in depth on top of RLS)
 -- ---------------------------------------------------------------------
 -- Anonymous visitors get nothing at all
 revoke all on all tables in schema public from anon;
 revoke all on all sequences in schema public from anon;
 
--- Functions: nothing for anonymous callers (PUBLIC is granted EXECUTE by default)
-revoke execute on all functions in schema public from public, anon;
-grant execute on all functions in schema public to authenticated, service_role;
-revoke execute on function public.reset_id_sequences() from authenticated;
+-- Functions: signed-in users may call only what the app calls; the server (service role)
+-- keeps everything. Trigger functions don't need EXECUTE to fire.
+revoke execute on all functions in schema public from public, anon, authenticated;
+grant execute on all functions in schema public to service_role;
+grant execute on function public.app_role(), public.issue_products(jsonb), public.update_issuance(integer, jsonb),
+  public.delete_issuance(integer), public.add_stock(integer, integer, text),
+  public.set_product_stock(integer, integer, integer) to authenticated;
 
 -- password_hash is readable by nobody except the service role
 do $$
@@ -191,11 +178,6 @@ begin
   revoke select on public.users from authenticated;
   execute format('grant select (%s) on public.users to authenticated', cols);
 end $$;
-
--- ---------------------------------------------------------------------
--- 8. Reports filter and sort issuances by their date
--- ---------------------------------------------------------------------
-create index if not exists idx_issuances_date on public.issuances (date desc, id desc);
 
 commit;
 

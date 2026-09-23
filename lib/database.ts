@@ -17,14 +17,23 @@ import {
   filterByUserWarehouses 
 } from "./warehouse-permissions"
 
-// Enhanced error handling wrapper
+// Enhanced error handling wrapper. The thrown error keeps the database's own message in
+// `detail` (the stock functions raise readable Arabic messages) for errorDetail() below.
 async function withErrorHandling<T>(operation: () => Promise<T>, errorMessage: string): Promise<T> {
   try {
     return await operation()
   } catch (error) {
     console.error(`Database error: ${errorMessage}`, error)
-    throw new Error(`${errorMessage}: ${(error as any).message || "Unknown error"}`)
+    const detail = (error as any)?.message || "Unknown error"
+    throw Object.assign(new Error(`${errorMessage}: ${detail}`), { detail })
   }
+}
+
+// The message worth showing the user for an error thrown by this module
+export function errorDetail(error: unknown, fallback: string): string {
+  const detail = (error as any)?.detail
+  // Arabic messages come from our database functions; English ones are technical
+  return typeof detail === "string" && /[\u0600-\u06FF]/.test(detail) ? detail : fallback
 }
 
 // Supabase returns at most 1000 rows per request (the project's max-rows setting),
@@ -108,27 +117,20 @@ export async function getProducts() {
 }
 
 // Generate next item code in format ITM-01, ITM-02, etc.
+// Uses the highest existing ITM number, not the newest product's code: products added with
+// their own codes (e.g. from an Excel import) used to reset the sequence to ITM-01.
 export async function generateNextItemCode(): Promise<string> {
   return withErrorHandling(async () => {
-    const { data, error } = await supabase
-      .from("products")
-      .select("item_code")
-      .not("item_code", "is", null)
-      .order("id", { ascending: false })
-      .limit(1)
+    const codes = await fetchAllRows<{ item_code: string }>("products", "id, item_code", (q) =>
+      q.ilike("item_code", "ITM-%").order("id"),
+    )
 
-    if (error) throw error
+    const highest = codes.reduce((max, { item_code }) => {
+      const match = item_code?.match(/^ITM-(\d+)$/i)
+      return match ? Math.max(max, parseInt(match[1], 10)) : max
+    }, 0)
 
-    let nextNumber = 1
-    if (data && data.length > 0 && data[0].item_code) {
-      const lastCode = data[0].item_code
-      const match = lastCode.match(/ITM-(\d+)$/)
-      if (match) {
-        nextNumber = parseInt(match[1]) + 1
-      }
-    }
-
-    return `ITM-${nextNumber.toString().padStart(2, '0')}`
+    return `ITM-${(highest + 1).toString().padStart(2, '0')}`
   }, "Failed to generate item code")
 }
 
@@ -212,7 +214,14 @@ export async function createProduct(product: ProductInsert & { minStock?: number
   }, "Failed to create product")
 }
 
-export async function updateProduct(id: number, updates: ProductUpdate & { minStock?: number }) {
+// Stock is only changed when the caller says what it expected the stock to be
+// (options.expectedStock): the database applies it only if nobody issued or added
+// stock meanwhile, so saving an edit dialog can't undo an issuance.
+export async function updateProduct(
+  id: number,
+  updates: ProductUpdate & { minStock?: number },
+  options: { expectedStock?: number } = {},
+) {
   return withErrorHandling(async () => {
     // Validate and sanitize input
     const sanitizedUpdates = validateObject(updates)
@@ -265,7 +274,6 @@ export async function updateProduct(id: number, updates: ProductUpdate & { minSt
     if (sanitizedUpdates.item_code !== undefined) {
       dbUpdates.item_code = sanitizedUpdates.item_code ? validateInput(sanitizedUpdates.item_code) : null
     }
-    if (sanitizedUpdates.stock !== undefined) dbUpdates.stock = Math.max(0, Number(sanitizedUpdates.stock))
     if (sanitizedUpdates.description !== undefined) {
       dbUpdates.description = sanitizedUpdates.description ? validateInput(sanitizedUpdates.description) : null
     }
@@ -277,6 +285,19 @@ export async function updateProduct(id: number, updates: ProductUpdate & { minSt
     }
     if (sanitizedUpdates.selling_price !== undefined) {
       dbUpdates.selling_price = sanitizedUpdates.selling_price ? Number(sanitizedUpdates.selling_price) : null
+    }
+
+    // Stock first: if it changed meanwhile, nothing is saved and the user reopens the product
+    if (sanitizedUpdates.stock !== undefined && options.expectedStock !== undefined) {
+      const newStock = Math.max(0, Number(sanitizedUpdates.stock))
+      if (newStock !== options.expectedStock) {
+        const { error: stockError } = await supabase.rpc("set_product_stock", {
+          p_product_id: productId,
+          p_expected: options.expectedStock,
+          p_new: newStock,
+        })
+        if (stockError) throw stockError
+      }
     }
 
     const { data, error } = await createSecureQuery("products", "update").update(dbUpdates).eq("id", productId).select().single()
@@ -366,159 +387,51 @@ export async function getIssuancesByItemCode(itemCode: string) {
   }, "Failed to fetch issuances by item code")
 }
 
-export async function createIssuance(issuance: IssuanceInsert) {
+// Issuing, editing and deleting go through database functions (see
+// supabase/migrations/20260923110000_stock_functions.sql) so the stock change and the
+// issuance row are written in one transaction. The database checks stock inside the
+// update itself, so two people issuing the same product at once can't oversell it, and
+// issued_by is always the signed-in user.
+function mapWrittenIssuance(data: any) {
+  return {
+    ...data,
+    productId: data.product_id,
+    productName: data.product_name,
+    customerName: data.customer_name,
+    serialNumber: data.serial_number,
+    issuedBy: data.issued_by,
+    date: data.date || data.created_at?.split("T")[0],
+  }
+}
+
+// All items are issued, or none are
+export async function createIssuances(items: Array<Partial<IssuanceInsert>>) {
   return withErrorHandling(async () => {
-    // Validate stock availability
-    const { data: product } = await supabase.from("products").select("stock").eq("id", issuance.product_id).single()
-
-    if (!product) {
-      throw new Error("Product not found")
-    }
-
-    if (product.stock < issuance.quantity) {
-      throw new Error("Insufficient stock")
-    }
-
-    // Use the issuance data directly as it matches the database format
-    const dbIssuance: IssuanceInsert = issuance
-
-    // Use transaction to ensure data consistency
-    const { data, error } = await supabase.from("issuances").insert(dbIssuance).select().single()
-
+    const { data, error } = await supabase.rpc("issue_products", { p_items: items })
     if (error) throw error
-
-    // Update product stock
-    const { error: updateError } = await supabase
-      .from("products")
-      .update({
-        stock: product.stock - issuance.quantity,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", issuance.product_id)
-
-    if (updateError) throw updateError
-
-    // Map back to frontend format
-    return {
-      ...data,
-      productId: data.product_id,
-      productName: data.product_name,
-      customerName: data.customer_name,
-      serialNumber: data.serial_number,
-      issuedBy: data.issued_by,
-      date: data.date || data.created_at?.split("T")[0],
-    }
+    return ((data as any[]) || []).map(mapWrittenIssuance)
   }, "Failed to create issuance")
 }
 
-export async function updateIssuance(id: number, updates: Partial<IssuanceInsert>, originalQuantity: number) {
+export async function createIssuance(issuance: Partial<IssuanceInsert>) {
+  const [created] = await createIssuances([issuance])
+  return created
+}
+
+// Changing quantity or product moves stock accordingly (admins and the issuer only)
+export async function updateIssuance(id: number, updates: Partial<IssuanceInsert>) {
   return withErrorHandling(async () => {
-    // Get current issuance data
-    const { data: currentIssuance, error: fetchError } = await supabase
-      .from("issuances")
-      .select("*")
-      .eq("id", id)
-      .single()
-
-    if (fetchError || !currentIssuance) {
-      throw new Error("Issuance not found")
-    }
-
-    // If quantity is being updated, check stock availability
-    if (updates.quantity && updates.quantity !== originalQuantity) {
-      const { data: product } = await supabase
-        .from("products")
-        .select("stock")
-        .eq("id", currentIssuance.product_id)
-        .single()
-
-      if (!product) {
-        throw new Error("Product not found")
-      }
-
-      // Calculate available stock (current stock + original quantity)
-      const availableStock = product.stock + originalQuantity
-
-      if (updates.quantity > availableStock) {
-        throw new Error("Insufficient stock for the requested quantity")
-      }
-
-      // Update product stock
-      const stockDifference = updates.quantity - originalQuantity
-      const { error: updateStockError } = await supabase
-        .from("products")
-        .update({
-          stock: product.stock - stockDifference,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", currentIssuance.product_id)
-
-      if (updateStockError) throw updateStockError
-    }
-
-    // Update issuance
-    const { data, error } = await supabase
-      .from("issuances")
-      .update(updates)
-      .eq("id", id)
-      .select()
-      .single()
-
+    const { data, error } = await supabase.rpc("update_issuance", { p_id: id, p_changes: updates })
     if (error) throw error
-
-    // Map back to frontend format
-    return {
-      ...data,
-      productId: data.product_id,
-      productName: data.product_name,
-      customerName: data.customer_name,
-      serialNumber: data.serial_number,
-      issuedBy: data.issued_by,
-      date: data.date || data.created_at?.split("T")[0],
-    }
+    return mapWrittenIssuance(data)
   }, "Failed to update issuance")
 }
 
+// Puts the issued quantity back into stock (admins and the issuer only)
 export async function deleteIssuance(id: number) {
   return withErrorHandling(async () => {
-    // Get issuance data before deletion
-    const { data: issuance, error: fetchError } = await supabase
-      .from("issuances")
-      .select("product_id, quantity")
-      .eq("id", id)
-      .single()
-
-    if (fetchError || !issuance) {
-      throw new Error("Issuance not found")
-    }
-
-    // Delete the issuance
-    const { error: deleteError } = await supabase.from("issuances").delete().eq("id", id)
-
-    if (deleteError) throw deleteError
-
-    // Get current product stock
-    const { data: product, error: productError } = await supabase
-      .from("products")
-      .select("stock")
-      .eq("id", issuance.product_id)
-      .single()
-
-    if (productError || !product) {
-      throw new Error("Product not found")
-    }
-
-    // Return stock to product
-    const { error: updateStockError } = await supabase
-      .from("products")
-      .update({
-        stock: product.stock + issuance.quantity,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", issuance.product_id)
-
-    if (updateStockError) throw updateStockError
-
+    const { error } = await supabase.rpc("delete_issuance", { p_id: id })
+    if (error) throw error
     return { success: true }
   }, "Failed to delete issuance")
 }
@@ -1070,7 +983,7 @@ export async function getStockEntries(productId?: number, limit = 50) {
     return (data || []).map(entry => ({
       ...entry,
       entryDateFormatted: formatDate(entry.entry_date),
-      entryTimeFormatted: formatTimeOnly(entry.entry_time),
+      entryTimeFormatted: formatTimeOnly(entry.entry_time, entry.entry_date),
       entryDateTimeFormatted: formatDateTime(entry.entry_datetime)
     }))
   }, "Failed to fetch stock entries")
@@ -1080,66 +993,37 @@ export async function createStockEntry(entry: {
   productId: number
   quantityAdded: number
   notes?: string
-  userId: string
-  userName: string
+  userId?: string
+  userName?: string
 }) {
   return withErrorHandling(async () => {
-    // Get current product data
+    // Check warehouse permission if product has warehouse
     const { data: product, error: productError } = await supabase
       .from("products")
-      .select("*")
+      .select("warehouse_id")
       .eq("id", entry.productId)
       .single()
 
     if (productError || !product) {
       throw new Error("Product not found")
     }
-
-    // Check warehouse permission if product has warehouse
     if (product.warehouse_id) {
       await checkWarehousePermission(product.warehouse_id, 'edit')
     }
 
-    const previousStock = product.stock
-    const newStock = previousStock + entry.quantityAdded
-
-    // Create stock entry record
-    const stockEntryData: StockEntryInsert = {
-      product_id: entry.productId,
-      product_name: product.name,
-      item_code: product.item_code,
-      quantity_added: entry.quantityAdded,
-      previous_stock: previousStock,
-      new_stock: newStock,
-      notes: entry.notes || null,
-      entered_by: entry.userName,
-      user_id: entry.userId,
-      warehouse_id: product.warehouse_id
-    }
-
-    const { data: stockEntry, error: entryError } = await supabase
-      .from("stock_entries")
-      .insert(stockEntryData)
-      .select()
-      .single()
-
-    if (entryError) throw entryError
-
-    // Update product stock
-    const { error: updateError } = await supabase
-      .from("products")
-      .update({
-        stock: newStock,
-        updated_at: new Date().toISOString()
-      })
-      .eq("id", entry.productId)
-
-    if (updateError) throw updateError
+    // Stock and its history row are written together by the database (see add_stock);
+    // who entered it is taken from the session, not from the client
+    const { data: stockEntry, error } = await supabase.rpc("add_stock", {
+      p_product_id: entry.productId,
+      p_quantity: entry.quantityAdded,
+      p_notes: entry.notes || null,
+    })
+    if (error) throw error
 
     return {
       ...stockEntry,
       entryDateFormatted: formatDate(stockEntry.entry_date),
-      entryTimeFormatted: formatTimeOnly(stockEntry.entry_time),
+      entryTimeFormatted: formatTimeOnly(stockEntry.entry_time, stockEntry.entry_date),
       entryDateTimeFormatted: formatDateTime(stockEntry.entry_datetime)
     }
   }, "Failed to create stock entry")
@@ -1158,7 +1042,7 @@ export async function getProductStockHistory(productId: number) {
     return (data || []).map(entry => ({
       ...entry,
       entryDateFormatted: formatDate(entry.entry_date),
-      entryTimeFormatted: formatTimeOnly(entry.entry_time),
+      entryTimeFormatted: formatTimeOnly(entry.entry_time, entry.entry_date),
       entryDateTimeFormatted: formatDateTime(entry.entry_datetime)
     }))
   }, "Failed to fetch product stock history")
@@ -1284,30 +1168,23 @@ export function formatDateOnly(date: string | Date): string {
   })
 }
 
-export function formatTimeOnly(time: string): string {
+// entry_time is stored in UTC (the database's clock). Convert it with the real Cairo
+// time zone, which also follows Egypt's summer time (UTC+3) and winter time (UTC+2);
+// the previous version always added 3 hours.
+export function formatTimeOnly(time: string, date?: string): string {
   try {
     if (!time) return '-'
-    // إذا كان الوقت يحتوي على ثواني وميكروثانية، نقوم بتنظيفه
-    const timeParts = time.split(':')
-    if (timeParts.length >= 2) {
-      let hours = parseInt(timeParts[0])
-      const minutes = timeParts[1].split('.')[0] // إزالة الميكروثانية إن وجدت
-      
-      // إضافة 3 ساعات للتوقيت المصري (UTC+3 في الصيف، UTC+2 في الشتاء)
-      // نستخدم UTC+3 لأن مصر تستخدم التوقيت الصيفي حالياً
-      hours = (hours + 3) % 24
-      
-      // تحويل إلى تنسيق 12 ساعة
-      const hour12 = hours === 0 ? 12 : hours > 12 ? hours - 12 : hours
-      const ampm = hours >= 12 ? 'PM' : 'AM'
-      
-      // التأكد من أن الدقائق تظهر بصيغة رقمين
-      const formattedMinutes = minutes.padStart(2, '0')
-      
-      return `${hour12}:${formattedMinutes} ${ampm}`
-    }
-    
-    return time
+    const [hours, minutes = '00'] = time.split('.')[0].split(':')
+    const day = date || new Date().toISOString().split('T')[0]
+    const utc = new Date(`${day}T${hours.padStart(2, '0')}:${minutes.padStart(2, '0')}:00Z`)
+    if (isNaN(utc.getTime())) return time
+
+    return utc.toLocaleTimeString("en-US", {
+      timeZone: "Africa/Cairo",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true
+    })
   } catch (error) {
     // في حالة حدوث خطأ، نعيد الوقت كما هو
     return time
@@ -1315,11 +1192,8 @@ export function formatTimeOnly(time: string): string {
 }
 
 export function getCurrentEgyptTime(): string {
-  // الحصول على التوقيت المصري (UTC+3 في الصيف)
-  const now = new Date()
-  const egyptTime = new Date(now.getTime() + (3 * 60 * 60 * 1000)) // إضافة 3 ساعات لـ UTC
-  
-  return egyptTime.toLocaleString("en-US", {
+  return new Date().toLocaleTimeString("en-US", {
+    timeZone: "Africa/Cairo",
     hour: "numeric",
     minute: "2-digit",
     hour12: true
@@ -1828,6 +1702,9 @@ export async function updateCategory(id: number, updates: { name?: string; descr
     if (sanitizedUpdates.description !== undefined) updateData.description = sanitizedUpdates.description?.trim() || null
     if (sanitizedUpdates.is_active !== undefined) updateData.is_active = sanitizedUpdates.is_active
 
+    // Products store the category by name, so a rename has to carry over to them
+    const { data: previous } = await supabase.from("categories").select("name").eq("id", id).single()
+
     const { data, error } = await supabase
       .from("categories")
       .update(updateData)
@@ -1836,6 +1713,14 @@ export async function updateCategory(id: number, updates: { name?: string; descr
       .single()
 
     if (error) throw error
+
+    if (previous?.name && updateData.name && previous.name !== updateData.name) {
+      const { error: renameError } = await supabase
+        .from("products")
+        .update({ category: updateData.name, updated_at: new Date().toISOString() })
+        .eq("category", previous.name)
+      if (renameError) throw renameError
+    }
     return data
   }, "Failed to update category")
 }
@@ -1847,15 +1732,22 @@ export async function deleteCategory(id: number) {
       throw new SecurityError("Invalid category ID", "INVALID_INPUT")
     }
 
-    // Check if category is being used by any products
-    const { data: productsUsingCategory } = await supabase
-      .from("products")
-      .select("id")
-      .eq("category", id)
-      .limit(1)
+    // Products reference the category by name (not id), so look it up by name
+    const { data: category, error: categoryError } = await supabase
+      .from("categories")
+      .select("name")
+      .eq("id", id)
+      .single()
+    if (categoryError) throw categoryError
 
-    if (productsUsingCategory && productsUsingCategory.length > 0) {
-      throw new Error("Cannot delete category that is being used by products")
+    const { count, error: countError } = await supabase
+      .from("products")
+      .select("id", { count: "exact", head: true })
+      .eq("category", category.name)
+    if (countError) throw countError
+
+    if (count && count > 0) {
+      throw new Error(`لا يمكن حذف فئة مستخدمة في ${count} منتج. انقل المنتجات لفئة أخرى أو عطّل الفئة بدلاً من حذفها`)
     }
 
     const { error } = await supabase

@@ -17,7 +17,7 @@ import { Sidebar } from "@/components/sidebar"
 import { Pagination } from "@/components/ui/pagination"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { getProducts, getIssuances, getIssuancesByItemCode, createIssuance, updateIssuance, deleteIssuance, getBranches, getCustomers, getWarehouses, searchByItemCode, searchIssuancesByFilters } from "@/lib/database"
+import { getProducts, getIssuances, getIssuancesByItemCode, createIssuances, updateIssuance, deleteIssuance, getBranches, getCustomers, getWarehouses, searchByItemCode, searchIssuancesByFilters, errorDetail } from "@/lib/database"
 import { getUserAccessibleWarehousesWithData } from "@/lib/warehouse-permissions"
 import { logActivity } from "@/lib/auth"
 
@@ -277,42 +277,41 @@ export default function IssuancePage() {
         }
       }
 
-      // Create issuances for all selected products
-      const issuancePromises = selectedProducts.map(async (selectedProd) => {
-        const product = products.find(p => p.id === selectedProd.id)
-        if (!product) return
+      // One request for all selected products: the database issues all of them or none,
+      // and refuses if another user took the stock meanwhile
+      const items = selectedProducts.map((selectedProd) => ({
+        product_id: selectedProd.id,
+        product_name: selectedProd.name,
+        brand: selectedProd.brand,
+        item_code: selectedProd.item_code || null,
+        model: machineModel || selectedProd.model,
+        quantity: selectedProd.quantity,
+        customer_id: selectedCustomer ? Number.parseInt(selectedCustomer) : null,
+        customer_name: finalCustomerName,
+        branch: branch.name,
+        branch_id: Number.parseInt(selectedBranch),
+        warehouse_id: selectedWarehouse && selectedWarehouse !== "none" ? Number.parseInt(selectedWarehouse) : null,
+        engineer,
+        serial_number: serialNumber,
+        warranty_type: warrantyType,
+        invoice_number: warrantyType === 'no_warranty' ? invoiceNumber : null,
+        // The sale price has its own column now; notes keep only the invoice value
+        unit_price: warrantyType === 'no_warranty' && selectedProd.customPrice ? Number(selectedProd.customPrice) : null,
+        notes: warrantyType === 'no_warranty'
+          ? `${notes ? notes + ' | ' : ''}${invoiceValue ? 'قيمة الفاتورة: ' + invoiceValue : ''}`.replace(/^\s*\|\s*/, '').replace(/\s*\|\s*$/, '')
+          : notes,
+        date: issuanceDate
+      }))
 
-        const issuanceData = {
-          product_id: selectedProd.id,
-          product_name: selectedProd.name,
-          brand: selectedProd.brand,
-          model: machineModel || selectedProd.model,
-          quantity: selectedProd.quantity,
-          customer_id: selectedCustomer ? Number.parseInt(selectedCustomer) : null,
-          customer_name: finalCustomerName,
-          branch: branch.name,
-          branch_id: Number.parseInt(selectedBranch),
-          warehouse_id: selectedWarehouse && selectedWarehouse !== "none" ? Number.parseInt(selectedWarehouse) : null,
-          engineer,
-          serial_number: serialNumber,
-          warranty_type: warrantyType,
-          invoice_number: warrantyType === 'no_warranty' ? invoiceNumber : null,
-          notes: warrantyType === 'no_warranty' ? `${notes ? notes + ' | ' : ''}${invoiceValue ? 'قيمة الفاتورة: ' + invoiceValue : ''}${selectedProd.customPrice ? ' | سعر البيع: ' + selectedProd.customPrice + ' | إجمالي: ' + (selectedProd.quantity * Number(selectedProd.customPrice)) : ''}`.replace(/^\s*\|\s*/, '').replace(/\s*\|\s*$/, '') : notes,
-          issued_by: user?.id || '',
-          date: issuanceDate
-        }
+      await createIssuances(items)
 
-        await createIssuance(issuanceData)
-
-        // Log the activity
+      for (const selectedProd of selectedProducts) {
         await logActivity(user?.id || '', user?.name || user?.email || '', 'issuance_created', 'issuance', JSON.stringify({
           product_name: selectedProd.name,
           quantity: selectedProd.quantity,
           customer: finalCustomerName
         }))
-      })
-
-      await Promise.all(issuancePromises)
+      }
 
       toast({
         title: "نجح",
@@ -332,7 +331,7 @@ export default function IssuancePage() {
       console.error('Error creating issuance:', error)
       toast({
         title: "خطأ",
-        description: "حدث خطأ في إصدار المنتجات",
+        description: errorDetail(error, "حدث خطأ في إصدار المنتجات"),
         variant: "destructive",
       })
     } finally {
@@ -359,18 +358,23 @@ export default function IssuancePage() {
     setWarrantyType(issuance.warranty_type || "")
     setInvoiceNumber(issuance.invoice_number || "")
     setIssuanceDate(issuance.date || new Date().toISOString().split('T')[0])
-    // Extract invoice value and selling price from notes if present
+    // Invoice value lives in the notes; the sale price has its own column (older rows
+    // may still carry it in the notes). Decimals are kept: 1500.75 stays 1500.75.
     const notesText = issuance.notes || ""
-    const invoiceMatch = notesText.match(/قيمة الفاتورة:\s*(\d+)/)
-    const sellingPriceMatch = notesText.match(/سعر البيع:\s*(\d+)/)
+    const invoiceMatch = notesText.match(/قيمة الفاتورة:\s*(\d+(?:\.\d+)?)/)
+    const sellingPriceMatch = notesText.match(/سعر البيع:\s*(\d+(?:\.\d+)?)/)
     setInvoiceValue(invoiceMatch ? invoiceMatch[1] : "")
-    setCustomSellingPrice(sellingPriceMatch ? sellingPriceMatch[1] : "")
+    setCustomSellingPrice(
+      issuance.unit_price != null ? String(Number(issuance.unit_price)) : sellingPriceMatch ? sellingPriceMatch[1] : ""
+    )
     // Clean notes from extracted values
     const cleanNotes = notesText
-      .replace(/\s*\|\s*قيمة الفاتورة:\s*\d+/g, "")
-      .replace(/قيمة الفاتورة:\s*\d+\s*\|?\s*/g, "")
-      .replace(/\s*\|\s*سعر البيع:\s*\d+/g, "")
-      .replace(/سعر البيع:\s*\d+\s*\|?\s*/g, "")
+      .replace(/\s*\|\s*قيمة الفاتورة:\s*\d+(?:\.\d+)?/g, "")
+      .replace(/قيمة الفاتورة:\s*\d+(?:\.\d+)?\s*\|?\s*/g, "")
+      .replace(/\s*\|\s*سعر البيع:\s*\d+(?:\.\d+)?/g, "")
+      .replace(/سعر البيع:\s*\d+(?:\.\d+)?\s*\|?\s*/g, "")
+      .replace(/\s*\|\s*إجمالي:\s*\d+(?:\.\d+)?/g, "")
+      .replace(/إجمالي:\s*\d+(?:\.\d+)?\s*\|?\s*/g, "")
       .trim()
     setNotes(cleanNotes)
     setIsEditDialogOpen(true)
@@ -389,12 +393,17 @@ export default function IssuancePage() {
 
     setSubmitting(true)
     try {
-      const updatedData = {
+      // Names are stored on the issuance too (reports group by them), so keep them in step
+      // with the selected customer and branch
+      const selectedCustomerRecord = customers.find(c => c.id.toString() === selectedCustomer)
+      const selectedBranchRecord = branches.find(b => b.id.toString() === selectedBranch)
+
+      const updatedData: Record<string, any> = {
         product_id: Number.parseInt(selectedProduct),
         quantity,
         model: machineModel,
         customer_id: selectedCustomer ? Number.parseInt(selectedCustomer) : null,
-        customer_name: selectedCustomer ? undefined : customerName,
+        customer_name: selectedCustomerRecord ? selectedCustomerRecord.name : customerName,
         branch_id: Number.parseInt(selectedBranch),
         warehouse_id: selectedWarehouse && selectedWarehouse !== "none" ? Number.parseInt(selectedWarehouse) : null,
         engineer,
@@ -402,10 +411,15 @@ export default function IssuancePage() {
         warranty_type: warrantyType,
         invoice_number: warrantyType === 'no_warranty' ? invoiceNumber : null,
         date: issuanceDate,
-        notes: warrantyType === 'no_warranty' ? `${notes ? notes + ' | ' : ''}${invoiceValue ? 'قيمة الفاتورة: ' + invoiceValue : ''}${customSellingPrice ? ' | سعر البيع: ' + customSellingPrice : ''}`.replace(/^\s*\|\s*/, '').replace(/\s*\|\s*$/, '') : notes
+        notes: warrantyType === 'no_warranty'
+          ? `${notes ? notes + ' | ' : ''}${invoiceValue ? 'قيمة الفاتورة: ' + invoiceValue : ''}`.replace(/^\s*\|\s*/, '').replace(/\s*\|\s*$/, '')
+          : notes
       }
+      if (selectedBranchRecord) updatedData.branch = selectedBranchRecord.name
+      if (warrantyType === 'no_warranty' && customSellingPrice) updatedData.unit_price = Number(customSellingPrice)
 
-      await updateIssuance(editingIssuance.id, updatedData, editingIssuance.quantity)
+      // The database moves stock if the quantity or the product changed
+      await updateIssuance(editingIssuance.id, updatedData)
 
       // Log the activity
       const product = products.find(p => p.id.toString() === selectedProduct)
@@ -433,7 +447,7 @@ export default function IssuancePage() {
       console.error('Error updating issuance:', error)
       toast({
         title: "خطأ",
-        description: "حدث خطأ في تحديث الإصدار",
+        description: errorDetail(error, "حدث خطأ في تحديث الإصدار"),
         variant: "destructive",
       })
     } finally {
@@ -467,7 +481,7 @@ export default function IssuancePage() {
       console.error('Error deleting issuance:', error)
       toast({
         title: "خطأ",
-        description: "حدث خطأ في حذف الإصدار",
+        description: errorDetail(error, "حدث خطأ في حذف الإصدار"),
         variant: "destructive",
       })
     }
