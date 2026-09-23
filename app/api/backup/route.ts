@@ -1,92 +1,43 @@
 import { NextResponse } from "next/server"
-import {
-  BACKUP_TABLES,
-  USERS_BACKUP_COLUMNS,
-  errorResponse,
-  fetchAllAdmin,
-  getAdminClient,
-  requireAppUser,
-  HttpError,
-} from "@/lib/supabase-admin"
+import { errorResponse, getAdminClient, requireAppUser, HttpError } from "@/lib/supabase-admin"
+import { backupDownloadUrl, listBackups, storeBackup } from "@/lib/auto-backup"
 
-async function buildBackup(tables: readonly string[], type: string) {
-  const backupData: any = {
-    metadata: {
-      timestamp: new Date().toISOString(),
-      version: "3.0",
-      system: "ITMCO Inventory Management",
-      type,
-      tables,
-      recordCounts: {},
-      backupId: `${type}_${Date.now()}`,
-    },
-    data: {},
-  }
+export const dynamic = "force-dynamic"
 
-  // Keep BACKUP_TABLES order so the file restores parents before children
-  for (const table of BACKUP_TABLES.filter((t) => tables.includes(t))) {
-    try {
-      const rows = await fetchAllAdmin(table, table === "users" ? USERS_BACKUP_COLUMNS : "*")
-      backupData.data[table] = rows
-      backupData.metadata.recordCounts[table] = rows.length
-    } catch (error: any) {
-      // Optional tables (e.g. release_items) may not exist in every database
-      if (error?.code === "42P01" || error?.code === "PGRST205") continue
-      throw new Error(`Failed to backup table ${table}: ${error.message}`)
-    }
-  }
-  return backupData
-}
-
+// GET               → stored backups (newest first)
+// GET ?download=... → short-lived download link for one of them
 export async function GET(request: Request) {
   try {
     await requireAppUser(request, ["admin"])
-    const backupData = await buildBackup(BACKUP_TABLES, "full")
+    const download = new URL(request.url).searchParams.get("download")
 
-    return NextResponse.json(backupData, {
-      headers: {
-        "Content-Disposition": `attachment; filename="itmco-backup-${new Date().toISOString().split("T")[0]}.json"`,
-      },
-    })
+    if (download) {
+      return NextResponse.json({ url: await backupDownloadUrl(download) })
+    }
+    return NextResponse.json({ backups: await listBackups() })
   } catch (error) {
+    if (error instanceof Error && error.message === "Invalid backup name") {
+      return errorResponse(new HttpError(400, error.message))
+    }
     return errorResponse(error)
   }
 }
 
+// POST → take a full backup now, keep it in storage, and return a download link
 export async function POST(request: Request) {
   try {
     const caller = await requireAppUser(request, ["admin"])
-    const body = await request.json().catch(() => ({}))
-    const type = body.type === "partial" ? "partial" : "full"
-    const tables: string[] = Array.isArray(body.tables) && body.tables.length > 0 ? body.tables : [...BACKUP_TABLES]
+    const stored = await storeBackup("manual")
 
-    const invalidTables = tables.filter((table) => !(BACKUP_TABLES as readonly string[]).includes(table))
-    if (invalidTables.length > 0) {
-      throw new HttpError(400, `Invalid table names: ${invalidTables.join(", ")}`)
-    }
-
-    const backupData = await buildBackup(tables, type)
-    const admin = getAdminClient()
-
-    await admin.from("activity_logs").insert({
+    await getAdminClient().from("activity_logs").insert({
       user_id: caller.id,
       user_name: caller.name,
       action: "نسخ احتياطي يدوي",
       module: "النظام",
-      details: `تم إنشاء نسخة احتياطية يدوية - ${Object.keys(backupData.data).length} جداول`,
+      details: `تم إنشاء نسخة احتياطية يدوية - ${Object.values(stored.recordCounts).reduce((a, b) => a + b, 0)} سجل`,
     })
 
-    // backup_history is optional; don't fail the download if it's missing
-    await admin.from("backup_history").insert({
-      backup_id: backupData.metadata.backupId,
-      timestamp: backupData.metadata.timestamp,
-      type: "manual",
-      record_counts: backupData.metadata.recordCounts,
-      size: JSON.stringify(backupData).length,
-      status: "completed",
-    })
-
-    return NextResponse.json(backupData)
+    return NextResponse.json({ ...stored, url: await backupDownloadUrl(stored.name) })
   } catch (error) {
     return errorResponse(error)
   }

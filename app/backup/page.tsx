@@ -2,13 +2,12 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   Download,
@@ -20,35 +19,89 @@ import {
   CheckCircle,
   Calendar,
   HardDrive,
+  Loader2,
 } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import { apiFetch } from "@/lib/api-client"
 
-const backupTables = [
-  { id: "users", name: "المستخدمين", description: "بيانات المستخدمين وأدوارهم (بدون كلمات المرور، ولا تتم استعادتها)" },
-  { id: "products", name: "المنتجات", description: "قائمة المنتجات ومعلومات المخزون" },
-  { id: "issuances", name: "الإصدارات", description: "سجلات إصدار المنتجات للعملاء" },
-  { id: "stock_entries", name: "إدخالات المخزون", description: "سجل إضافة الكميات للمنتجات" },
-  { id: "warehouses", name: "المخازن", description: "بيانات المخازن" },
-  { id: "categories", name: "الفئات", description: "فئات المنتجات" },
-  { id: "customers", name: "العملاء", description: "بيانات العملاء" },
-  { id: "branches", name: "الفروع", description: "بيانات الفروع" },
-  { id: "user_warehouse_permissions", name: "صلاحيات المخازن", description: "صلاحيات المستخدمين على المخازن" },
-  { id: "activity_logs", name: "سجل النشاطات", description: "تتبع جميع العمليات في النظام" },
-]
+interface StoredBackup {
+  name: string
+  size: number
+  createdAt: string
+  type: "auto" | "manual"
+}
+
+// Rows per restore request; keeps each request well under Vercel's ~4.5 MB body limit
+const RESTORE_CHUNK_ROWS = 1000
+
+const TABLE_NAMES: Record<string, string> = {
+  warehouses: "المخازن",
+  categories: "الفئات",
+  customers: "العملاء",
+  branches: "الفروع",
+  users: "المستخدمين",
+  products: "المنتجات",
+  issuances: "الإصدارات",
+  release_items: "عناصر الإصدار",
+  stock_entries: "إدخالات المخزون",
+  user_warehouse_permissions: "صلاحيات المخازن",
+  activity_logs: "سجل النشاطات",
+}
+
+const formatFileSize = (bytes: number) => {
+  if (!bytes) return "0 KB"
+  const k = 1024
+  const sizes = ["Bytes", "KB", "MB", "GB"]
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i]
+}
+
+const formatTimestamp = (iso: string) =>
+  iso
+    ? new Date(iso).toLocaleString("en-GB", {
+        timeZone: "Africa/Cairo",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : "-"
+
+// Backups are saved gzipped; older ones may be plain JSON
+async function readBackupFile(file: File) {
+  if (file.name.endsWith(".gz")) {
+    const stream = file.stream().pipeThrough(new DecompressionStream("gzip"))
+    return JSON.parse(await new Response(stream).text())
+  }
+  return JSON.parse(await file.text())
+}
 
 export default function BackupPage() {
-  const { user, loading: authLoading } = useAuth()
-  const [selectedTables, setSelectedTables] = useState(backupTables.map((t) => t.id))
-  const [backupType, setBackupType] = useState("full")
-  const [loading, setLoading] = useState(false)
-  const [restoreFile, setRestoreFile] = useState<File | null>(null)
+  const { user } = useAuth()
+  const [creating, setCreating] = useState(false)
+  const [restoring, setRestoring] = useState(false)
+  const [restoreProgress, setRestoreProgress] = useState("")
   const [restoreData, setRestoreData] = useState<any>(null)
-  const [backupHistory, setBackupHistory] = useState<any[]>([])
-  const [autoBackupEnabled, setAutoBackupEnabled] = useState(false)
+  const [backups, setBackups] = useState<StoredBackup[]>([])
+  const [loadingList, setLoadingList] = useState(true)
   const { toast } = useToast()
+
+  const loadBackups = useCallback(async () => {
+    setLoadingList(true)
+    try {
+      const response = await apiFetch("/api/backup")
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "فشل تحميل قائمة النسخ")
+      setBackups(result.backups || [])
+    } catch (error: any) {
+      toast({ title: "خطأ", description: error.message, variant: "destructive" })
+    } finally {
+      setLoadingList(false)
+    }
+  }, [toast])
 
   useEffect(() => {
     if (user && user.role !== "admin") {
@@ -60,176 +113,135 @@ export default function BackupPage() {
       window.location.href = "/dashboard"
       return
     }
+    if (user) loadBackups()
+  }, [user, toast, loadBackups])
 
-    if (user) {
-      // Load backup history from localStorage
-      const history = localStorage.getItem("backup_history")
-      if (history) {
-        setBackupHistory(JSON.parse(history))
-      }
-
-      // Check auto-backup setting
-      const autoBackup = localStorage.getItem("auto_backup_enabled")
-      setAutoBackupEnabled(autoBackup === "true")
-    }
-  }, [user, toast])
+  const startDownload = (url: string) => {
+    const a = document.createElement("a")
+    a.href = url
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+  }
 
   const handleCreateBackup = async () => {
-    setLoading(true)
+    setCreating(true)
     try {
-      const response = await apiFetch("/api/backup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          type: backupType,
-          tables: selectedTables,
-        }),
-      })
+      const response = await apiFetch("/api/backup", { method: "POST" })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "فشل في إنشاء النسخة الاحتياطية")
 
-      if (!response.ok) {
-        throw new Error("فشل في إنشاء النسخة الاحتياطية")
-      }
+      startDownload(result.url)
+      await loadBackups()
 
-      const backupData = await response.json()
-
-      // Download the backup file
-      const blob = new Blob([JSON.stringify(backupData, null, 2)], { type: "application/json" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `itmco-backup-${new Date().toISOString().split("T")[0]}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-
-      // Save to backup history
-      const newBackup = {
-        id: Date.now(),
-        timestamp: new Date().toISOString(),
-        type: backupType,
-        tables: selectedTables,
-        recordCounts: backupData.metadata.recordCounts,
-        size: blob.size,
-      }
-
-      const updatedHistory = [newBackup, ...backupHistory.slice(0, 9)] // Keep last 10 backups
-      setBackupHistory(updatedHistory)
-      localStorage.setItem("backup_history", JSON.stringify(updatedHistory))
-
+      const total = Object.values(result.recordCounts as Record<string, number>).reduce((a, b) => a + b, 0)
       toast({
         title: "تم إنشاء النسخة الاحتياطية",
-        description: "تم تحميل ملف النسخة الاحتياطية بنجاح",
+        description: `تم حفظ ${total.toLocaleString("en-US")} سجل على السيرفر وتحميل نسخة منها`,
       })
     } catch (error: any) {
-      toast({
-        title: "خطأ في النسخ الاحتياطي",
-        description: error.message,
-        variant: "destructive",
-      })
+      toast({ title: "خطأ في النسخ الاحتياطي", description: error.message, variant: "destructive" })
     } finally {
-      setLoading(false)
+      setCreating(false)
     }
   }
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDownload = async (name: string) => {
+    try {
+      const response = await apiFetch(`/api/backup?download=${encodeURIComponent(name)}`)
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error || "فشل التحميل")
+      startDownload(result.url)
+    } catch (error: any) {
+      toast({ title: "خطأ في التحميل", description: error.message, variant: "destructive" })
+    }
+  }
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (file) {
-      setRestoreFile(file)
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        try {
-          const data = JSON.parse(e.target?.result as string)
-          setRestoreData(data)
-        } catch (error) {
-          toast({
-            title: "خطأ في قراءة الملف",
-            description: "ملف النسخة الاحتياطية غير صالح",
-            variant: "destructive",
-          })
-        }
-      }
-      reader.readAsText(file)
+    setRestoreData(null)
+    if (!file) return
+    try {
+      const data = await readBackupFile(file)
+      if (!data?.metadata || !data?.data) throw new Error()
+      setRestoreData(data)
+    } catch {
+      toast({
+        title: "خطأ في قراءة الملف",
+        description: "ملف النسخة الاحتياطية غير صالح",
+        variant: "destructive",
+      })
     }
   }
 
   const handleRestore = async () => {
-    if (!restoreData) {
-      toast({
-        title: "خطأ",
-        description: "يرجى اختيار ملف النسخة الاحتياطية أولاً",
-        variant: "destructive",
-      })
-      return
-    }
+    if (!restoreData) return
 
-    setLoading(true)
+    setRestoring(true)
+    let sent = 0
+    const failed: string[] = []
     try {
-      const response = await apiFetch("/api/restore", {
+      // Table by table in the file's order (parents first), in chunks
+      const tables = Object.keys(restoreData.data).filter(
+        (table) => table !== "users" && Array.isArray(restoreData.data[table]),
+      )
+      const totalRows = tables.reduce((sum, table) => sum + restoreData.data[table].length, 0)
+
+      for (const table of tables) {
+        const rows: any[] = restoreData.data[table]
+        for (let i = 0; i < rows.length; i += RESTORE_CHUNK_ROWS) {
+          setRestoreProgress(`${TABLE_NAMES[table] || table}: ${sent.toLocaleString("en-US")} / ${totalRows.toLocaleString("en-US")}`)
+          const response = await apiFetch("/api/restore", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              metadata: restoreData.metadata,
+              data: { [table]: rows.slice(i, i + RESTORE_CHUNK_ROWS) },
+              final: false,
+            }),
+          })
+          const result = await response.json()
+          if (!response.ok) throw new Error(result.error || "فشل في الاستعادة")
+          if (result.results?.errors?.[table] && !failed.includes(table)) failed.push(table)
+          sent += Math.min(RESTORE_CHUNK_ROWS, rows.length - i)
+        }
+      }
+
+      // Last call: move id sequences past the restored rows and log the restore
+      await apiFetch("/api/restore", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(restoreData),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ metadata: restoreData.metadata, data: {}, final: true }),
       })
 
-      const result = await response.json()
-
-      if (result.success) {
-        toast({
-          title: "تم الاستعادة بنجاح",
-          description: result.message,
-        })
+      if (failed.length === 0) {
+        toast({ title: "تمت الاستعادة", description: `تمت مراجعة ${sent.toLocaleString("en-US")} سجل وإضافة الناقص منها` })
       } else {
         toast({
-          title: "فشل في الاستعادة",
-          description: result.message,
+          title: "تمت الاستعادة مع أخطاء",
+          description: `تعذرت استعادة: ${failed.map((t) => TABLE_NAMES[t] || t).join("، ")}`,
           variant: "destructive",
         })
       }
     } catch (error: any) {
-      toast({
-        title: "خطأ في الاستعادة",
-        description: error.message,
-        variant: "destructive",
-      })
+      toast({ title: "خطأ في الاستعادة", description: error.message, variant: "destructive" })
     } finally {
-      setLoading(false)
+      setRestoring(false)
+      setRestoreProgress("")
     }
-  }
-
-  const toggleAutoBackup = () => {
-    const newValue = !autoBackupEnabled
-    setAutoBackupEnabled(newValue)
-    localStorage.setItem("auto_backup_enabled", newValue.toString())
-
-    if (newValue) {
-      // Set up daily auto-backup (in a real app, this would be server-side)
-      toast({
-        title: "تم تفعيل النسخ الاحتياطي التلقائي",
-        description: "سيتم إنشاء نسخة احتياطية يومياً تلقائياً",
-      })
-    } else {
-      toast({
-        title: "تم إلغاء النسخ الاحتياطي التلقائي",
-        description: "لن يتم إنشاء نسخ احتياطية تلقائية",
-      })
-    }
-  }
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes"
-    const k = 1024
-    const sizes = ["Bytes", "KB", "MB", "GB"]
-    const i = Math.floor(Math.log(bytes) / Math.log(k))
-    return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
   if (!user) {
-    return <div>جاري التحميل...</div>
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white gap-2">
+        <Loader2 className="h-5 w-5 animate-spin" />
+        جاري التحميل...
+      </div>
+    )
   }
+
+  const latest = backups[0]
+  const latestAuto = backups.find((b) => b.type === "auto")
 
   return (
     <div className="flex min-h-screen bg-slate-950 relative overflow-hidden">
@@ -239,26 +251,11 @@ export default function BackupPage() {
       <div className="flex-1 p-6 relative">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-white mb-2">إدارة النسخ الاحتياطية</h1>
-          <p className="text-slate-300">إنشاء واستعادة النسخ الاحتياطية لحماية بيانات النظام</p>
+          <p className="text-slate-300">نسخة كاملة تلقائية كل يوم، محفوظة على السيرفر لمدة 30 يوماً</p>
         </div>
 
         {/* Status Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-slate-800 border-slate-700">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-slate-300 flex items-center gap-2">
-                <Database className="w-4 h-4" />
-                حالة قاعدة البيانات
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="w-5 h-5 text-green-400" />
-                <span className="text-green-400 font-medium">متصلة</span>
-              </div>
-            </CardContent>
-          </Card>
-
           <Card className="bg-slate-800 border-slate-700">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-slate-300 flex items-center gap-2">
@@ -267,11 +264,7 @@ export default function BackupPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-white font-medium">
-                {backupHistory.length > 0
-                  ? new Date(backupHistory[0].timestamp).toLocaleDateString("en-US")
-                  : "لا توجد"}
-              </div>
+              <div className="text-white font-medium">{latest ? formatTimestamp(latest.createdAt) : "لا توجد"}</div>
             </CardContent>
           </Card>
 
@@ -283,7 +276,7 @@ export default function BackupPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-white font-medium">{backupHistory.length}</div>
+              <div className="text-white font-medium">{backups.length}</div>
             </CardContent>
           </Card>
 
@@ -296,18 +289,33 @@ export default function BackupPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-2">
-                {autoBackupEnabled ? (
+                {latestAuto ? (
                   <>
                     <CheckCircle className="w-5 h-5 text-green-400" />
-                    <span className="text-green-400 font-medium">مفعل</span>
+                    <span className="text-green-400 font-medium">يعمل يومياً</span>
                   </>
                 ) : (
                   <>
                     <AlertTriangle className="w-5 h-5 text-orange-400" />
-                    <span className="text-orange-400 font-medium">معطل</span>
+                    <span className="text-orange-400 font-medium">لم يعمل بعد</span>
                   </>
                 )}
               </div>
+              <p className="text-xs text-slate-400 mt-1">
+                {latestAuto ? `آخر تشغيل: ${formatTimestamp(latestAuto.createdAt)}` : "يحتاج CRON_SECRET في Vercel"}
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-slate-800 border-slate-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-slate-300 flex items-center gap-2">
+                <Database className="w-4 h-4" />
+                حجم آخر نسخة
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-white font-medium">{latest ? formatFileSize(latest.size) : "-"}</div>
             </CardContent>
           </Card>
         </div>
@@ -318,44 +326,24 @@ export default function BackupPage() {
             <CardHeader>
               <CardTitle className="text-white flex items-center gap-2">
                 <Download className="w-5 h-5" />
-                إنشاء نسخة احتياطية
+                إنشاء نسخة احتياطية الآن
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <Label className="text-slate-300">الجداول المراد نسخها:</Label>
-                {backupTables.map((table) => (
-                  <div key={table.id} className="flex items-start space-x-2 space-x-reverse">
-                    <Checkbox
-                      id={table.id}
-                      checked={selectedTables.includes(table.id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedTables([...selectedTables, table.id])
-                        } else {
-                          setSelectedTables(selectedTables.filter((t) => t !== table.id))
-                        }
-                      }}
-                    />
-                    <div className="grid gap-1.5 leading-none">
-                      <Label htmlFor={table.id} className="text-white font-medium">
-                        {table.name}
-                      </Label>
-                      <p className="text-xs text-slate-400">{table.description}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="flex items-center space-x-2 space-x-reverse">
-                <Checkbox id="auto-backup" checked={autoBackupEnabled} onCheckedChange={toggleAutoBackup} />
-                <Label htmlFor="auto-backup" className="text-slate-300">
-                  تفعيل النسخ الاحتياطي التلقائي اليومي
-                </Label>
-              </div>
-
-              <Button onClick={handleCreateBackup} disabled={loading || selectedTables.length === 0} className="w-full">
-                {loading ? "جاري إنشاء النسخة..." : "إنشاء وتحميل النسخة الاحتياطية"}
+              <p className="text-sm text-slate-300">
+                نسخة كاملة من كل الجداول (المنتجات، الإصدارات، إدخالات المخزون، المخازن، الفئات، العملاء، الفروع،
+                الصلاحيات، سجل النشاطات). تُحفظ على السيرفر ويتم تحميل نسخة منها لجهازك.
+              </p>
+              <p className="text-xs text-slate-400">كلمات المرور لا تُحفظ في النسخ الاحتياطية.</p>
+              <Button onClick={handleCreateBackup} disabled={creating} className="w-full">
+                {creating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                    جاري إنشاء النسخة...
+                  </>
+                ) : (
+                  "إنشاء وتحميل نسخة احتياطية"
+                )}
               </Button>
             </CardContent>
           </Card>
@@ -369,21 +357,21 @@ export default function BackupPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Alert className="bg-red-900/20 border-red-800">
+              <Alert className="bg-amber-900/20 border-amber-800">
                 <AlertTriangle className="h-4 w-4" />
-                <AlertDescription className="text-red-300">
-                  تحذير: استعادة النسخة الاحتياطية ستستبدل البيانات الحالية. تأكد من إنشاء نسخة احتياطية حديثة أولاً.
+                <AlertDescription className="text-amber-200">
+                  الاستعادة تضيف السجلات الناقصة فقط ولا تعدّل أو تحذف البيانات الحالية. المستخدمون لا تتم استعادتهم.
                 </AlertDescription>
               </Alert>
 
               <div className="grid gap-2">
                 <Label htmlFor="backup-file" className="text-slate-300">
-                  اختر ملف النسخة الاحتياطية
+                  اختر ملف النسخة الاحتياطية (.json.gz أو .json)
                 </Label>
                 <Input
                   id="backup-file"
                   type="file"
-                  accept=".json"
+                  accept=".gz,.json,application/gzip,application/json"
                   onChange={handleFileUpload}
                   className="bg-slate-700 border-slate-600 text-white"
                 />
@@ -395,58 +383,69 @@ export default function BackupPage() {
                   <div className="space-y-1 text-sm">
                     <div className="flex justify-between">
                       <span className="text-slate-300">التاريخ:</span>
+                      <span className="text-white">{formatTimestamp(restoreData.metadata.timestamp)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-300">السجلات:</span>
                       <span className="text-white">
-                        {new Date(restoreData.metadata.timestamp).toLocaleString("en-US")}
+                        {Object.values(restoreData.data as Record<string, any[]>)
+                          .reduce((sum, rows) => sum + (Array.isArray(rows) ? rows.length : 0), 0)
+                          .toLocaleString("en-US")}
                       </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-300">النوع:</span>
-                      <span className="text-white">{restoreData.metadata.type}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-slate-300">الجداول:</span>
-                      <span className="text-white">{restoreData.metadata.tables.length}</span>
                     </div>
                   </div>
                 </div>
               )}
 
-              <Button
-                onClick={handleRestore}
-                disabled={loading || !restoreData}
-                variant="destructive"
-                className="w-full"
-              >
-                {loading ? "جاري الاستعادة..." : "استعادة النسخة الاحتياطية"}
+              {restoreProgress && <p className="text-sm text-slate-300">{restoreProgress}</p>}
+
+              <Button onClick={handleRestore} disabled={restoring || !restoreData} variant="destructive" className="w-full">
+                {restoring ? (
+                  <>
+                    <Loader2 className="w-4 h-4 ml-2 animate-spin" />
+                    جاري الاستعادة...
+                  </>
+                ) : (
+                  "استعادة النسخة الاحتياطية"
+                )}
               </Button>
             </CardContent>
           </Card>
         </div>
 
-        {/* Backup History */}
+        {/* Stored backups */}
         <Card className="bg-slate-800 border-slate-700">
           <CardHeader>
             <CardTitle className="text-white flex items-center gap-2">
               <Calendar className="w-5 h-5" />
-              سجل النسخ الاحتياطية
+              النسخ المحفوظة على السيرفر
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {backupHistory.length > 0 ? (
+            {loadingList ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-slate-300">
+                <Loader2 className="w-5 h-5 animate-spin" />
+                جاري التحميل...
+              </div>
+            ) : backups.length > 0 ? (
               <div className="space-y-3">
-                {backupHistory.map((backup) => (
-                  <div key={backup.id} className="flex items-center justify-between p-3 bg-slate-700 rounded-lg">
+                {backups.map((backup) => (
+                  <div key={backup.name} className="flex items-center justify-between gap-3 p-3 bg-slate-700 rounded-lg">
                     <div>
-                      <div className="text-white font-medium">{new Date(backup.timestamp).toLocaleString("en-US")}</div>
-                      <div className="text-slate-300 text-sm">
-                        {backup.tables.length} جداول - {formatFileSize(backup.size)}
-                      </div>
+                      <div className="text-white font-medium">{formatTimestamp(backup.createdAt)}</div>
+                      <div className="text-slate-300 text-sm">{formatFileSize(backup.size)}</div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary">{backup.type}</Badge>
-                      <div className="text-slate-400 text-sm">
-                        {(Object.values(backup.recordCounts || {}) as number[]).reduce((a: number, b: number) => a + b, 0)} سجل
-                      </div>
+                      <Badge variant="secondary">{backup.type === "auto" ? "تلقائي" : "يدوي"}</Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-slate-500 text-slate-200"
+                        onClick={() => handleDownload(backup.name)}
+                        aria-label={`تحميل نسخة ${formatTimestamp(backup.createdAt)}`}
+                      >
+                        <Download className="w-4 h-4" />
+                      </Button>
                     </div>
                   </div>
                 ))}
@@ -455,7 +454,7 @@ export default function BackupPage() {
               <div className="text-center py-8">
                 <Database className="w-12 h-12 text-slate-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-white mb-2">لا توجد نسخ احتياطية</h3>
-                <p className="text-slate-400">ابدأ بإنشاء أول نسخة احتياطية لحماية بياناتك</p>
+                <p className="text-slate-400">أول نسخة تلقائية تتعمل بعد منتصف الليل (حوالي الساعة 3-4 الفجر)، أو اعمل نسخة الآن</p>
               </div>
             )}
           </CardContent>

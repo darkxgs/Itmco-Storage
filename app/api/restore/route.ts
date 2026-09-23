@@ -4,7 +4,8 @@ import { RESTORABLE_TABLES, errorResponse, getAdminClient, requireAppUser, HttpE
 const CHUNK_SIZE = 500
 
 // Adds rows from a backup file that are missing from the database. Existing rows (same id)
-// are left untouched, so running a restore twice is harmless.
+// are left untouched, so running a restore twice is harmless. The backup page sends a big
+// file in several requests (Vercel limits a request to ~4.5 MB); `final: true` marks the last.
 export async function POST(request: Request) {
   try {
     const caller = await requireAppUser(request, ["admin"])
@@ -49,18 +50,20 @@ export async function POST(request: Request) {
       }
     }
 
-    // Rows came back with their original ids; move each id sequence past them so new
-    // inserts don't collide. Function is created by the security migration.
-    const { error: sequenceError } = await admin.rpc("reset_id_sequences")
-    if (sequenceError) console.error("reset_id_sequences failed:", sequenceError)
+    if (backupData.final !== false) {
+      // Rows came back with their original ids; move each id sequence past them so new
+      // inserts don't collide. Function is created by the security migration.
+      const { error: sequenceError } = await admin.rpc("reset_id_sequences")
+      if (sequenceError) console.error("reset_id_sequences failed:", sequenceError)
 
-    await admin.from("activity_logs").insert({
-      user_id: caller.id,
-      user_name: caller.name,
-      action: "استعادة نسخة احتياطية",
-      module: "النظام",
-      details: `استعادة ${results.summary.successfulTables}/${results.summary.totalTables} جداول`,
-    })
+      await admin.from("activity_logs").insert({
+        user_id: caller.id,
+        user_name: caller.name,
+        action: "استعادة نسخة احتياطية",
+        module: "النظام",
+        details: `استعادة نسخة احتياطية بتاريخ ${backupData.metadata.timestamp || "غير معروف"}`,
+      })
+    }
 
     return NextResponse.json({
       success: results.summary.failedTables === 0,

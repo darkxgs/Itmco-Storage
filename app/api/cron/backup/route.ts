@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { createAutoBackup, isBackupDue, cleanupOldBackups } from "@/lib/auto-backup"
+import { deleteOldBackups, storeBackup, RETENTION_DAYS } from "@/lib/auto-backup"
 
+export const dynamic = "force-dynamic"
+export const maxDuration = 60
+
+// Daily full backup, scheduled in vercel.json. Keeps RETENTION_DAYS days of backups.
 export async function GET(request: NextRequest) {
   try {
     // Vercel Cron sends "Authorization: Bearer $CRON_SECRET"; secrets in the URL end up in logs
@@ -12,35 +16,21 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Check if backup is due
-    const isDue = await isBackupDue()
-    
-    if (!isDue) {
-      return NextResponse.json({
-        success: true,
-        message: 'Backup not due yet',
-        timestamp: new Date().toISOString()
-      })
-    }
-
-    // Create auto backup
-    const backupResult = await createAutoBackup()
-    
-    // Clean up old backups
-    await cleanupOldBackups()
+    const stored = await storeBackup('auto')
+    const removed = await deleteOldBackups()
 
     return NextResponse.json({
-      success: backupResult.success,
-      message: backupResult.success ? 'Auto backup completed successfully' : 'Auto backup failed',
-      backupId: backupResult.backupId,
-      recordCounts: backupResult.recordCounts,
-      size: backupResult.size,
-      error: backupResult.error,
-      timestamp: backupResult.timestamp
+      success: true,
+      backup: stored.name,
+      size: stored.size,
+      recordCounts: stored.recordCounts,
+      removedOlderThanDays: RETENTION_DAYS,
+      removed,
+      timestamp: new Date().toISOString()
     })
   } catch (error: any) {
     console.error('Cron backup error:', error)
-    
+
     return NextResponse.json(
       {
         success: false,
@@ -51,11 +41,4 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     )
   }
-}
-
-export async function POST() {
-  return NextResponse.json(
-    { error: 'Method not allowed' },
-    { status: 405 }
-  )
 }

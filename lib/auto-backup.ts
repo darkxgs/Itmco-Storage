@@ -1,282 +1,106 @@
-// Server-only (used by the cron route): runs with the service role so RLS doesn't hide rows
-import { getAdminClient, USERS_BACKUP_COLUMNS } from "./supabase-admin"
-import { logActivity } from "./auth"
+// Server-only (API routes): full backups kept as gzipped JSON in a private Supabase
+// Storage bucket. The daily Vercel cron (/api/cron/backup) and the backup page both
+// create them here; files are downloaded through short-lived signed URLs, so their
+// size isn't limited by Vercel's ~4.5 MB response cap.
+import { gzipSync } from "node:zlib"
+import { BACKUP_TABLES, USERS_BACKUP_COLUMNS, fetchAllAdmin, getAdminClient } from "./supabase-admin"
 
-export interface BackupConfig {
-  autoBackupEnabled: boolean
-  backupFrequency: 'hourly' | 'daily' | 'weekly'
-  backupRetentionDays: number
-  lastBackupAt?: string
-  nextBackupAt?: string
-}
+const BUCKET = "backups"
+export const RETENTION_DAYS = 30
+const FILE_NAME = /^itmco-backup-[0-9TZ-]+-(auto|manual)\.json\.gz$/
 
-export interface BackupResult {
-  success: boolean
-  backupId?: string
-  timestamp: string
-  recordCounts: Record<string, number>
+export interface StoredBackup {
+  name: string
   size: number
-  error?: string
+  createdAt: string
+  type: "auto" | "manual"
 }
 
-// Get backup configuration from database
-export async function getBackupConfig(): Promise<BackupConfig> {
-  try {
-    const { data, error } = await getAdminClient()
-      .from('backup_config')
-      .select('*')
-      .single()
+export async function buildBackup(type: "auto" | "manual") {
+  const backup: any = {
+    metadata: {
+      timestamp: new Date().toISOString(),
+      version: "3.0",
+      system: "ITMCO Inventory Management",
+      type,
+      tables: [] as string[],
+      recordCounts: {} as Record<string, number>,
+    },
+    data: {},
+  }
 
-    if (error) {
-      // Return default config if no config exists
-      return {
-        autoBackupEnabled: true,
-        backupFrequency: 'daily',
-        backupRetentionDays: 30
-      }
-    }
-
-    return {
-      autoBackupEnabled: data.auto_backup_enabled,
-      backupFrequency: data.backup_frequency,
-      backupRetentionDays: data.backup_retention_days,
-      lastBackupAt: data.last_backup_at,
-      nextBackupAt: data.next_backup_at
-    }
-  } catch (error) {
-    console.error('Error getting backup config:', error)
-    return {
-      autoBackupEnabled: true,
-      backupFrequency: 'daily',
-      backupRetentionDays: 30
+  // BACKUP_TABLES order: parents before children, so a restore satisfies foreign keys
+  for (const table of BACKUP_TABLES) {
+    try {
+      const rows = await fetchAllAdmin(table, table === "users" ? USERS_BACKUP_COLUMNS : "*")
+      backup.data[table] = rows
+      backup.metadata.tables.push(table)
+      backup.metadata.recordCounts[table] = rows.length
+    } catch (error: any) {
+      // Optional tables (e.g. release_items) may not exist in every database
+      if (error?.code === "42P01" || error?.code === "PGRST205") continue
+      throw new Error(`Failed to backup table ${table}: ${error.message}`)
     }
   }
+  return backup
 }
 
-// Update backup configuration
-export async function updateBackupConfig(config: Partial<BackupConfig>): Promise<void> {
-  try {
-    const { error } = await getAdminClient()
-      .from('backup_config')
-      .update({
-        auto_backup_enabled: config.autoBackupEnabled,
-        backup_frequency: config.backupFrequency,
-        backup_retention_days: config.backupRetentionDays,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', 1)
-
-    if (error) throw error
-  } catch (error) {
-    console.error('Error updating backup config:', error)
-    throw error
-  }
+async function ensureBucket() {
+  const storage = getAdminClient().storage
+  const { data } = await storage.getBucket(BUCKET)
+  if (data) return
+  const { error } = await storage.createBucket(BUCKET, { public: false })
+  if (error && !/already exists/i.test(error.message)) throw error
 }
 
-// Create a comprehensive backup
-export async function createAutoBackup(): Promise<BackupResult> {
-  const timestamp = new Date().toISOString()
-  
-  try {
-    // Get all data for backup
-    const [users, products, issuances, activityLogs, securityLogs] = await Promise.all([
-      getAdminClient().from("users").select(USERS_BACKUP_COLUMNS).order("created_at", { ascending: true }),
-      getAdminClient().from("products").select("*").order("created_at", { ascending: true }),
-      getAdminClient().from("issuances").select("*").order("created_at", { ascending: true }),
-      getAdminClient().from("activity_logs").select("*").order("created_at", { ascending: true }),
-      getAdminClient().from("security_logs").select("*").order("created_at", { ascending: true })
-    ])
+export async function storeBackup(type: "auto" | "manual") {
+  const backup = await buildBackup(type)
+  const body = gzipSync(Buffer.from(JSON.stringify(backup)))
+  const name = `itmco-backup-${backup.metadata.timestamp.replace(/[:.]/g, "-")}-${type}.json.gz`
 
-    if (users.error || products.error || issuances.error || activityLogs.error) {
-      throw new Error("Failed to fetch data for backup")
-    }
+  await ensureBucket()
+  const { error } = await getAdminClient()
+    .storage.from(BUCKET)
+    .upload(name, body, { contentType: "application/gzip", upsert: false })
+  if (error) throw error
 
-    const recordCounts = {
-      users: users.data?.length || 0,
-      products: products.data?.length || 0,
-      issuances: issuances.data?.length || 0,
-      activity_logs: activityLogs.data?.length || 0,
-      security_logs: securityLogs.data?.length || 0
-    }
-
-    const backupData = {
-      metadata: {
-        timestamp,
-        version: "2.0",
-        system: "ITMCO Inventory Management",
-        type: "auto",
-        tables: ["users", "products", "issuances", "activity_logs", "security_logs"],
-        recordCounts,
-        backupId: `auto_${Date.now()}`
-      },
-      data: {
-        users: users.data,
-        products: products.data,
-        issuances: issuances.data,
-        activity_logs: activityLogs.data,
-        security_logs: securityLogs.data
-      }
-    }
-
-    // Calculate backup size
-    const backupJson = JSON.stringify(backupData)
-    const size = new Blob([backupJson]).size
-
-    // Store backup metadata in database (in production, you'd store the actual backup in cloud storage)
-    await getAdminClient().from('backup_history').insert({
-      backup_id: backupData.metadata.backupId,
-      timestamp,
-      type: 'auto',
-      record_counts: recordCounts,
-      size,
-      status: 'completed'
-    })
-
-    // Update backup config with last backup time
-    const config = await getBackupConfig()
-    const nextBackupTime = calculateNextBackupTime(config.backupFrequency)
-    
-    await getAdminClient()
-      .from('backup_config')
-      .update({
-        last_backup_at: timestamp,
-        next_backup_at: nextBackupTime,
-        updated_at: timestamp
-      })
-      .eq('id', 1)
-
-    // Log the backup activity
-    await logActivity(
-      'system',
-      'نظام النسخ الاحتياطي',
-      'نسخ احتياطي تلقائي',
-      'النظام',
-      `تم إنشاء نسخة احتياطية تلقائية - ${Object.values(recordCounts).reduce((a, b) => a + b, 0)} سجل`
-    )
-
-    return {
-      success: true,
-      backupId: backupData.metadata.backupId,
-      timestamp,
-      recordCounts,
-      size
-    }
-  } catch (error: any) {
-    console.error('Auto backup failed:', error)
-    
-    // Log the failure
-    await logActivity(
-      'system',
-      'نظام النسخ الاحتياطي',
-      'فشل النسخ الاحتياطي',
-      'النظام',
-      `فشل في إنشاء النسخة الاحتياطية التلقائية: ${error.message}`
-    )
-
-    return {
-      success: false,
-      timestamp,
-      recordCounts: {},
-      size: 0,
-      error: error.message
-    }
-  }
+  return { name, size: body.length, recordCounts: backup.metadata.recordCounts as Record<string, number> }
 }
 
-// Calculate next backup time based on frequency
-function calculateNextBackupTime(frequency: 'hourly' | 'daily' | 'weekly'): string {
-  const now = new Date()
-  
-  switch (frequency) {
-    case 'hourly':
-      now.setHours(now.getHours() + 1)
-      break
-    case 'daily':
-      now.setDate(now.getDate() + 1)
-      break
-    case 'weekly':
-      now.setDate(now.getDate() + 7)
-      break
-  }
-  
-  return now.toISOString()
+export async function listBackups(): Promise<StoredBackup[]> {
+  await ensureBucket()
+  const { data, error } = await getAdminClient()
+    .storage.from(BUCKET)
+    .list("", { limit: 1000, sortBy: { column: "name", order: "desc" } })
+  if (error) throw error
+
+  return (data || [])
+    .filter((file) => FILE_NAME.test(file.name))
+    .map((file) => ({
+      name: file.name,
+      size: Number(file.metadata?.size) || 0,
+      createdAt: file.created_at || "",
+      type: file.name.endsWith("-auto.json.gz") ? "auto" : "manual",
+    }))
 }
 
-// Check if backup is due
-export async function isBackupDue(): Promise<boolean> {
-  try {
-    const config = await getBackupConfig()
-    
-    if (!config.autoBackupEnabled) {
-      return false
-    }
-    
-    if (!config.nextBackupAt) {
-      return true // No backup scheduled, create one
-    }
-    
-    const nextBackup = new Date(config.nextBackupAt)
-    const now = new Date()
-    
-    return now >= nextBackup
-  } catch (error) {
-    console.error('Error checking backup due:', error)
-    return false
-  }
+export async function deleteOldBackups(days = RETENTION_DAYS) {
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000
+  const old = (await listBackups()).filter((file) => file.createdAt && new Date(file.createdAt).getTime() < cutoff)
+  if (old.length === 0) return 0
+
+  const { error } = await getAdminClient()
+    .storage.from(BUCKET)
+    .remove(old.map((file) => file.name))
+  if (error) throw error
+  return old.length
 }
 
-// Clean up old backups based on retention policy
-export async function cleanupOldBackups(): Promise<void> {
-  try {
-    const config = await getBackupConfig()
-    const cutoffDate = new Date()
-    cutoffDate.setDate(cutoffDate.getDate() - config.backupRetentionDays)
-    
-    const { error } = await getAdminClient()
-      .from('backup_history')
-      .delete()
-      .lt('timestamp', cutoffDate.toISOString())
-    
-    if (error) {
-      console.error('Error cleaning up old backups:', error)
-    }
-  } catch (error) {
-    console.error('Error in cleanup process:', error)
-  }
-}
-
-// Initialize backup system
-export async function initializeBackupSystem(): Promise<void> {
-  try {
-    // Create backup_history table if it doesn't exist
-    await getAdminClient().rpc('create_backup_history_table')
-    
-    // Schedule initial backup if needed
-    if (await isBackupDue()) {
-      await createAutoBackup()
-    }
-    
-    // Clean up old backups
-    await cleanupOldBackups()
-  } catch (error) {
-    console.error('Error initializing backup system:', error)
-  }
-}
-
-// Get backup history
-export async function getBackupHistory(limit: number = 10): Promise<any[]> {
-  try {
-    const { data, error } = await getAdminClient()
-      .from('backup_history')
-      .select('*')
-      .order('timestamp', { ascending: false })
-      .limit(limit)
-    
-    if (error) throw error
-    
-    return data || []
-  } catch (error) {
-    console.error('Error getting backup history:', error)
-    return []
-  }
+export async function backupDownloadUrl(name: string) {
+  if (!FILE_NAME.test(name)) throw new Error("Invalid backup name")
+  const { data, error } = await getAdminClient()
+    .storage.from(BUCKET)
+    .createSignedUrl(name, 60, { download: name })
+  if (error) throw error
+  return data.signedUrl
 }
