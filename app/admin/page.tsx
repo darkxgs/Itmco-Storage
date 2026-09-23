@@ -15,6 +15,7 @@ import { toast } from "sonner"
 import { Plus, Edit, Trash2, Building2, Users, Search } from "lucide-react"
 import { getBranches, createBranch, updateBranch, deleteBranch, getCustomers, createCustomer, updateCustomer, deleteCustomer } from "@/lib/database"
 import type { Branch, Customer, BranchInsert, CustomerInsert } from "@/lib/supabase"
+import { useAuth } from "@/hooks/use-auth"
 
 interface BranchFormData {
   name: string
@@ -36,6 +37,11 @@ interface CustomerFormData {
 }
 
 export default function AdminPage() {
+  const { user } = useAuth()
+  useEffect(() => {
+    if (user && user.role !== "admin") window.location.href = "/dashboard"
+  }, [user])
+
   const [branches, setBranches] = useState<Branch[]>([])
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)

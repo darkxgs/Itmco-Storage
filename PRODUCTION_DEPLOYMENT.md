@@ -190,14 +190,8 @@ for i in {1..150}; do curl -X POST https://your-app.vercel.app/api/backup; done
 4. انتظر حتى اكتمال العملية
 
 ### إعادة تعيين كلمة مرور المدير:
-```sql
--- في Supabase SQL Editor
-UPDATE users 
-SET password_hash = '$2b$10$UQWLCOX4ITXd.ekx3YXW/ukQy8mU.CuRwJuTRF8PQj6Wk0mh1NYfW'
-WHERE email = 'itmcoadmin@gmail.com';
-
--- كلمة المرور الجديدة: itmcoadmin@12
-```
+من لوحة Supabase: Authentication → Users → اختر المستخدم → Send password recovery / Reset password.
+لا تضع كلمات مرور أو hashes معروفة في أي ملف داخل المستودع.
 
 ### تنظيف سجلات الأمان:
 ```sql

@@ -13,8 +13,16 @@ import { Download, FileText, Calendar, TrendingUp, Package, AlertTriangle } from
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
-import { getMonthlyIssuances, getProductFrequency, getBranchPerformance, getFilteredIssuances, getBranches, getCustomers, getWarehouses, getCategories } from "@/lib/database"
-import { getCurrentUserId } from "@/lib/warehouse-permissions"
+import {
+  getFilteredIssuances,
+  getBranches,
+  getCustomers,
+  getWarehouses,
+  getCategories,
+  summarizeMonthlyIssuances,
+  summarizeProductFrequency,
+  summarizeBranchPerformance,
+} from "@/lib/database"
 import { exportToCSV, exportToPDF, exportToExcel, validateExportData, generateSummaryStats } from "@/lib/export-utils"
 import { ErrorBoundary } from "@/components/error-boundary"
 
@@ -62,25 +70,24 @@ export default function ReportsPage() {
     }
   }, [user])
 
+  // Dropdown options only need loading once, not on every filter change
+  useEffect(() => {
+    if (authLoading || !user) return
+    Promise.all([getBranches(), getCustomers(), getWarehouses(), getCategories()])
+      .then(([branchesData, customersData, warehousesData, categoriesData]) => {
+        setBranches(branchesData)
+        setCustomers(customersData)
+        setWarehouses(warehousesData)
+        setCategories(categoriesData)
+      })
+      .catch((err) => console.error('Error loading report filters:', err))
+  }, [authLoading, user])
+
   const fetchData = async () => {
     try {
       setLoading(true)
       setError(null)
-      
-      // Load dynamic data first
-      const userId = await getCurrentUserId()
-      const [branchesData, customersData, warehousesData, categoriesData] = await Promise.all([
-        getBranches(),
-        getCustomers(),
-        getWarehouses(),
-        getCategories()
-      ])
-      
-      setBranches(branchesData)
-      setCustomers(customersData)
-      setWarehouses(warehousesData)
-      setCategories(categoriesData)
-      
+
       // Prepare filter parameters
       const filterParams = {
         startDate: filters.startDate || undefined,
@@ -95,19 +102,14 @@ export default function ReportsPage() {
         itemCode: filters.itemCode || undefined
       }
       
-      const [monthly, frequency, branch, filtered, recent] = await Promise.all([
-        getMonthlyIssuances(),
-        getProductFrequency(filterParams),
-        getBranchPerformance(filterParams),
-        getFilteredIssuances(filterParams),
-        getFilteredIssuances({ ...filterParams, limit: 10 })
-      ])
-      
-      setMonthlyData(monthly)
-      setProductFrequency(frequency)
-      setBranchData(branch)
+      // One paged read of every matching issuance; charts and cards are derived from it
+      const filtered = await getFilteredIssuances(filterParams)
+
+      setMonthlyData(summarizeMonthlyIssuances(filtered))
+      setProductFrequency(summarizeProductFrequency(filtered))
+      setBranchData(summarizeBranchPerformance(filtered))
       setAllTransactions(filtered)
-      setRecentTransactions(recent)
+      setRecentTransactions(filtered.slice(0, 10))
     } catch (err) {
       console.error('Error fetching data:', err)
       setError('Failed to load report data')
@@ -122,10 +124,25 @@ export default function ReportsPage() {
   }
 
   useEffect(() => {
-    if (!authLoading && user) {
-      fetchData()
-    }
+    if (authLoading || !user) return
+    // Debounce so typing in the text filters doesn't re-read the whole table per keystroke
+    const timer = setTimeout(fetchData, 400)
+    return () => clearTimeout(timer)
   }, [authLoading, user, filters])
+
+  // Human-readable filters for the export header, plus a filename that names the date range
+  const getExportMeta = () => {
+    const nameOf = (list: any[], id: string) => list.find((item) => item.id?.toString() === id)?.name || id
+    const exportFilters = {
+      ...filters,
+      branch: filters.branch !== "all" ? nameOf(branches, filters.branch) : undefined,
+      customer: filters.customer && filters.customer !== "all" ? nameOf(customers, filters.customer) : undefined,
+      warehouse: filters.warehouse !== "all" ? nameOf(warehouses, filters.warehouse) : undefined,
+    }
+    const from = filters.startDate || "البداية"
+    const to = filters.endDate || new Date().toLocaleDateString("en-CA")
+    return { filters: exportFilters, filename: `تقرير_الإصدارات_${from}_${to}` }
+  }
 
   const handleExportCSV = async () => {
     try {
@@ -147,8 +164,7 @@ export default function ReportsPage() {
       
       await exportToCSV({
         data: validationResult.data,
-        filename: `تقرير_الإصدارات_${new Date().toISOString().split('T')[0]}`,
-        filters,
+        ...getExportMeta(),
         summaryStats
       })
 
@@ -188,8 +204,7 @@ export default function ReportsPage() {
       
       await exportToExcel({
         data: validationResult.data,
-        filename: `تقرير_الإصدارات_${new Date().toISOString().split('T')[0]}`,
-        filters,
+        ...getExportMeta(),
         summaryStats
       })
 
@@ -229,8 +244,7 @@ export default function ReportsPage() {
       
       await exportToPDF({
         data: validationResult.data,
-        filename: `تقرير_الإصدارات_${new Date().toISOString().split('T')[0]}`,
-        filters,
+        ...getExportMeta(),
         summaryStats,
         chartData: {
           monthlyData,
@@ -502,8 +516,8 @@ export default function ReportsPage() {
                     <Package className="h-4 w-4 text-blue-400" />
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-white">{recentTransactions.length}</div>
-                    <p className="text-xs text-slate-400">هذا الشهر</p>
+                    <div className="text-2xl font-bold text-white">{allTransactions.length}</div>
+                    <p className="text-xs text-slate-400">حسب الفلاتر الحالية</p>
                   </CardContent>
                 </Card>
 

@@ -48,8 +48,27 @@ export interface ExportOptions {
     productName?: string
     engineer?: string
     customer?: string
+    warehouse?: string
+    itemCode?: string
+    serialNumber?: string
   }
   summaryStats?: any
+}
+
+// Lines describing the active filters, shared by the CSV, Excel and PDF headers
+export function describeFilters(filters: ExportOptions['filters'] = {}): string[] {
+  const parts: string[] = []
+  if (filters.startDate) parts.push(`من تاريخ: ${filters.startDate}`)
+  if (filters.endDate) parts.push(`إلى تاريخ: ${filters.endDate}`)
+  if (filters.branch && filters.branch !== 'all') parts.push(`الفرع: ${filters.branch}`)
+  if (filters.category && filters.category !== 'all') parts.push(`الفئة: ${filters.category}`)
+  if (filters.productName) parts.push(`المنتج: ${filters.productName}`)
+  if (filters.engineer) parts.push(`المهندس: ${filters.engineer}`)
+  if (filters.customer && filters.customer !== 'all') parts.push(`العميل: ${filters.customer}`)
+  if (filters.warehouse && filters.warehouse !== 'all') parts.push(`المخزن: ${filters.warehouse}`)
+  if (filters.itemCode) parts.push(`كود الصنف: ${filters.itemCode}`)
+  if (filters.serialNumber) parts.push(`الرقم التسلسلي: ${filters.serialNumber}`)
+  return parts
 }
 
 // Enhanced CSV Export
@@ -63,15 +82,7 @@ export function exportToCSV(options: ExportOptions): void {
   ]
 
   // Add filter information as header
-  const filterInfo: string[] = []
-  const safeFilters = filters || {}
-  if (safeFilters.startDate) filterInfo.push(`من تاريخ: ${safeFilters.startDate}`)
-  if (safeFilters.endDate) filterInfo.push(`إلى تاريخ: ${safeFilters.endDate}`)
-  if (safeFilters.branch && safeFilters.branch !== 'all') filterInfo.push(`الفرع: ${safeFilters.branch}`)
-  if (safeFilters.category && safeFilters.category !== 'all') filterInfo.push(`الفئة: ${safeFilters.category}`)
-  if (safeFilters.productName) filterInfo.push(`المنتج: ${safeFilters.productName}`)
-  if (safeFilters.engineer) filterInfo.push(`المهندس: ${safeFilters.engineer}`)
-  if (safeFilters.customer) filterInfo.push(`العميل: ${safeFilters.customer}`)
+  const filterInfo = describeFilters(filters)
 
   const finalCsvData = [
     [title],
@@ -93,7 +104,7 @@ export function exportToCSV(options: ExportOptions): void {
   const link = document.createElement('a')
   const url = URL.createObjectURL(blob)
   link.setAttribute('href', url)
-  link.setAttribute('download', `${filename}_${new Date().toISOString().split('T')[0]}.csv`)
+  link.setAttribute('download', `${filename}.csv`)
   link.style.visibility = 'hidden'
   document.body.appendChild(link)
   link.click()
@@ -187,16 +198,8 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
 
   // Filters HTML
   let filtersHtml = ''
-  if (safeFilters.startDate || safeFilters.endDate || safeFilters.branch || safeFilters.category || safeFilters.productName || safeFilters.engineer || safeFilters.customer) {
-    const parts: string[] = []
-    if (safeFilters.startDate) parts.push(`من تاريخ: ${safeFilters.startDate}`)
-    if (safeFilters.endDate) parts.push(`إلى تاريخ: ${safeFilters.endDate}`)
-    if (safeFilters.branch && safeFilters.branch !== 'all') parts.push(`الفرع: ${safeFilters.branch}`)
-    if (safeFilters.category && safeFilters.category !== 'all') parts.push(`الفئة: ${safeFilters.category}`)
-    if (safeFilters.productName) parts.push(`المنتج: ${safeFilters.productName}`)
-    if (safeFilters.engineer) parts.push(`المهندس: ${safeFilters.engineer}`)
-    if (safeFilters.customer) parts.push(`العميل: ${safeFilters.customer}`)
-
+  const parts = describeFilters(safeFilters)
+  if (parts.length > 0) {
     filtersHtml = `
       <div style="font-size:12px;margin:8px 0;">
         <div style="font-weight:600;margin-bottom:4px;">الفلاتر المطبقة:</div>
@@ -417,7 +420,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
       pdf.text(`${i} / ${pageCount}`, pageWidth / 2, pageHeight - 5, { align: 'center' })
     }
 
-    pdf.save(`${filename}_${new Date().toISOString().split('T')[0]}.pdf`)
+    pdf.save(`${filename}.pdf`)
 
     // Cleanup
     document.body.removeChild(container)
@@ -496,9 +499,9 @@ const mapRowForStrings = (item: ExportData): string[] => {
     translateWarrantyType(item.warrantyType), // نوع الضمان مترجم
     item.invoiceNumber ?? '',
     item.invoiceValue ?? '', // قيمة الفاتورة
-    item.purchasePrice ? `${purchasePrice.toLocaleString('ar-SA')} ريال` : '',
-    item.sellingPrice ? `${sellingPrice.toLocaleString('ar-SA')} ريال` : '',
-    (purchasePrice > 0 || sellingPrice > 0) ? `${profit.toLocaleString('ar-SA')} ريال` : '', // الربح
+    item.purchasePrice ? `${purchasePrice.toLocaleString('en-US')} ج.م` : '',
+    item.sellingPrice ? `${sellingPrice.toLocaleString('en-US')} ج.م` : '',
+    (purchasePrice > 0 || sellingPrice > 0) ? `${profit.toLocaleString('en-US')} ج.م` : '', // الربح
     totalPrice > 0 ? `${totalPrice}` : '', // الإجمالي - رقم فقط
     item.notes ?? ''
   ]
@@ -519,15 +522,10 @@ export function exportToExcel(options: ExportOptions): void {
     ['']
   ]
 
-  if (safeFilters.startDate || safeFilters.endDate || safeFilters.branch || safeFilters.category || safeFilters.productName || safeFilters.engineer || safeFilters.customer) {
+  const filterLines = describeFilters(safeFilters)
+  if (filterLines.length > 0) {
     headerInfo.push(['الفلاتر المطبقة:'])
-    if (safeFilters.startDate) headerInfo.push([`من تاريخ: ${safeFilters.startDate}`])
-    if (safeFilters.endDate) headerInfo.push([`إلى تاريخ: ${safeFilters.endDate}`])
-    if (safeFilters.branch && safeFilters.branch !== 'all') headerInfo.push([`الفرع: ${safeFilters.branch}`])
-    if (safeFilters.category && safeFilters.category !== 'all') headerInfo.push([`الفئة: ${safeFilters.category}`])
-    if (safeFilters.productName) headerInfo.push([`المنتج: ${safeFilters.productName}`])
-    if (safeFilters.engineer) headerInfo.push([`المهندس: ${safeFilters.engineer}`])
-    if (safeFilters.customer) headerInfo.push([`العميل: ${safeFilters.customer}`])
+    filterLines.forEach(line => headerInfo.push([line]))
     headerInfo.push([''])
   }
 
@@ -669,7 +667,7 @@ export function exportToExcel(options: ExportOptions): void {
   ;(worksheet as any)[summaryValueCell] = { t: 'n', f: `SUM(${sumRange})`, s: { font: { bold: true } } }
  
    XLSX.utils.book_append_sheet(workbook, worksheet, 'تقرير الإصدارات')
-   XLSX.writeFile(workbook, `${filename}_${new Date().toISOString().split('T')[0]}.xlsx`)
+   XLSX.writeFile(workbook, `${filename}.xlsx`)
 }
 
 // Summary statistics for reports

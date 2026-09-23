@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { loadUserFromStorage, clearUserFromStorage, type User } from "@/lib/utils"
+import { type User } from "@/lib/utils"
+import { supabase } from "@/lib/supabase"
+import { getSessionUser, signOut } from "@/lib/auth"
 
 export function useAuth(requireAuth = true) {
   const [user, setUser] = useState<User | null>(null)
@@ -8,24 +10,35 @@ export function useAuth(requireAuth = true) {
   const router = useRouter()
 
   useEffect(() => {
-    const loadUser = () => {
-      const userData = loadUserFromStorage()
-      
-      if (userData) {
-        setUser(userData)
+    let cancelled = false
+
+    getSessionUser().then((sessionUser) => {
+      if (cancelled) return
+      if (sessionUser) {
+        setUser(sessionUser)
       } else if (requireAuth) {
         router.push("/login")
         return
       }
-      
       setLoading(false)
-    }
+    })
 
-    loadUser()
+    // Session expired, or signed out in another tab
+    const { data: subscription } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        setUser(null)
+        if (requireAuth) router.push("/login")
+      }
+    })
+
+    return () => {
+      cancelled = true
+      subscription.subscription.unsubscribe()
+    }
   }, [router, requireAuth])
 
-  const logout = () => {
-    clearUserFromStorage()
+  const logout = async () => {
+    await signOut()
     setUser(null)
     router.push("/login")
   }

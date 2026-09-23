@@ -3,12 +3,12 @@
 import { useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Package, Loader2 } from "lucide-react"
-import { loadUserFromStorage } from "@/lib/utils"
+import { getSessionUser } from "@/lib/auth"
 
 export default function HomePage() {
   useEffect(() => {
-    const checkAuth = () => {
-      const user = loadUserFromStorage()
+    const checkAuth = async () => {
+      const user = await getSessionUser()
       if (user) {
         window.location.href = "/dashboard"
       } else {

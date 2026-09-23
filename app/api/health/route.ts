@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
+import { getAdminClient } from "@/lib/supabase-admin"
+
+export const dynamic = "force-dynamic"
 
 export async function GET() {
   try {
-    // Test database connection
-    const { data, error } = await supabase.from("users").select("count").limit(1)
+    // Head-only count: proves the database answers without returning any rows
+    const { error } = await getAdminClient().from("products").select("id", { count: "exact", head: true })
 
     if (error) {
       throw error
@@ -22,7 +24,6 @@ export async function GET() {
         status: "unhealthy",
         timestamp: new Date().toISOString(),
         database: "disconnected",
-        error: error.message,
       },
       { status: 500 },
     )

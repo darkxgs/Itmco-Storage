@@ -22,7 +22,8 @@ import { Sidebar } from '@/components/sidebar'
 import { useAuth } from '@/hooks/use-auth'
 import { ErrorBoundary } from '@/components/error-boundary'
 
-interface UserWithPermissions extends User {
+// password_hash is never read by the client
+interface UserWithPermissions extends Omit<User, 'password_hash'> {
   permissions: UserWarehousePermission[]
 }
 
@@ -69,7 +70,7 @@ export default function WarehousePermissionsPage() {
       // Load users
       const { data: usersData, error: usersError } = await supabase
         .from('users')
-        .select('*')
+        .select('id, name, email, role, is_active, created_at, updated_at')
         .order('name')
       
       if (usersError) throw usersError

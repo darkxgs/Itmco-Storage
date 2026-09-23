@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect, useMemo, useRef } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -14,6 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog"
 import { ShoppingCart, Calendar, User, Building, Edit, Trash2, Loader2, Plus, X, Search } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
+import { Pagination } from "@/components/ui/pagination"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import { getProducts, getIssuances, getIssuancesByItemCode, createIssuance, updateIssuance, deleteIssuance, getBranches, getCustomers, getWarehouses, searchByItemCode, searchIssuancesByFilters } from "@/lib/database"
@@ -74,6 +75,15 @@ export default function IssuancePage() {
   const [selectedIndex, setSelectedIndex] = useState(-1)
   const { toast } = useToast()
 
+  // id → record lookups; the table and filters used to scan these arrays once per row
+  const productsById = useMemo(() => new Map(products.map((p: any) => [p.id, p])), [products])
+  const customersById = useMemo(() => new Map(customers.map((c: any) => [c.id, c])), [customers])
+  const branchesById = useMemo(() => new Map(branches.map((b: any) => [b.id, b])), [branches])
+  const warehousesById = useMemo(() => new Map(warehouses.map((w: any) => [w.id, w])), [warehouses])
+
+  const ISSUANCES_PER_PAGE = 100
+  const [issuancePage, setIssuancePage] = useState(1)
+
   // Filter issuances based on search criteria
   const filteredIssuances = useMemo(() => {
     return issuances.filter((issuance) => {
@@ -95,7 +105,7 @@ export default function IssuancePage() {
       const matchesWarehouse = !filterWarehouse || filterWarehouse === "all" || issuance.warehouse_id?.toString() === filterWarehouse
 
       // Find the product associated with this issuance to check item_code
-      const product = products.find(p => p.id === issuance.product_id)
+      const product: any = productsById.get(issuance.product_id)
       const productItemCode = (product?.item_code || issuance.item_code || "").toLowerCase()
       const itemCodeSearchLower = itemCodeSearch.toLowerCase().trim()
       const matchesItemCode = !itemCodeSearch || itemCodeSearchLower === "" ||
@@ -103,7 +113,18 @@ export default function IssuancePage() {
 
       return matchesSearch && matchesBranch && matchesCustomer && matchesWarehouse && matchesItemCode
     })
-  }, [issuances, products, searchTerm, filterBranch, filterCustomer, filterWarehouse, itemCodeSearch])
+  }, [issuances, productsById, searchTerm, filterBranch, filterCustomer, filterWarehouse, itemCodeSearch])
+
+  // Back to the first page whenever the result set changes
+  useEffect(() => {
+    setIssuancePage(1)
+  }, [searchTerm, filterBranch, filterCustomer, filterWarehouse, itemCodeSearch])
+
+  const issuanceTotalPages = Math.max(1, Math.ceil(filteredIssuances.length / ISSUANCES_PER_PAGE))
+  const pagedIssuances = useMemo(
+    () => filteredIssuances.slice((issuancePage - 1) * ISSUANCES_PER_PAGE, issuancePage * ISSUANCES_PER_PAGE),
+    [filteredIssuances, issuancePage],
+  )
 
   useEffect(() => {
     const loadData = async () => {
@@ -137,10 +158,15 @@ export default function IssuancePage() {
     loadData()
   }, [user, toast])
 
+  // loadData above already fetched everything; only refetch when a search is cleared
+  const hadItemCodeSearch = useRef(false)
+
   useEffect(() => {
     const searchProducts = async () => {
       // 1. Search products (for filtering options)
       if (!itemCodeSearch.trim()) {
+        if (!hadItemCodeSearch.current) return
+        hadItemCodeSearch.current = false
         try {
           const productsData = await getProducts()
           setProducts(productsData || [])
@@ -156,6 +182,7 @@ export default function IssuancePage() {
         return
       }
 
+      hadItemCodeSearch.current = true
       try {
         // Find matching products
         const results = await searchByItemCode(itemCodeSearch)
@@ -1553,11 +1580,11 @@ export default function IssuancePage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredIssuances.map((issuance) => {
-                    const product = products.find(p => p.id === issuance.product_id)
-                    const customer = customers.find(c => c.id === issuance.customer_id)
-                    const branch = branches.find(b => b.id === issuance.branch_id)
-                    const warehouse = warehouses.find(w => w.id === issuance.warehouse_id)
+                  {pagedIssuances.map((issuance) => {
+                    const product: any = productsById.get(issuance.product_id)
+                    const customer: any = customersById.get(issuance.customer_id)
+                    const branch: any = branchesById.get(issuance.branch_id)
+                    const warehouse: any = warehousesById.get(issuance.warehouse_id)
 
                     return (
                       <TableRow key={issuance.id} className="border-slate-700 hover:bg-slate-700/30 transition-colors">
@@ -1631,6 +1658,16 @@ export default function IssuancePage() {
                   })}
                 </TableBody>
               </Table>
+            </div>
+            <div className="mt-4">
+              <Pagination
+                currentPage={issuancePage}
+                totalPages={issuanceTotalPages}
+                onPageChange={setIssuancePage}
+                showInfo={true}
+                totalItems={filteredIssuances.length}
+                itemsPerPage={ISSUANCES_PER_PAGE}
+              />
             </div>
           </CardContent>
         </Card>

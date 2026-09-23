@@ -61,9 +61,15 @@ export default function ProfitMarginReportPage() {
     return uniqueCategories.sort((a, b) => a.localeCompare(b, 'ar'))
   }, [products])
 
+  // Purchase prices and margins are for admins and inventory managers only
   useEffect(() => {
+    if (!user) return
+    if (!["admin", "inventory_manager"].includes(user.role)) {
+      window.location.href = "/dashboard"
+      return
+    }
     loadData()
-  }, [])
+  }, [user])
 
   const loadData = async () => {
     try {

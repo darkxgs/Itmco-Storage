@@ -29,7 +29,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useAuth } from "@/hooks/use-auth"
 import { supabase } from "@/lib/supabase"
-import { logActivity, hashPassword } from "@/lib/auth"
+import { logActivity } from "@/lib/auth"
+import { apiFetch } from "@/lib/api-client"
 import { validateEmail, validatePassword } from "@/lib/validation"
 import { formatDate } from "@/lib/utils"
 
@@ -71,7 +72,10 @@ export default function UsersPage() {
     const loadUsers = async () => {
       try {
         setLoading(true)
-        const { data, error } = await supabase.from("users").select("*").order("created_at", { ascending: false })
+        const { data, error } = await supabase
+          .from("users")
+          .select("id, name, email, role, is_active, created_at, updated_at")
+          .order("created_at", { ascending: false })
 
         if (error) throw error
         setUsers(data || [])
@@ -150,35 +154,29 @@ export default function UsersPage() {
     try {
       setSubmitting(true)
 
-      // Check if email already exists
-      const { data: existingUser } = await supabase.from("users").select("id").eq("email", newUser.email).single()
-
-      if (existingUser) {
+      // Creates the Supabase Auth login and the profile together (admin-only route)
+      const response = await apiFetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: newUser.name.trim(),
+          email: newUser.email.toLowerCase().trim(),
+          role: newUser.role,
+          password: newUser.password,
+          is_active: newUser.is_active,
+        }),
+      })
+      const result = await response.json()
+      if (!response.ok) {
         toast({
-          title: "خطأ في البيانات",
-          description: "البريد الإلكتروني مستخدم بالفعل",
+          title: "خطأ في الإضافة",
+          description: result.error || "فشل في إضافة المستخدم",
           variant: "destructive",
         })
         return
       }
 
-      const passwordHash = await hashPassword(newUser.password)
-
-      const { data, error } = await supabase
-        .from("users")
-        .insert({
-          name: newUser.name.trim(),
-          email: newUser.email.toLowerCase().trim(),
-          role: newUser.role,
-          password_hash: passwordHash,
-          is_active: newUser.is_active,
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-
-      setUsers([data, ...users])
+      setUsers([result.user, ...users])
 
       await logActivity(
         user.id,
@@ -221,40 +219,34 @@ export default function UsersPage() {
     try {
       setSubmitting(true)
 
-      // Check if email already exists for other users
-      const { data: existingUser } = await supabase
-        .from("users")
-        .select("id")
-        .eq("email", editingUser.email)
-        .neq("id", editingUser.id)
-        .single()
+      const updateData: any = {
+        id: editingUser.id,
+        name: editingUser.name.trim(),
+        email: editingUser.email.toLowerCase().trim(),
+        role: editingUser.role,
+        is_active: editingUser.is_active,
+      }
 
-      if (existingUser) {
+      if (editingUser.password) {
+        updateData.password = editingUser.password
+      }
+
+      const response = await apiFetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      })
+      const result = await response.json()
+      if (!response.ok) {
         toast({
-          title: "خطأ في البيانات",
-          description: "البريد الإلكتروني مستخدم بالفعل",
+          title: "خطأ في التحديث",
+          description: result.error || "فشل في تحديث بيانات المستخدم",
           variant: "destructive",
         })
         return
       }
 
-      const updateData: any = {
-        name: editingUser.name.trim(),
-        email: editingUser.email.toLowerCase().trim(),
-        role: editingUser.role,
-        is_active: editingUser.is_active,
-        updated_at: new Date().toISOString(),
-      }
-
-      if (editingUser.password) {
-        updateData.password_hash = await hashPassword(editingUser.password)
-      }
-
-      const { data, error } = await supabase.from("users").update(updateData).eq("id", editingUser.id).select().single()
-
-      if (error) throw error
-
-      setUsers(users.map((u) => (u.id === editingUser.id ? data : u)))
+      setUsers(users.map((u) => (u.id === editingUser.id ? result.user : u)))
 
       await logActivity(
         user.id,
@@ -295,9 +287,16 @@ export default function UsersPage() {
     }
 
     try {
-      const { error } = await supabase.from("users").delete().eq("id", userId)
-
-      if (error) throw error
+      const response = await apiFetch(`/api/admin/users?id=${encodeURIComponent(userId)}`, { method: "DELETE" })
+      const result = await response.json()
+      if (!response.ok) {
+        toast({
+          title: "خطأ في الحذف",
+          description: result.error || "فشل في حذف المستخدم",
+          variant: "destructive",
+        })
+        return
+      }
 
       setUsers(users.filter((u) => u.id !== userId))
 
@@ -330,19 +329,15 @@ export default function UsersPage() {
     }
 
     try {
-      const { data, error } = await supabase
-        .from("users")
-        .update({
-          is_active: !currentStatus,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", userId)
-        .select()
-        .single()
+      const response = await apiFetch("/api/admin/users", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: userId, is_active: !currentStatus }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error)
 
-      if (error) throw error
-
-      setUsers(users.map((u) => (u.id === userId ? data : u)))
+      setUsers(users.map((u) => (u.id === userId ? result.user : u)))
 
       const action = !currentStatus ? "تفعيل مستخدم" : "إلغاء تفعيل مستخدم"
       const statusText = !currentStatus ? "تفعيل" : "إلغاء تفعيل"

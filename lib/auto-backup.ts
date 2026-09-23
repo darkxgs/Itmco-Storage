@@ -1,4 +1,5 @@
-import { supabase } from "./supabase"
+// Server-only (used by the cron route): runs with the service role so RLS doesn't hide rows
+import { getAdminClient, USERS_BACKUP_COLUMNS } from "./supabase-admin"
 import { logActivity } from "./auth"
 
 export interface BackupConfig {
@@ -21,7 +22,7 @@ export interface BackupResult {
 // Get backup configuration from database
 export async function getBackupConfig(): Promise<BackupConfig> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getAdminClient()
       .from('backup_config')
       .select('*')
       .single()
@@ -55,7 +56,7 @@ export async function getBackupConfig(): Promise<BackupConfig> {
 // Update backup configuration
 export async function updateBackupConfig(config: Partial<BackupConfig>): Promise<void> {
   try {
-    const { error } = await supabase
+    const { error } = await getAdminClient()
       .from('backup_config')
       .update({
         auto_backup_enabled: config.autoBackupEnabled,
@@ -79,11 +80,11 @@ export async function createAutoBackup(): Promise<BackupResult> {
   try {
     // Get all data for backup
     const [users, products, issuances, activityLogs, securityLogs] = await Promise.all([
-      supabase.from("users").select("*").order("created_at", { ascending: true }),
-      supabase.from("products").select("*").order("created_at", { ascending: true }),
-      supabase.from("issuances").select("*").order("created_at", { ascending: true }),
-      supabase.from("activity_logs").select("*").order("created_at", { ascending: true }),
-      supabase.from("security_logs").select("*").order("created_at", { ascending: true })
+      getAdminClient().from("users").select(USERS_BACKUP_COLUMNS).order("created_at", { ascending: true }),
+      getAdminClient().from("products").select("*").order("created_at", { ascending: true }),
+      getAdminClient().from("issuances").select("*").order("created_at", { ascending: true }),
+      getAdminClient().from("activity_logs").select("*").order("created_at", { ascending: true }),
+      getAdminClient().from("security_logs").select("*").order("created_at", { ascending: true })
     ])
 
     if (users.error || products.error || issuances.error || activityLogs.error) {
@@ -122,7 +123,7 @@ export async function createAutoBackup(): Promise<BackupResult> {
     const size = new Blob([backupJson]).size
 
     // Store backup metadata in database (in production, you'd store the actual backup in cloud storage)
-    await supabase.from('backup_history').insert({
+    await getAdminClient().from('backup_history').insert({
       backup_id: backupData.metadata.backupId,
       timestamp,
       type: 'auto',
@@ -135,7 +136,7 @@ export async function createAutoBackup(): Promise<BackupResult> {
     const config = await getBackupConfig()
     const nextBackupTime = calculateNextBackupTime(config.backupFrequency)
     
-    await supabase
+    await getAdminClient()
       .from('backup_config')
       .update({
         last_backup_at: timestamp,
@@ -231,7 +232,7 @@ export async function cleanupOldBackups(): Promise<void> {
     const cutoffDate = new Date()
     cutoffDate.setDate(cutoffDate.getDate() - config.backupRetentionDays)
     
-    const { error } = await supabase
+    const { error } = await getAdminClient()
       .from('backup_history')
       .delete()
       .lt('timestamp', cutoffDate.toISOString())
@@ -248,7 +249,7 @@ export async function cleanupOldBackups(): Promise<void> {
 export async function initializeBackupSystem(): Promise<void> {
   try {
     // Create backup_history table if it doesn't exist
-    await supabase.rpc('create_backup_history_table')
+    await getAdminClient().rpc('create_backup_history_table')
     
     // Schedule initial backup if needed
     if (await isBackupDue()) {
@@ -265,7 +266,7 @@ export async function initializeBackupSystem(): Promise<void> {
 // Get backup history
 export async function getBackupHistory(limit: number = 10): Promise<any[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getAdminClient()
       .from('backup_history')
       .select('*')
       .order('timestamp', { ascending: false })

@@ -40,11 +40,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 
 ## 5. اختبار النظام
 
-1. اذهب إلى `/test` لاختبار الاتصال بقاعدة البيانات
-2. جرب تسجيل الدخول بالحسابات التجريبية:
-   - مدير: itmcoadmin@gmail.com / itmcoadmin@12
-   - مخزون: inventory@itmco.com / inventory@itmco
-   - مهندس: engineer@itmco.com / engineer@itmco
+1. افتح `/api/health` للتأكد من الاتصال بقاعدة البيانات
+2. سجّل الدخول بحساب المدير الذي أنشأته في Supabase Auth (لا توجد حسابات تجريبية بكلمات مرور معروفة)
 
 ## استكشاف الأخطاء
 

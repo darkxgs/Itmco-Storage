@@ -22,11 +22,9 @@
 - **Charts**: Recharts
 - **Deployment**: Vercel
 
-## الحسابات التجريبية
+## الحسابات
 
-- **مدير النظام**: `itmcoadmin@gmail.com` / `itmcoadmin@12`
-- **مدير المخزون**: `inventory@itmco.com` / `inventory@itmco`
-- **مهندس**: `engineer@itmco.com` / `engineer@itmco`
+لا تُكتب كلمات المرور في المستودع. تسجيل الدخول يتم عبر Supabase Auth، وإنشاء المستخدمين وتغيير كلمات المرور من صفحة "إدارة المستخدمين" (للمدير فقط).
 
 ## التثبيت والإعداد
 
@@ -91,6 +89,10 @@ vercel --prod
 |---------|--------|
 | `NEXT_PUBLIC_SUPABASE_URL` | رابط مشروع Supabase |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | مفتاح Supabase العام |
+| `SUPABASE_SERVICE_ROLE_KEY` | مفتاح service role (سري، للسيرفر فقط: إدارة المستخدمين والنسخ الاحتياطي) |
+| `CRON_SECRET` | اختياري: سر يحمي `/api/cron/backup` |
+
+راجع `SECURITY_MIGRATION.md` لخطوات الترحيل إلى Supabase Auth بالترتيب.
 
 ## هيكل المشروع
 
@@ -179,6 +181,4 @@ vercel --prod
 ## الترخيص
 
 هذا المشروع مطور خصيصاً لشركة ITMCO.
-\`\`\`
 
-Now let's create a production deployment checklist:

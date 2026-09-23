@@ -14,7 +14,7 @@ import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
 import { supabase } from "@/lib/supabase"
-import { getCategories } from "@/lib/database"
+import { getCategories, fetchAllRows } from "@/lib/database"
 
 // Types for search results
 interface ProductResult {
@@ -57,6 +57,9 @@ interface UserResult {
 }
 
 type SearchResult = ProductResult | IssuanceResult | UserResult
+
+// Rendering thousands of rows freezes the page; the export still includes everything
+const MAX_RESULT_ROWS = 200
 
 export default function SearchPage() {
   const { user } = useAuth()
@@ -101,14 +104,9 @@ export default function SearchPage() {
       let data: any[] = []
 
       if (searchType === "products") {
-        const { data: productsData, error } = await supabase
-          .from("products")
-          .select("*")
-          .order("created_at", { ascending: false })
-
-        if (error) throw error
-
-        let filtered = productsData ?? []
+        let filtered = await fetchAllRows("products", "*", (q) =>
+          q.order("created_at", { ascending: false }).order("id", { ascending: false }),
+        )
 
         if (searchTerm) {
           const s = searchTerm.toLowerCase()
@@ -137,29 +135,27 @@ export default function SearchPage() {
 
         data = filtered
       } else if (searchType === "issuances") {
-        query = supabase.from("issuances").select("*")
+        // Commas and parentheses are syntax inside PostgREST's or=(...) filter
+        const term = searchTerm.replace(/[,()]/g, " ").trim()
 
-        if (searchTerm) {
-          query = query.or(
-            `product_name.ilike.%${searchTerm}%,customer_name.ilike.%${searchTerm}%,engineer.ilike.%${searchTerm}%,serial_number.ilike.%${searchTerm}%`,
-          )
-        }
-
-        if (selectedBranch !== "all") {
-          query = query.eq("branch", selectedBranch)
-        }
-
-        if (dateRange?.from) {
-          query = query.gte("created_at", dateRange.from.toISOString())
-        }
-
-        if (dateRange?.to) {
-          query = query.lte("created_at", dateRange.to.toISOString())
-        }
-
-        const { data: issuancesData, error } = await query.order("created_at", { ascending: false })
-        if (error) throw error
-        data = issuancesData
+        data = await fetchAllRows("issuances", "*", (q) => {
+          if (term) {
+            q = q.or(
+              `product_name.ilike.%${term}%,customer_name.ilike.%${term}%,engineer.ilike.%${term}%,serial_number.ilike.%${term}%`,
+            )
+          }
+          if (selectedBranch !== "all") {
+            q = q.eq("branch", selectedBranch)
+          }
+          // Filter on the issuance date shown to users; the picker gives local calendar days
+          if (dateRange?.from) {
+            q = q.gte("date", dateRange.from.toLocaleDateString("en-CA"))
+          }
+          if (dateRange?.to) {
+            q = q.lte("date", dateRange.to.toLocaleDateString("en-CA"))
+          }
+          return q.order("date", { ascending: false }).order("id", { ascending: false })
+        })
       } else if (searchType === "users") {
         if (!user || user.role !== "admin") {
           toast({
@@ -171,10 +167,11 @@ export default function SearchPage() {
           return
         }
 
-        query = supabase.from("users").select("*")
+        query = supabase.from("users").select("id, name, email, role, is_active, created_at, updated_at")
 
-        if (searchTerm) {
-          query = query.or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`)
+        const term = searchTerm.replace(/[,()]/g, " ").trim()
+        if (term) {
+          query = query.or(`name.ilike.%${term}%,email.ilike.%${term}%`)
         }
 
         const { data: usersData, error } = await query.order("created_at", { ascending: false })
@@ -496,6 +493,11 @@ export default function SearchPage() {
               <CardTitle className="text-white">نتائج البحث ({results.length} نتيجة)</CardTitle>
             </CardHeader>
             <CardContent>
+              {results.length > MAX_RESULT_ROWS && (
+                <p className="text-sm text-slate-400 mb-3">
+                  يتم عرض أول {MAX_RESULT_ROWS} نتيجة فقط. التصدير إلى Excel يشمل كل النتائج ({results.length}).
+                </p>
+              )}
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -533,7 +535,7 @@ export default function SearchPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {results.map((item: any, index) => (
+                    {results.slice(0, MAX_RESULT_ROWS).map((item: any, index) => (
                       <TableRow key={index} className="border-slate-700">
                         {searchType === "products" && (
                           <>

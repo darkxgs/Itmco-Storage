@@ -11,9 +11,9 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Package, Eye, EyeOff, Loader2, AlertTriangle, Mail } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import { loginUser } from "@/lib/auth"
+import { loginUser, getSessionUser } from "@/lib/auth"
 import { validateEmail, validateRequired } from "@/lib/validation"
-import { loadUserFromStorage, saveUserToStorage } from "@/lib/utils"
+import { saveUserToStorage } from "@/lib/utils"
 import Link from "next/link"
 
 export default function LoginPage() {
@@ -28,11 +28,10 @@ export default function LoginPage() {
   const { toast } = useToast()
 
   useEffect(() => {
-    // Check if user is already logged in
-    const user = loadUserFromStorage()
-    if (user) {
-      router.push("/dashboard")
-    }
+    // Check if user is already logged in (a live Supabase session, not just a cached profile)
+    getSessionUser().then((user) => {
+      if (user) router.push("/dashboard")
+    })
   }, [router])
 
   const validateForm = () => {

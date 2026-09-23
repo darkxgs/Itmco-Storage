@@ -1,147 +1,93 @@
 import { NextResponse } from "next/server"
-import { supabase } from "@/lib/supabase"
-import { createSecurityMiddleware, SecurityError } from "@/lib/security"
-import { logActivity } from "@/lib/auth"
+import {
+  BACKUP_TABLES,
+  USERS_BACKUP_COLUMNS,
+  errorResponse,
+  fetchAllAdmin,
+  getAdminClient,
+  requireAppUser,
+  HttpError,
+} from "@/lib/supabase-admin"
 
-export async function GET() {
+async function buildBackup(tables: readonly string[], type: string) {
+  const backupData: any = {
+    metadata: {
+      timestamp: new Date().toISOString(),
+      version: "3.0",
+      system: "ITMCO Inventory Management",
+      type,
+      tables,
+      recordCounts: {},
+      backupId: `${type}_${Date.now()}`,
+    },
+    data: {},
+  }
+
+  // Keep BACKUP_TABLES order so the file restores parents before children
+  for (const table of BACKUP_TABLES.filter((t) => tables.includes(t))) {
+    try {
+      const rows = await fetchAllAdmin(table, table === "users" ? USERS_BACKUP_COLUMNS : "*")
+      backupData.data[table] = rows
+      backupData.metadata.recordCounts[table] = rows.length
+    } catch (error: any) {
+      // Optional tables (e.g. release_items) may not exist in every database
+      if (error?.code === "42P01" || error?.code === "PGRST205") continue
+      throw new Error(`Failed to backup table ${table}: ${error.message}`)
+    }
+  }
+  return backupData
+}
+
+export async function GET(request: Request) {
   try {
-    // Get all data for backup
-    const [users, products, issuances, activityLogs] = await Promise.all([
-      supabase.from("users").select("*").order("created_at", { ascending: true }),
-      supabase.from("products").select("*").order("created_at", { ascending: true }),
-      supabase.from("issuances").select("*").order("created_at", { ascending: true }),
-      supabase.from("activity_logs").select("*").order("created_at", { ascending: true }),
-    ])
-
-    if (users.error || products.error || issuances.error || activityLogs.error) {
-      throw new Error("Failed to fetch data for backup")
-    }
-
-    const backupData = {
-      metadata: {
-        timestamp: new Date().toISOString(),
-        version: "1.0",
-        system: "ITMCO Inventory Management",
-        tables: ["users", "products", "issuances", "activity_logs"],
-        recordCounts: {
-          users: users.data?.length || 0,
-          products: products.data?.length || 0,
-          issuances: issuances.data?.length || 0,
-          activity_logs: activityLogs.data?.length || 0,
-        },
-      },
-      data: {
-        users: users.data,
-        products: products.data,
-        issuances: issuances.data,
-        activity_logs: activityLogs.data,
-      },
-    }
+    await requireAppUser(request, ["admin"])
+    const backupData = await buildBackup(BACKUP_TABLES, "full")
 
     return NextResponse.json(backupData, {
       headers: {
         "Content-Disposition": `attachment; filename="itmco-backup-${new Date().toISOString().split("T")[0]}.json"`,
-        "Content-Type": "application/json",
       },
     })
-  } catch (error: any) {
-    console.error("Backup error:", error)
-    return NextResponse.json(
-      {
-        error: "Backup failed",
-        message: error.message,
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 },
-    )
+  } catch (error) {
+    return errorResponse(error)
   }
 }
 
 export async function POST(request: Request) {
   try {
-    // Apply security middleware
-    const securityMiddleware = createSecurityMiddleware()
-    const secureRequest = await securityMiddleware(request as any)
-    
-    const { type = "full", tables = ["users", "products", "issuances", "activity_logs", "security_logs"] } = await secureRequest.json()
+    const caller = await requireAppUser(request, ["admin"])
+    const body = await request.json().catch(() => ({}))
+    const type = body.type === "partial" ? "partial" : "full"
+    const tables: string[] = Array.isArray(body.tables) && body.tables.length > 0 ? body.tables : [...BACKUP_TABLES]
 
-    // Validate table names (whitelist approach)
-    const allowedTables = ["users", "products", "issuances", "activity_logs", "security_logs", "backup_history"]
-    const invalidTables = tables.filter((table: string) => !allowedTables.includes(table))
-    
+    const invalidTables = tables.filter((table) => !(BACKUP_TABLES as readonly string[]).includes(table))
     if (invalidTables.length > 0) {
-      throw new SecurityError(`Invalid table names: ${invalidTables.join(', ')}`, 'INVALID_INPUT')
+      throw new HttpError(400, `Invalid table names: ${invalidTables.join(", ")}`)
     }
 
-    const backupData: any = {
-      metadata: {
-        timestamp: new Date().toISOString(),
-        version: "2.0",
-        system: "ITMCO Inventory Management",
-        type,
-        tables,
-        backupId: `manual_${Date.now()}`
-      },
-      data: {},
-    }
+    const backupData = await buildBackup(tables, type)
+    const admin = getAdminClient()
 
-    // Fetch data based on requested tables
-    for (const table of tables) {
-      const { data, error } = await supabase.from(table).select("*").order("created_at", { ascending: true })
+    await admin.from("activity_logs").insert({
+      user_id: caller.id,
+      user_name: caller.name,
+      action: "نسخ احتياطي يدوي",
+      module: "النظام",
+      details: `تم إنشاء نسخة احتياطية يدوية - ${Object.keys(backupData.data).length} جداول`,
+    })
 
-      if (error) {
-        throw new Error(`Failed to backup table: ${table}`)
-      }
-
-      backupData.data[table] = data
-      backupData.metadata.recordCounts = {
-        ...backupData.metadata.recordCounts,
-        [table]: data?.length || 0,
-      }
-    }
-
-    // Log backup activity
-    await logActivity(
-      'system',
-      'نظام النسخ الاحتياطي',
-      'نسخ احتياطي يدوي',
-      'النظام',
-      `تم إنشاء نسخة احتياطية يدوية - ${tables.length} جداول`
-    )
-
-    // Store backup metadata
-    await supabase.from('backup_history').insert({
+    // backup_history is optional; don't fail the download if it's missing
+    await admin.from("backup_history").insert({
       backup_id: backupData.metadata.backupId,
       timestamp: backupData.metadata.timestamp,
-      type: 'manual',
+      type: "manual",
       record_counts: backupData.metadata.recordCounts,
       size: JSON.stringify(backupData).length,
-      status: 'completed'
+      status: "completed",
     })
 
     return NextResponse.json(backupData)
-  } catch (error: any) {
-    console.error("Custom backup error:", error)
-    
-    if (error instanceof SecurityError) {
-      return NextResponse.json(
-        {
-          error: "Security violation",
-          message: error.message,
-          type: error.type,
-          timestamp: new Date().toISOString(),
-        },
-        { status: 403 }
-      )
-    }
-    
-    return NextResponse.json(
-      {
-        error: "Custom backup failed",
-        message: error.message,
-        timestamp: new Date().toISOString(),
-      },
-      { status: 500 },
-    )
+  } catch (error) {
+    return errorResponse(error)
   }
 }

@@ -219,13 +219,10 @@ export async function revokeWarehousePermission(
  * Get current user ID from Supabase auth
  */
 export async function getCurrentUserId(): Promise<string | null> {
-  // Use localStorage-based authentication instead of Supabase Auth
+  // The verified Supabase Auth session, not the editable localStorage profile
   try {
-    const userData = localStorage.getItem('user')
-    if (!userData) return null
-    
-    const parsedUser = JSON.parse(userData)
-    return parsedUser?.id || null
+    const { data } = await supabase.auth.getSession()
+    return data.session?.user.id ?? null
   } catch (error) {
     console.error('Error getting current user ID:', error)
     return null

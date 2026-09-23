@@ -9,9 +9,10 @@ import { Bar, BarChart, Line, LineChart, Pie, PieChart, Cell, ResponsiveContaine
 import { Button } from "@/components/ui/button"
 import {
   getDashboardStats,
-  getMonthlyIssuances,
-  getProductFrequency,
-  getBranchPerformance,
+  getFilteredIssuances,
+  summarizeMonthlyIssuances,
+  summarizeProductFrequency,
+  summarizeBranchPerformance,
   getActivityLogs,
   getMonthlyStockData,
   getWeeklyIssuanceData,
@@ -53,21 +54,23 @@ export default function DashboardPage() {
       // Pass userId for non-admin users to filter by their warehouses
       const userId = user.role !== 'admin' ? user.id : undefined
       
-      const [statsData, monthlyStats, productStats, branchStats, activityData, stockData, issuanceData] =
+      // One read of the last 12 months of issuances feeds all the issuance charts
+      const yearAgo = new Date()
+      yearAgo.setFullYear(yearAgo.getFullYear() - 1)
+
+      const [statsData, recentIssuances, activityData, stockData, issuanceData] =
         await Promise.all([
           getDashboardStats(userId),
-          getMonthlyIssuances(),
-          getProductFrequency(),
-          getBranchPerformance(),
+          getFilteredIssuances({ startDate: yearAgo.toLocaleDateString("en-CA") }),
           getActivityLogs(10),
           getMonthlyStockData(userId),
           getWeeklyIssuanceData(userId),
         ])
 
       setStats(statsData)
-      setMonthlyData(monthlyStats)
-      setProductData(productStats)
-      setBranchData(branchStats)
+      setMonthlyData(summarizeMonthlyIssuances(recentIssuances))
+      setProductData(summarizeProductFrequency(recentIssuances))
+      setBranchData(summarizeBranchPerformance(recentIssuances))
       setRecentActivity(activityData)
       setMonthlyStockData(stockData)
       setWeeklyIssuanceData(issuanceData)

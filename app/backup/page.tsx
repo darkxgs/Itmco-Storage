@@ -24,11 +24,18 @@ import {
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
+import { apiFetch } from "@/lib/api-client"
 
 const backupTables = [
-  { id: "users", name: "المستخدمين", description: "حسابات المستخدمين وبيانات المصادقة" },
+  { id: "users", name: "المستخدمين", description: "بيانات المستخدمين وأدوارهم (بدون كلمات المرور، ولا تتم استعادتها)" },
   { id: "products", name: "المنتجات", description: "قائمة المنتجات ومعلومات المخزون" },
   { id: "issuances", name: "الإصدارات", description: "سجلات إصدار المنتجات للعملاء" },
+  { id: "stock_entries", name: "إدخالات المخزون", description: "سجل إضافة الكميات للمنتجات" },
+  { id: "warehouses", name: "المخازن", description: "بيانات المخازن" },
+  { id: "categories", name: "الفئات", description: "فئات المنتجات" },
+  { id: "customers", name: "العملاء", description: "بيانات العملاء" },
+  { id: "branches", name: "الفروع", description: "بيانات الفروع" },
+  { id: "user_warehouse_permissions", name: "صلاحيات المخازن", description: "صلاحيات المستخدمين على المخازن" },
   { id: "activity_logs", name: "سجل النشاطات", description: "تتبع جميع العمليات في النظام" },
 ]
 
@@ -70,7 +77,7 @@ export default function BackupPage() {
   const handleCreateBackup = async () => {
     setLoading(true)
     try {
-      const response = await fetch("/api/backup", {
+      const response = await apiFetch("/api/backup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -160,7 +167,7 @@ export default function BackupPage() {
 
     setLoading(true)
     try {
-      const response = await fetch("/api/restore", {
+      const response = await apiFetch("/api/restore", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

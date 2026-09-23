@@ -1,50 +1,81 @@
-import bcrypt from "bcryptjs"
 import { supabase } from "./supabase"
+import { clearUserFromStorage, loadUserFromStorage, saveUserToStorage, type User } from "./utils"
 
-export async function hashPassword(password: string): Promise<string> {
-  const saltRounds = 12
-  return await bcrypt.hash(password, saltRounds)
-}
+const INVALID_CREDENTIALS = "البريد الإلكتروني أو كلمة المرور غير صحيحة"
 
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return await bcrypt.compare(password, hash)
+// The app profile (name, role) for a Supabase Auth user. Passwords live in Supabase Auth;
+// the browser never sees a password hash.
+async function loadProfile(userId: string): Promise<User | null> {
+  const { data, error } = await supabase
+    .from("users")
+    .select("id, name, email, role, is_active")
+    .eq("id", userId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data || !data.is_active) return null
+  return { id: data.id, name: data.name, email: data.email, role: data.role }
 }
 
 export async function authenticateUser(email: string, password: string) {
   try {
-    const { data: user, error } = await supabase
-      .from("users")
-      .select("*")
-      .eq("email", email)
-      .eq("is_active", true)
-      .single()
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password,
+    })
 
-    if (error || !user) {
-      return { success: false, message: "البريد الإلكتروني أو كلمة المرور غير صحيحة" }
+    if (error || !data.user) {
+      if (error?.status === 429) {
+        return { success: false, message: "محاولات كثيرة. يرجى الانتظار قليلاً ثم المحاولة مرة أخرى" }
+      }
+      return { success: false, message: INVALID_CREDENTIALS }
     }
 
-    const isValidPassword = await verifyPassword(password, user.password_hash)
-
-    if (!isValidPassword) {
-      return { success: false, message: "البريد الإلكتروني أو كلمة المرور غير صحيحة" }
+    const user = await loadProfile(data.user.id)
+    if (!user) {
+      await supabase.auth.signOut()
+      return { success: false, message: "هذا الحساب غير مفعل. تواصل مع مدير النظام" }
     }
 
-    // Update last login
-    await supabase.from("users").update({ updated_at: new Date().toISOString() }).eq("id", user.id)
-
-    return {
-      success: true,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-      },
-    }
+    return { success: true, user }
   } catch (error) {
     console.error("Authentication error:", error)
     return { success: false, message: "حدث خطأ في النظام" }
   }
+}
+
+// The signed-in user, or null. The localStorage profile is only a display cache:
+// without a live Supabase session it is discarded, and the database (RLS) is what
+// actually enforces access.
+export async function getSessionUser(): Promise<User | null> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
+
+  if (!session) {
+    clearUserFromStorage()
+    return null
+  }
+
+  try {
+    const user = await loadProfile(session.user.id)
+    if (!user) {
+      await signOut()
+      return null
+    }
+    saveUserToStorage(user)
+    return user
+  } catch (error) {
+    // Network hiccup: keep working from the cached profile of this same session
+    console.error("Error refreshing profile:", error)
+    const cached = loadUserFromStorage()
+    return cached?.id === session.user.id ? cached : null
+  }
+}
+
+export async function signOut() {
+  await supabase.auth.signOut()
+  clearUserFromStorage()
 }
 
 export async function logActivity(userId: string, userName: string, action: string, module: string, details: string) {
@@ -63,8 +94,3 @@ export async function logActivity(userId: string, userName: string, action: stri
 
 // Alias for authenticateUser to match the import in login page
 export const loginUser = authenticateUser
-
-// Sign in function for test components
-export async function signIn(email: string, password: string) {
-  return await authenticateUser(email, password)
-}

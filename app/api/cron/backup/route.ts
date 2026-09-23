@@ -3,10 +3,9 @@ import { createAutoBackup, isBackupDue, cleanupOldBackups } from "@/lib/auto-bac
 
 export async function GET(request: NextRequest) {
   try {
-    // Verify cron secret to prevent unauthorized access
-    const cronSecret = request.nextUrl.searchParams.get('secret')
-    
-    if (cronSecret !== process.env.CRON_SECRET) {
+    // Vercel Cron sends "Authorization: Bearer $CRON_SECRET"; secrets in the URL end up in logs
+    const cronSecret = process.env.CRON_SECRET
+    if (!cronSecret || request.headers.get('authorization') !== `Bearer ${cronSecret}`) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }

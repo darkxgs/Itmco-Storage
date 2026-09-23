@@ -27,18 +27,82 @@ async function withErrorHandling<T>(operation: () => Promise<T>, errorMessage: s
   }
 }
 
+// Supabase returns at most 1000 rows per request (the project's max-rows setting),
+// so a plain select silently drops everything past the first page. Read the total
+// count first, then fetch the remaining pages in parallel. `build` must apply a
+// deterministic order (end with an `id` tiebreaker) so pages don't overlap.
+const PAGE_SIZE = 1000
+
+export async function fetchAllRows<T = any>(
+  table: string,
+  columns: string,
+  build: (query: any) => any = (query) => query,
+): Promise<T[]> {
+  const first = await build(supabase.from(table).select(columns, { count: "exact" })).range(0, PAGE_SIZE - 1)
+  if (first.error) throw first.error
+
+  const rows: any[] = [...(first.data || [])]
+  const total: number = first.count ?? rows.length
+  // The server may cap pages below PAGE_SIZE; step by what it actually returned.
+  const step = rows.length
+  if (step === 0 || rows.length >= total) return rows as T[]
+
+  const pages = []
+  for (let from = step; from < total; from += step) {
+    pages.push(build(supabase.from(table).select(columns)).range(from, from + step - 1))
+  }
+  for (const page of await Promise.all(pages)) {
+    if (page.error) throw page.error
+    rows.push(...(page.data || []))
+  }
+
+  // A row inserted between page requests shifts the pages by one; drop the duplicate.
+  if (rows.length > 0 && rows[0]?.id !== undefined) {
+    const seen = new Set()
+    return rows.filter((row) => (seen.has(row.id) ? false : (seen.add(row.id), true))) as T[]
+  }
+  return rows as T[]
+}
+
+const ISSUANCE_WITH_PRODUCT = `
+  *,
+  products(
+    id,
+    name,
+    brand,
+    model,
+    item_code,
+    purchase_price,
+    selling_price,
+    category
+  )
+`
+
+function mapIssuance(item: any) {
+  return {
+    ...item,
+    productId: item.product_id,
+    productName: item.product_name,
+    customerName: item.customer_name,
+    serialNumber: item.serial_number,
+    issuedBy: item.issued_by,
+    date: item.date || item.created_at?.split("T")[0], // Use date field first, then fallback to created_at
+    item_code: item.products?.item_code || null,
+    purchase_price: item.products?.purchase_price || 0,
+    selling_price: item.products?.selling_price || 0,
+    category: item.products?.category || '',
+  }
+}
+
 // Products with warehouse permission filtering
 export async function getProducts() {
   return withErrorHandling(async () => {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .order("created_at", { ascending: false })
+    const data = await fetchAllRows("products", "*", (q) =>
+      q.order("created_at", { ascending: false }).order("id", { ascending: false }),
+    )
 
-    if (error) throw error
-    
     // Filter products by user's warehouse permissions
-    const filteredData = await filterByUserWarehouses(data || [], 'view')
+    const filteredData = await filterByUserWarehouses(data, 'view')
     return filteredData
   }, "Failed to fetch products")
 }
@@ -269,39 +333,10 @@ export async function deleteProduct(id: number) {
 // Enhanced issuances with better data mapping
 export async function getIssuances() {
   return withErrorHandling(async () => {
-    const { data, error } = await supabase
-      .from("issuances")
-      .select(`
-        *,
-        products(
-          id,
-          name,
-          brand,
-          model,
-          item_code,
-          purchase_price,
-          selling_price,
-          category
-        )
-      `)
-      .order("created_at", { ascending: false })
-
-    if (error) throw error
-
-    // Map database fields to frontend format
-    return (data || []).map((item) => ({
-      ...item,
-      productId: item.product_id,
-      productName: item.product_name,
-      customerName: item.customer_name,
-      serialNumber: item.serial_number,
-      issuedBy: item.issued_by,
-      date: item.date || item.created_at?.split("T")[0], // Use date field first, then fallback to created_at
-      item_code: item.products?.item_code || null,
-      purchase_price: item.products?.purchase_price || 0,
-      selling_price: item.products?.selling_price || 0,
-      category: item.products?.category || '',
-    }))
+    const data = await fetchAllRows("issuances", ISSUANCE_WITH_PRODUCT, (q) =>
+      q.order("created_at", { ascending: false }).order("id", { ascending: false }),
+    )
+    return data.map(mapIssuance)
   }, "Failed to fetch issuances")
 }
 
@@ -321,40 +356,13 @@ export async function getIssuancesByItemCode(itemCode: string) {
     const productIds = productsData.map(p => p.id)
 
     // 2. Query issuances for those product ids
-    const { data, error } = await supabase
-      .from("issuances")
-      .select(`
-        *,
-        products(
-          id,
-          name,
-          brand,
-          model,
-          item_code,
-          purchase_price,
-          selling_price,
-          category
-        )
-      `)
-      .in("product_id", productIds)
-      .order("created_at", { ascending: false })
-
-    if (error) throw error
-
-    // Map database fields to frontend format
-    return (data || []).map((item) => ({
-      ...item,
-      productId: item.product_id,
-      productName: item.product_name,
-      customerName: item.customer_name,
-      serialNumber: item.serial_number,
-      issuedBy: item.issued_by,
-      date: item.date || item.created_at?.split("T")[0],
-      item_code: item.products?.item_code || null,
-      purchase_price: item.products?.purchase_price || 0,
-      selling_price: item.products?.selling_price || 0,
-      category: item.products?.category || '',
-    }))
+    const data = await fetchAllRows("issuances", ISSUANCE_WITH_PRODUCT, (q) =>
+      q
+        .in("product_id", productIds)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false }),
+    )
+    return data.map(mapIssuance)
   }, "Failed to fetch issuances by item code")
 }
 
@@ -541,18 +549,13 @@ export async function getDashboardStats(userId?: string) {
     }
 
     // Fetch fresh data with warehouse filtering
-    let productsQuery = supabase.from("products").select("stock, min_stock, warehouse_id")
-    let issuancesQuery = supabase.from("issuances").select("id, warehouse_id").gte("created_at", new Date().toISOString().split("T")[0])
+    let warehouseIds: number[] | null = null
 
     // If userId is provided, filter by user's accessible warehouses
     if (userId) {
-      const accessibleWarehouses = await getUserAccessibleWarehouses(userId)
-      const warehouseIds = accessibleWarehouses
-      
-      if (warehouseIds.length > 0) {
-        productsQuery = productsQuery.in("warehouse_id", warehouseIds)
-        issuancesQuery = issuancesQuery.in("warehouse_id", warehouseIds)
-      } else {
+      warehouseIds = await getUserAccessibleWarehouses(userId)
+
+      if (warehouseIds.length === 0) {
         // No accessible warehouses, return empty stats
         return {
           totalProducts: 0,
@@ -563,16 +566,23 @@ export async function getDashboardStats(userId?: string) {
       }
     }
 
-    const [productsResult, issuancesResult] = await Promise.all([
-      productsQuery,
+    // "Today" is the local calendar date, matching the issuance `date` column
+    const today = new Date().toLocaleDateString("en-CA")
+    let issuancesQuery = supabase.from("issuances").select("id", { count: "exact", head: true }).eq("date", today)
+    if (warehouseIds) issuancesQuery = issuancesQuery.in("warehouse_id", warehouseIds)
+
+    const [products, issuancesResult] = await Promise.all([
+      fetchAllRows<{ stock: number; min_stock: number }>("products", "id, stock, min_stock, warehouse_id", (q) => {
+        const scoped = warehouseIds ? q.in("warehouse_id", warehouseIds) : q
+        return scoped.order("id")
+      }),
       issuancesQuery,
     ])
 
-    const products = productsResult.data || []
     const totalProducts = products.length
     const totalStock = products.reduce((sum, p) => sum + (p.stock || 0), 0)
     const lowStockCount = products.filter((p) => (p.stock || 0) <= (p.min_stock || 0) && (p.stock || 0) > 0).length
-    const todayIssuances = issuancesResult.data?.length || 0
+    const todayIssuances = issuancesResult.count || 0
 
     const stats = {
       totalProducts,
@@ -600,28 +610,25 @@ export async function getMonthlyStockData(userId?: string) {
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
     
     // Filter by user's warehouses if userId provided
-    let productsQuery = supabase.from("products").select("stock")
-    let issuancesQuery = supabase.from("issuances").select("created_at, quantity").gte("created_at", sixMonthsAgo.toISOString())
-    
+    let warehouseIds: number[] | null = null
     if (userId) {
-      const accessibleWarehouses = await getUserAccessibleWarehouses(userId)
-      const warehouseIds = accessibleWarehouses
-      
-      if (warehouseIds.length > 0) {
-        productsQuery = productsQuery.in("warehouse_id", warehouseIds)
-        issuancesQuery = issuancesQuery.in("warehouse_id", warehouseIds)
-      } else {
+      warehouseIds = await getUserAccessibleWarehouses(userId)
+      if (warehouseIds.length === 0) {
         return []
       }
     }
+    const scope = (q: any) => (warehouseIds ? q.in("warehouse_id", warehouseIds) : q)
+    const since = sixMonthsAgo.toISOString()
 
-    const [issuancesResult, productsResult] = await Promise.all([
-      supabase.from("issuances").select("created_at, quantity").gte("created_at", sixMonthsAgo.toISOString()),
-      supabase.from("products").select("stock"),
+    const [issuances, stockEntries, products] = await Promise.all([
+      fetchAllRows<{ created_at: string; quantity: number }>("issuances", "id, created_at, quantity", (q) =>
+        scope(q.gte("created_at", since)).order("id"),
+      ),
+      fetchAllRows<{ created_at: string; quantity_added: number }>("stock_entries", "id, created_at, quantity_added", (q) =>
+        scope(q.gte("created_at", since)).order("id"),
+      ),
+      fetchAllRows<{ stock: number }>("products", "id, stock", (q) => scope(q).order("id")),
     ])
-
-    const issuances = issuancesResult.data || []
-    const products = productsResult.data || []
     const currentTotalStock = products.reduce((sum, p) => sum + (p.stock || 0), 0)
 
     // Calculate stock for each month
@@ -646,12 +653,15 @@ export async function getMonthlyStockData(userId?: string) {
       date.setMonth(date.getMonth() - i)
       const monthName = months[date.getMonth()]
 
-      // Calculate stock at end of this month
-      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0)
-      const issuancesUpToMonth = issuances.filter((issuance) => new Date(issuance.created_at) <= monthEnd)
-
-      const totalIssued = issuancesUpToMonth.reduce((sum, issuance) => sum + (issuance.quantity || 0), 0)
-      const stockAtMonth = Math.max(0, currentTotalStock + totalIssued)
+      // Stock at the end of this month = current stock, plus what was issued since, minus what was added since
+      const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 1)
+      const issuedSince = issuances
+        .filter((issuance) => new Date(issuance.created_at) >= monthEnd)
+        .reduce((sum, issuance) => sum + (issuance.quantity || 0), 0)
+      const addedSince = stockEntries
+        .filter((entry) => new Date(entry.created_at) >= monthEnd)
+        .reduce((sum, entry) => sum + (entry.quantity_added || 0), 0)
+      const stockAtMonth = Math.max(0, currentTotalStock + issuedSince - addedSince)
 
       monthlyData.push({
         name: monthName,
@@ -716,7 +726,7 @@ export async function getWeeklyIssuanceData(userId?: string) {
 }
 
 // Enhanced reports functions with advanced filtering
-export async function getFilteredIssuances(filters: {
+export type IssuanceReportFilters = {
   startDate?: string
   endDate?: string
   branch?: string
@@ -728,116 +738,74 @@ export async function getFilteredIssuances(filters: {
   serialNumber?: string
   itemCode?: string
   limit?: number
-} = {}) {
+}
+
+export async function getFilteredIssuances(filters: IssuanceReportFilters = {}) {
   return withErrorHandling(async () => {
-    let query = supabase
-      .from("issuances")
-      .select(`
-        *,
-        products!inner(
-          id,
-          name,
-          brand,
-          model,
-          category,
-          description,
-          item_code,
-          purchase_price,
-          selling_price
-        )
-      `)
-      .order("created_at", { ascending: false })
+    const category = filters.category && filters.category !== "all" ? filters.category : undefined
+    const itemCode = filters.itemCode?.trim()
+    const productName = filters.productName?.trim().toLowerCase()
 
-    // Apply date filters
-    if (filters.startDate) {
-      query = query.gte("created_at", filters.startDate)
-    }
-    if (filters.endDate) {
-      query = query.lte("created_at", filters.endDate)
-    }
-
-    // Apply branch filter
-    if (filters.branch && filters.branch !== "all") {
-      // Check if it's an ID (numeric) or name (string)
-      if (!isNaN(Number(filters.branch))) {
-        query = query.eq("branch_id", filters.branch)
-      } else {
-        query = query.eq("branch", filters.branch)
-      }
-    }
-
-    // Apply engineer filter
-    if (filters.engineer) {
-      query = query.ilike("engineer", `%${filters.engineer}%`)
-    }
-
-    // Apply customer filter
-    if (filters.customer && filters.customer !== "all") {
-      // Check if it's an ID (numeric) or name (string)
-      if (!isNaN(Number(filters.customer))) {
-        query = query.eq("customer_id", filters.customer)
-      } else {
-        query = query.ilike("customer_name", `%${filters.customer}%`)
-      }
-    }
-
-    // Apply warehouse filter
-    if (filters.warehouse && filters.warehouse !== "all") {
-      query = query.eq("warehouse_id", filters.warehouse)
-    }
-
-    // Apply serial number filter
-    if (filters.serialNumber) {
-      query = query.ilike("serial_number", `%${filters.serialNumber}%`)
-    }
-
-    // Apply limit if specified
-    if (filters.limit) {
-      query = query.limit(filters.limit)
-    }
-
-    const { data, error } = await query
-
-    if (error) throw error
-
-    let results = data || []
-
-    // Apply product-based filters (client-side for complex joins)
-    if (filters.category && filters.category !== "all") {
-      results = results.filter(item => item.products?.category === filters.category)
-    }
-
-    const productName = filters.productName
-    if (productName) {
-      results = results.filter(item => 
-        item.product_name?.toLowerCase().includes(productName.toLowerCase()) ||
-        item.products?.name?.toLowerCase().includes(productName.toLowerCase())
+    // Only inner-join products when filtering on product columns, so issuances
+    // whose product row is missing still show up in unfiltered reports.
+    const productJoin = category || itemCode ? "products!inner" : "products"
+    const columns = `
+      *,
+      ${productJoin}(
+        id,
+        name,
+        brand,
+        model,
+        category,
+        description,
+        item_code,
+        purchase_price,
+        selling_price
       )
+    `
+
+    const applyFilters = (query: any) => {
+      // Filter on the issuance date the user sees (and can edit), not on when the row was
+      // inserted. `date` is a DATE column, so an end date of 2026-03-31 includes all of that day.
+      if (filters.startDate) query = query.gte("date", filters.startDate)
+      if (filters.endDate) query = query.lte("date", filters.endDate)
+
+      if (filters.branch && filters.branch !== "all") {
+        query = isNaN(Number(filters.branch)) ? query.eq("branch", filters.branch) : query.eq("branch_id", filters.branch)
+      }
+      if (filters.engineer) query = query.ilike("engineer", `%${filters.engineer}%`)
+      if (filters.customer && filters.customer !== "all") {
+        query = isNaN(Number(filters.customer))
+          ? query.ilike("customer_name", `%${filters.customer}%`)
+          : query.eq("customer_id", filters.customer)
+      }
+      if (filters.warehouse && filters.warehouse !== "all") query = query.eq("warehouse_id", filters.warehouse)
+      if (filters.serialNumber) query = query.ilike("serial_number", `%${filters.serialNumber}%`)
+      if (category) query = query.eq("products.category", category)
+      if (itemCode) query = query.ilike("products.item_code", `%${itemCode}%`)
+
+      return query
+        .order("date", { ascending: false })
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
     }
 
-    // Apply item code filter (both database and client-side)
-    const itemCode = filters.itemCode
-    if (itemCode) {
-      // First try database-level filtering for better performance
-      const itemCodeQuery = supabase
-        .from("products")
-        .select("id")
-        .ilike("item_code", `%${itemCode}%`)
-      
-      const { data: productIds } = await itemCodeQuery
-      
-      if (productIds && productIds.length > 0) {
-        const ids = productIds.map(p => p.id)
-        results = results.filter(item => 
-          ids.includes(item.product_id) ||
-          item.products?.item_code?.toLowerCase().includes(itemCode.toLowerCase())
-        )
-      } else {
-        // Fallback to client-side filtering
-        results = results.filter(item => 
-          item.products?.item_code?.toLowerCase().includes(itemCode.toLowerCase())
-        )
-      }
+    let results: any[]
+    if (filters.limit && !productName) {
+      const { data, error } = await applyFilters(supabase.from("issuances").select(columns)).limit(filters.limit)
+      if (error) throw error
+      results = data || []
+    } else {
+      results = await fetchAllRows("issuances", columns, applyFilters)
+    }
+
+    // Product name matches either the name stored on the issuance or the current product name
+    if (productName) {
+      results = results.filter(item =>
+        item.product_name?.toLowerCase().includes(productName) ||
+        item.products?.name?.toLowerCase().includes(productName)
+      )
+      if (filters.limit) results = results.slice(0, filters.limit)
     }
 
     // Get warehouses to map warehouse_id to warehouse name
@@ -868,81 +836,81 @@ export async function getFilteredIssuances(filters: {
   }, "Failed to fetch filtered issuances")
 }
 
-export async function getMonthlyIssuances(filters: {
-  startDate?: string
-  endDate?: string
-  branch?: string
-  category?: string
-} = {}) {
-  return withErrorHandling(async () => {
-    const issuances = await getFilteredIssuances(filters)
+const ARABIC_MONTHS = [
+  "يناير", "فبراير", "مارس", "أبريل", "مايو", "يونيو",
+  "يوليو", "أغسطس", "سبتمبر", "أكتوبر", "نوفمبر", "ديسمبر",
+]
 
-    // Group by month
-    const monthlyData = issuances.reduce((acc: any, item) => {
-      const month = new Date(item.created_at).toLocaleDateString("ar-SA", { month: "long" })
-      if (!acc[month]) {
-        acc[month] = { month, issued: 0 }
-      }
-      acc[month].issued += item.quantity || 0
-      return acc
-    }, {})
-
-    return Object.values(monthlyData || {})
-  }, "Failed to fetch monthly issuances")
+// Group by calendar month of the issuance date (Gregorian), oldest first,
+// keeping the year so January 2025 and January 2026 stay separate.
+export function summarizeMonthlyIssuances(issuances: any[]) {
+  const byMonth = new Map<string, number>()
+  for (const item of issuances) {
+    const key = String(item.date || item.created_at || "").slice(0, 7) // YYYY-MM
+    if (!/^\d{4}-\d{2}$/.test(key)) continue
+    byMonth.set(key, (byMonth.get(key) || 0) + (item.quantity || 0))
+  }
+  return [...byMonth.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, issued]) => ({
+      month: `${ARABIC_MONTHS[Number(key.slice(5, 7)) - 1]} ${key.slice(0, 4)}`,
+      issued,
+    }))
 }
 
-export async function getProductFrequency(filters: {
-  startDate?: string
-  endDate?: string
-  branch?: string
-  category?: string
-} = {}) {
-  return withErrorHandling(async () => {
-    const issuances = await getFilteredIssuances(filters)
-
-    // Group by product with enhanced details
-    const productData = issuances.reduce((acc: any, item) => {
-      const productKey = item.product_name
-      if (!acc[productKey]) {
-        acc[productKey] = {
-          name: item.product_name,
-          category: item.productDetails?.category,
-          partNumber: item.productDetails?.partNumber,
-          brand: item.productDetails?.brand,
-          model: item.productDetails?.model,
-          count: 0
-        }
+export function summarizeProductFrequency(issuances: any[], top = 10) {
+  const productData = issuances.reduce((acc: any, item) => {
+    const productKey = item.product_name
+    if (!acc[productKey]) {
+      acc[productKey] = {
+        name: item.product_name,
+        category: item.productDetails?.category,
+        partNumber: item.productDetails?.partNumber,
+        brand: item.productDetails?.brand,
+        model: item.productDetails?.model,
+        count: 0
       }
-      acc[productKey].count += item.quantity || 0
-      return acc
-    }, {})
+    }
+    acc[productKey].count += item.quantity || 0
+    return acc
+  }, {})
 
-    return Object.values(productData || {})
-      .sort((a: any, b: any) => b.count - a.count)
-      .slice(0, 10) // Top 10 products
-  }, "Failed to fetch product frequency")
+  return Object.values(productData)
+    .sort((a: any, b: any) => b.count - a.count)
+    .slice(0, top)
 }
 
-export async function getBranchPerformance(filters: {
-  startDate?: string
-  endDate?: string
-  category?: string
-  productName?: string
-} = {}) {
-  return withErrorHandling(async () => {
-    const issuances = await getFilteredIssuances(filters)
+export function summarizeBranchPerformance(issuances: any[]) {
+  const branchData = issuances.reduce((acc: any, item) => {
+    if (!acc[item.branch]) {
+      acc[item.branch] = { branch: item.branch, count: 0 }
+    }
+    acc[item.branch].count += item.quantity || 0
+    return acc
+  }, {})
 
-    // Group by branch
-    const branchData = issuances.reduce((acc: any, item) => {
-      if (!acc[item.branch]) {
-        acc[item.branch] = { branch: item.branch, count: 0 }
-      }
-      acc[item.branch].count += item.quantity || 0
-      return acc
-    }, {})
+  return Object.values(branchData).sort((a: any, b: any) => b.count - a.count)
+}
 
-    return Object.values(branchData || {}).sort((a: any, b: any) => b.count - a.count)
-  }, "Failed to fetch branch performance")
+export async function getMonthlyIssuances(filters: IssuanceReportFilters = {}) {
+  return withErrorHandling(
+    async () => summarizeMonthlyIssuances(await getFilteredIssuances(filters)),
+    "Failed to fetch monthly issuances",
+  )
+}
+
+export async function getProductFrequency(filters: IssuanceReportFilters = {}) {
+  return withErrorHandling(
+    async () => summarizeProductFrequency(await getFilteredIssuances(filters)),
+    "Failed to fetch product frequency",
+  )
+}
+
+export async function getBranchPerformance(filters: IssuanceReportFilters = {}) {
+  return withErrorHandling(
+    async () => summarizeBranchPerformance(await getFilteredIssuances(filters)),
+    "Failed to fetch branch performance",
+  )
 }
 
 // Search functionality with advanced filtering
@@ -1370,13 +1338,7 @@ export function calculateStockValue(products: Product[]): number {
 
 export async function getBranches() {
   return withErrorHandling(async () => {
-    const { data, error } = await supabase
-      .from("branches")
-      .select("*")
-      .order("name", { ascending: true })
-
-    if (error) throw error
-    return data || []
+    return await fetchAllRows("branches", "*", (q) => q.order("name", { ascending: true }).order("id"))
   }, "Failed to fetch branches")
 }
 
@@ -1482,13 +1444,7 @@ export async function deleteBranch(id: number) {
 
 export async function getCustomers() {
   return withErrorHandling(async () => {
-    const { data, error } = await supabase
-      .from("customers")
-      .select("*")
-      .order("name", { ascending: true })
-
-    if (error) throw error
-    return data || []
+    return await fetchAllRows("customers", "*", (q) => q.order("name", { ascending: true }).order("id"))
   }, "Failed to fetch customers")
 }
 
@@ -1608,13 +1564,7 @@ export async function generateNextWarehouseNumber(): Promise<string> {
 
 export async function getWarehouses() {
   return withErrorHandling(async () => {
-    const { data, error } = await supabase
-      .from("warehouses")
-      .select("*")
-      .order("warehouse_number", { ascending: true })
-
-    if (error) throw error
-    return data || []
+    return await fetchAllRows("warehouses", "*", (q) => q.order("warehouse_number", { ascending: true }).order("id"))
   }, "Failed to fetch warehouses")
 }
 
@@ -1711,17 +1661,14 @@ export async function searchByItemCode(itemCode: string) {
 
     const sanitizedCode = validateInput(itemCode.trim())
     
-    const { data, error } = await supabase
-      .from("products")
-      .select(`
+    return await fetchAllRows(
+      "products",
+      `
         *,
         warehouses:warehouse_id(id, warehouse_number, name, location)
-      `)
-      .ilike("item_code", `%${sanitizedCode}%`)
-      .order("item_code", { ascending: true })
-
-    if (error) throw error
-    return data || []
+      `,
+      (q) => q.ilike("item_code", `%${sanitizedCode}%`).order("item_code", { ascending: true }).order("id"),
+    )
   }, "Failed to search by item code")
 }
 
@@ -1734,44 +1681,44 @@ export async function searchIssuancesByFilters(filters: {
   endDate?: string
 }) {
   return withErrorHandling(async () => {
-    let query = supabase
-      .from("issuances")
-      .select(`
+    const applyFilters = (query: any) => {
+      if (filters.itemCode) {
+        query = query.ilike("item_code", `%${validateInput(filters.itemCode)}%`)
+      }
+    
+      if (filters.branchName) {
+        query = query.ilike("branch", `%${validateInput(filters.branchName)}%`)
+      }
+    
+      if (filters.customerName) {
+        query = query.ilike("customer_name", `%${validateInput(filters.customerName)}%`)
+      }
+    
+      if (filters.serialNumber) {
+        query = query.ilike("serial_number", `%${validateInput(filters.serialNumber)}%`)
+      }
+    
+      if (filters.startDate) {
+        query = query.gte("date", filters.startDate)
+      }
+    
+      if (filters.endDate) {
+        query = query.lte("date", filters.endDate)
+      }
+
+      return query.order("date", { ascending: false }).order("id", { ascending: false })
+    }
+
+    return await fetchAllRows(
+      "issuances",
+      `
         *,
         branches:branch_id(id, name, code),
         customers:customer_id(id, name, code),
         warehouses:warehouse_id(id, warehouse_number, name)
-      `)
-
-    if (filters.itemCode) {
-      query = query.ilike("item_code", `%${validateInput(filters.itemCode)}%`)
-    }
-    
-    if (filters.branchName) {
-      query = query.ilike("branch", `%${validateInput(filters.branchName)}%`)
-    }
-    
-    if (filters.customerName) {
-      query = query.ilike("customer_name", `%${validateInput(filters.customerName)}%`)
-    }
-    
-    if (filters.serialNumber) {
-      query = query.ilike("serial_number", `%${validateInput(filters.serialNumber)}%`)
-    }
-    
-    if (filters.startDate) {
-      query = query.gte("created_at", filters.startDate)
-    }
-    
-    if (filters.endDate) {
-      query = query.lte("created_at", filters.endDate)
-    }
-
-    query = query.order("created_at", { ascending: false })
-
-    const { data, error } = await query
-    if (error) throw error
-    return data || []
+      `,
+      applyFilters,
+    )
   }, "Failed to search issuances")
 }
 
