@@ -29,7 +29,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { ErrorBoundary } from "@/components/error-boundary"
 import { useAuth } from "@/hooks/use-auth"
-import * as XLSX from 'xlsx'
 
 interface BranchFormData {
   name: string
@@ -168,6 +167,7 @@ export default function BranchesPage() {
     if (!file) return
 
     try {
+      const XLSX = await import('xlsx') // loaded on demand, keeps it out of the page bundle
       const data = await file.arrayBuffer()
       const workbook = XLSX.read(data)
       const sheetName = workbook.SheetNames[0]
@@ -275,7 +275,8 @@ export default function BranchesPage() {
   }
 
   // Download Excel template
-  const downloadTemplate = () => {
+  const downloadTemplate = async () => {
+    const XLSX = await import('xlsx')
     const templateData = [
       {
         'اسم الفرع': 'فرع القاهرة',

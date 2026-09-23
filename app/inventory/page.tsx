@@ -126,11 +126,6 @@ export default function InventoryPage() {
         setProducts(productsData)
         setWarehouses(warehousesData)
         setCategories(categoriesData)
-
-        toast({
-          title: "تم تحميل البيانات",
-          description: `تم تحميل ${productsData.length} منتج بنجاح`,
-        })
       } catch (error) {
         console.error("Error loading data:", error)
         toast({

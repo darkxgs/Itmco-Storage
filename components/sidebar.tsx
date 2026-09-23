@@ -127,6 +127,12 @@ const navigation = [
   },
 ]
 
+// Every page renders its own <Sidebar />, so it remounts on each navigation. Keep the
+// low-stock list for a few minutes across remounts instead of re-reading all products.
+const LOW_STOCK_CACHE_MS = 5 * 60 * 1000
+let lowStockCache: { at: number; products: Array<{ id: number; name: string; stock: number; min_stock: number | null; item_code: string | null }> } | null = null
+const COLLAPSED_KEY = "sidebarCollapsed"
+
 export function Sidebar() {
   const pathname = usePathname()
   const { user, logout } = useAuth()
@@ -152,14 +158,19 @@ export function Sidebar() {
     setLoadingNotifications(true)
     try {
       // Get all products and filter in JS (Supabase can't compare columns directly)
-      const { data: allProducts, error } = await supabase
-        .from('products')
-        .select('id, name, stock, min_stock, item_code')
-        .order('stock', { ascending: true })
+      let allProducts = lowStockCache && Date.now() - lowStockCache.at < LOW_STOCK_CACHE_MS ? lowStockCache.products : null
+      if (!allProducts) {
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, name, stock, min_stock, item_code')
+          .order('stock', { ascending: true })
 
-      if (error) {
-        console.error('Error fetching products:', error)
-        return
+        if (error) {
+          console.error('Error fetching products:', error)
+          return
+        }
+        allProducts = data || []
+        lowStockCache = { at: Date.now(), products: allProducts }
       }
 
       // Filter products that are low stock (stock <= min_stock) or out of stock
@@ -219,11 +230,22 @@ export function Sidebar() {
   const clearAllDismissed = () => {
     setDismissedIds([])
     localStorage.removeItem('dismissedNotifications')
+    lowStockCache = null
     fetchLowStockNotifications()
   }
 
-  // Auto-collapse on medium widths and short heights to maximize content area
+  // Auto-collapse on medium widths and short heights to maximize content area, unless the
+  // user chose a state with the collapse button (remembered across pages and visits)
   useEffect(() => {
+    let saved: string | null = null
+    try {
+      saved = localStorage.getItem(COLLAPSED_KEY)
+    } catch {}
+    if (saved !== null) {
+      setCollapsed(saved === "true")
+      return
+    }
+
     const handleResize = () => {
       if (typeof window === "undefined") return
       const w = window.innerWidth
@@ -235,6 +257,15 @@ export function Sidebar() {
     window.addEventListener("resize", handleResize)
     return () => window.removeEventListener("resize", handleResize)
   }, [])
+
+  const toggleCollapsed = () => {
+    setCollapsed((current) => {
+      try {
+        localStorage.setItem(COLLAPSED_KEY, String(!current))
+      } catch {}
+      return !current
+    })
+  }
 
   const handleLogout = () => {
     logout()
@@ -257,7 +288,9 @@ export function Sidebar() {
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => setCollapsed(!collapsed)}
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? "توسيع القائمة" : "طي القائمة"}
+          aria-expanded={!collapsed}
           className="text-slate-400 hover:text-white hidden lg:flex"
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -266,6 +299,7 @@ export function Sidebar() {
           variant="ghost"
           size="sm"
           onClick={() => setMobileOpen(false)}
+          aria-label="إغلاق القائمة"
           className="text-slate-400 hover:text-white lg:hidden"
         >
           <X className="w-4 h-4" />
@@ -289,7 +323,10 @@ export function Sidebar() {
             </div>
             <Dialog open={notificationOpen} onOpenChange={setNotificationOpen}>
               <DialogTrigger asChild>
-                <button className="relative p-2 rounded-lg hover:bg-slate-700 transition-colors">
+                <button
+                  className="relative p-2 rounded-lg hover:bg-slate-700 transition-colors"
+                  aria-label={unreadCount > 0 ? `التنبيهات (${unreadCount} غير مقروء)` : "التنبيهات"}
+                >
                   <Bell className="w-5 h-5 text-slate-400 hover:text-white" />
                   {unreadCount > 0 && (
                     <Badge
@@ -426,20 +463,27 @@ export function Sidebar() {
           const isActive = pathname === item.href
 
           return (
-            <Link key={item.name} href={item.href}>
-              <Button
-                variant={isActive ? "secondary" : "ghost"}
-                className={cn(
-                  "w-full justify-start gap-3 text-right",
-                  isActive ? "bg-slate-700 text-white" : "text-slate-300 hover:text-white hover:bg-slate-800",
-                  collapsed && "justify-center px-2",
-                )}
+            <Button
+              key={item.name}
+              asChild
+              variant={isActive ? "secondary" : "ghost"}
+              className={cn(
+                "w-full justify-start gap-3 text-right",
+                isActive ? "bg-slate-700 text-white" : "text-slate-300 hover:text-white hover:bg-slate-800",
+                collapsed && "justify-center px-2",
+              )}
+            >
+              <Link
+                href={item.href}
                 onClick={() => setMobileOpen(false)}
+                aria-current={isActive ? "page" : undefined}
+                aria-label={collapsed ? item.name : undefined}
+                title={collapsed ? item.name : undefined}
               >
-                <Icon className="w-5 h-5 flex-shrink-0" />
+                <Icon className="w-5 h-5 flex-shrink-0" aria-hidden="true" />
                 {!collapsed && <span>{item.name}</span>}
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           )
         })}
       </nav>
@@ -449,6 +493,8 @@ export function Sidebar() {
         <Button
           variant="ghost"
           onClick={handleLogout}
+          aria-label={collapsed ? "تسجيل الخروج" : undefined}
+          title={collapsed ? "تسجيل الخروج" : undefined}
           className={cn(
             "w-full justify-start gap-3 text-slate-300 hover:text-white hover:bg-slate-800",
             collapsed && "justify-center px-2",
@@ -468,7 +514,8 @@ export function Sidebar() {
         variant="ghost"
         size="sm"
         onClick={() => setMobileOpen(true)}
-        className="fixed top-4 right-4 z-50 lg:hidden bg-slate-800 text-white"
+        aria-label="فتح القائمة"
+        className="mobile-menu-button fixed top-3 right-3 z-50 lg:hidden bg-slate-800/90 backdrop-blur text-white shadow-lg"
       >
         <Menu className="w-5 h-5" />
       </Button>

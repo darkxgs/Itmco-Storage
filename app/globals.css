@@ -51,7 +51,7 @@
   /* Auto zoom-out for content overflow */
   .auto-zoom-container {
     @apply min-w-0 overflow-x-auto;
-    transform-origin: top left;
+    transform-origin: top right; /* RTL: content starts at the right edge */
   }
   
   /* Ensure content fits by allowing horizontal scroll and zoom */
@@ -353,7 +353,7 @@
 @media screen and (max-width: 768px) {
   .complex-table {
     transform: scale(0.9);
-    transform-origin: top left;
+    transform-origin: top right; /* RTL: content starts at the right edge */
     width: 111.11%;
   }
 }
@@ -361,7 +361,7 @@
 @media screen and (max-width: 480px) {
   .complex-table {
     transform: scale(0.85);
-    transform-origin: top left;
+    transform-origin: top right; /* RTL: content starts at the right edge */
     width: 117.65%;
   }
 }
@@ -372,4 +372,12 @@
   opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
+}
+
+/* Phones/tablets: the sidebar becomes a fixed menu button at the top right; start the page
+   below it so it doesn't cover page titles */
+@media (max-width: 1023px) {
+  .page-container:has(.mobile-menu-button) {
+    padding-top: 3.25rem;
+  }
 }

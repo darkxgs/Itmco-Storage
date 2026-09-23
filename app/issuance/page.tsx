@@ -1571,7 +1571,10 @@ export default function IssuancePage() {
         {/* Issuances Table */}
         <Card className="bg-slate-800 border-slate-700 mt-6">
           <CardHeader>
-            <CardTitle className="text-white text-right">سجل الإصدارات</CardTitle>
+            <CardTitle className="text-white text-right flex items-center gap-2">
+              سجل الإصدارات
+              <span className="text-sm font-normal text-slate-400">({filteredIssuances.length.toLocaleString("en-US")})</span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -1630,6 +1633,8 @@ export default function IssuancePage() {
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleEditIssuance(issuance)}
+                                aria-label={`تعديل الإصدار ${issuance.id}`}
+                                title="تعديل"
                                 className="h-7 w-7 p-0 bg-blue-900/20 border-blue-700/50 text-blue-400 hover:bg-blue-900/30 hover:border-blue-600/50 hover:text-blue-300 transition-all duration-200"
                               >
                                 <Edit className="w-3.5 h-3.5" />
@@ -1639,6 +1644,8 @@ export default function IssuancePage() {
                                   <Button
                                     variant="outline"
                                     size="sm"
+                                    aria-label={`حذف الإصدار ${issuance.id}`}
+                                    title="حذف"
                                     className="h-7 w-7 p-0 bg-red-900/20 border-red-700/50 text-red-400 hover:bg-red-900/30 hover:border-red-600/50 hover:text-red-300 transition-all duration-200"
                                   >
                                     <Trash2 className="w-4 h-4" />

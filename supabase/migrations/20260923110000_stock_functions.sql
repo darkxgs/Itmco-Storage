@@ -287,7 +287,7 @@ begin
   if not found then
     if exists (select 1 from public.products where id = p_product_id) then
       raise exception 'تغيّرت كمية هذا المنتج أثناء التعديل (إصدار أو إضافة). أعد فتح المنتج وحاول مرة أخرى'
-        using errcode = '40001';
+        using errcode = 'P0001';
     end if;
     raise exception 'المنتج غير موجود' using errcode = 'P0002';
   end if;

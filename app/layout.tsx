@@ -1,16 +1,23 @@
 import type React from "react"
-import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import type { Metadata, Viewport } from "next"
+import { Cairo } from "next/font/google"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 
-const inter = Inter({ subsets: ["latin"] })
+// Arabic + Latin glyphs (Inter had no Arabic, so all Arabic text fell back to the system font)
+const cairo = Cairo({ subsets: ["arabic", "latin"], display: "swap" })
 
 export const metadata: Metadata = {
   title: "ITMCO - نظام إدارة المخزون",
   description: "نظام إدارة المخزون لشركة ITMCO",
-    generator: 'v0.dev'
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#020617",
+  colorScheme: "dark",
 }
 
 export default function RootLayout({
@@ -20,11 +27,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=0.5, user-scalable=yes" />
-      </head>
-      <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
+      <body className={cairo.className}>
+        {/* The pages are designed for the dark theme only */}
+        <ThemeProvider attribute="class" defaultTheme="dark" forcedTheme="dark" disableTransitionOnChange>
           <div className="page-container auto-zoom-container">
             {children}
           </div>

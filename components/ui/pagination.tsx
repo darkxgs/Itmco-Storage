@@ -67,12 +67,13 @@ export function Pagination({
         </div>
       )}
 
-      <div className="flex items-center justify-center space-x-1 sm:space-x-2 space-x-reverse">
+      <nav aria-label="التنقل بين الصفحات" className="flex items-center justify-center space-x-1 sm:space-x-2 space-x-reverse">
         <Button
           variant="outline"
           size="sm"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
+          aria-label="الصفحة السابقة"
           className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600 disabled:opacity-50 h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm"
         >
           <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -82,7 +83,7 @@ export function Pagination({
         {pages.map((page, index) => {
           if (page === "ellipsis-start" || page === "ellipsis-end") {
             return (
-              <Button key={index} variant="ghost" size="sm" disabled className="text-slate-400 h-7 sm:h-8 w-7 sm:w-8 p-0">
+              <Button key={index} variant="ghost" size="sm" disabled aria-hidden="true" className="text-slate-400 h-7 sm:h-8 w-7 sm:w-8 p-0">
                 <MoreHorizontal className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             )
@@ -94,6 +95,8 @@ export function Pagination({
               variant={currentPage === page ? "default" : "outline"}
               size="sm"
               onClick={() => onPageChange(page as number)}
+              aria-label={`صفحة ${page}`}
+              aria-current={currentPage === page ? "page" : undefined}
               className={cn(
                 "min-w-[28px] sm:min-w-[40px] h-7 sm:h-8 text-xs sm:text-sm",
                 currentPage === page
@@ -111,12 +114,13 @@ export function Pagination({
           size="sm"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
+          aria-label="الصفحة التالية"
           className="bg-slate-700 border-slate-600 text-white hover:bg-slate-600 disabled:opacity-50 h-7 sm:h-8 px-2 sm:px-3 text-xs sm:text-sm"
         >
           <span className="hidden sm:inline">التالي</span>
           <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
         </Button>
-      </div>
+      </nav>
     </div>
   )
 }

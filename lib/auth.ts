@@ -28,6 +28,10 @@ export async function authenticateUser(email: string, password: string) {
       if (error?.status === 429) {
         return { success: false, message: "محاولات كثيرة. يرجى الانتظار قليلاً ثم المحاولة مرة أخرى" }
       }
+      // Deactivated from the users page (Supabase Auth ban)
+      if (error?.code === "user_banned") {
+        return { success: false, message: "هذا الحساب غير مفعل. تواصل مع مدير النظام" }
+      }
       return { success: false, message: INVALID_CREDENTIALS }
     }
 

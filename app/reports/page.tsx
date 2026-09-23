@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { Bar, BarChart, Pie, PieChart, Cell, ResponsiveContainer, XAxis, YAxis } from "recharts"
-import { Download, FileText, Calendar, TrendingUp, Package, AlertTriangle } from "lucide-react"
+import { Download, FileText, Calendar, TrendingUp, Package, AlertTriangle, Loader2 } from "lucide-react"
 import { Sidebar } from "@/components/sidebar"
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/hooks/use-auth"
@@ -23,7 +23,20 @@ import {
   summarizeProductFrequency,
   summarizeBranchPerformance,
 } from "@/lib/database"
-import { exportToCSV, exportToPDF, exportToExcel, validateExportData, generateSummaryStats } from "@/lib/export-utils"
+// The export code pulls in jsPDF, html2canvas and SheetJS (~500 KB); load it on first export
+const loadExportUtils = () => import("@/lib/export-utils")
+
+// Local calendar date as YYYY-MM-DD (what <input type="date"> and the issuance date use)
+const toISODate = (d: Date) => d.toLocaleDateString("en-CA")
+
+// Quick ranges for the date filter; null means no date filter
+const DATE_PRESETS: Array<{ label: string; range: () => [Date, Date] | null }> = [
+  { label: "هذا الشهر", range: () => { const n = new Date(); return [new Date(n.getFullYear(), n.getMonth(), 1), n] } },
+  { label: "الشهر الماضي", range: () => { const n = new Date(); return [new Date(n.getFullYear(), n.getMonth() - 1, 1), new Date(n.getFullYear(), n.getMonth(), 0)] } },
+  { label: "آخر 3 شهور", range: () => { const n = new Date(); return [new Date(n.getFullYear(), n.getMonth() - 2, 1), n] } },
+  { label: "هذه السنة", range: () => { const n = new Date(); return [new Date(n.getFullYear(), 0, 1), n] } },
+  { label: "كل الفترات", range: () => null },
+]
 import { ErrorBoundary } from "@/components/error-boundary"
 
 export default function ReportsPage() {
@@ -148,6 +161,8 @@ export default function ReportsPage() {
     try {
       setExporting(true)
       
+      const { exportToCSV, validateExportData, generateSummaryStats } = await loadExportUtils()
+
       // Validate data before export
       const validationResult = validateExportData(allTransactions)
       if (!validationResult.isValid) {
@@ -188,6 +203,8 @@ export default function ReportsPage() {
     try {
       setExporting(true)
       
+      const { exportToExcel, validateExportData, generateSummaryStats } = await loadExportUtils()
+
       // Validate data before export
       const validationResult = validateExportData(allTransactions)
       if (!validationResult.isValid) {
@@ -228,6 +245,8 @@ export default function ReportsPage() {
     try {
       setExporting(true)
       
+      const { exportToPDF, validateExportData, generateSummaryStats } = await loadExportUtils()
+
       // Validate data before export
       const validationResult = validateExportData(allTransactions)
       if (!validationResult.isValid) {
@@ -303,11 +322,35 @@ export default function ReportsPage() {
               <CardTitle className="text-white">فلاتر التقارير</CardTitle>
             </CardHeader>
             <CardContent>
+              {/* Quick date ranges */}
+              <div className="flex flex-wrap gap-2 mb-4" role="group" aria-label="فترات سريعة">
+                {DATE_PRESETS.map((preset) => {
+                  const range = preset.range()
+                  const startDate = range ? toISODate(range[0]) : ""
+                  const endDate = range ? toISODate(range[1]) : ""
+                  const active = filters.startDate === startDate && filters.endDate === endDate
+                  return (
+                    <Button
+                      key={preset.label}
+                      type="button"
+                      size="sm"
+                      variant={active ? "default" : "outline"}
+                      aria-pressed={active}
+                      className={active ? "bg-blue-600 hover:bg-blue-700" : "border-slate-600 text-slate-300 hover:bg-slate-700"}
+                      onClick={() => setFilters((prev) => ({ ...prev, startDate, endDate }))}
+                    >
+                      {preset.label}
+                    </Button>
+                  )
+                })}
+              </div>
+
               {/* Enhanced Filtering Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <div>
-                  <label className="text-sm text-slate-300">تاريخ البداية</label>
+                  <label htmlFor="report-start-date" className="text-sm text-slate-300">تاريخ البداية</label>
                   <input
+                    id="report-start-date"
                     type="date"
                     className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
                     value={filters.startDate}
@@ -315,8 +358,9 @@ export default function ReportsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-slate-300">تاريخ النهاية</label>
+                  <label htmlFor="report-end-date" className="text-sm text-slate-300">تاريخ النهاية</label>
                   <input
+                    id="report-end-date"
                     type="date"
                     className="w-full bg-slate-700 border-slate-600 text-white rounded-md px-3 py-2"
                     value={filters.endDate}
@@ -461,15 +505,22 @@ export default function ReportsPage() {
                   >
                     مسح الفلاتر
                   </Button>
-                  <div className="text-sm text-slate-400 flex items-center">
-                    عدد النتائج: {allTransactions.length}
+                  <div className="text-sm text-slate-400 flex items-center gap-2" aria-live="polite">
+                    {loading ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                        جاري التحميل...
+                      </>
+                    ) : (
+                      <>عدد النتائج: {allTransactions.length.toLocaleString("en-US")}</>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">
                   <Button 
                     onClick={handleExportCSV} 
                     className="bg-green-600 hover:bg-green-700"
-                    disabled={exporting}
+                    disabled={exporting || loading}
                   >
                     <Download className="w-4 h-4 ml-2" />
                     {exporting ? "جاري التصدير..." : "CSV"}
@@ -477,7 +528,7 @@ export default function ReportsPage() {
                   <Button 
                     onClick={handleExportExcel} 
                     className="bg-blue-600 hover:bg-blue-700"
-                    disabled={exporting}
+                    disabled={exporting || loading}
                   >
                     <Download className="w-4 h-4 ml-2" />
                     {exporting ? "جاري التصدير..." : "Excel"}
@@ -485,7 +536,7 @@ export default function ReportsPage() {
                   <Button 
                     onClick={handleExportPDF} 
                     className="bg-red-600 hover:bg-red-700"
-                    disabled={exporting}
+                    disabled={exporting || loading}
                   >
                     <FileText className="w-4 h-4 ml-2" />
                     {exporting ? "جاري التصدير..." : "PDF"}
