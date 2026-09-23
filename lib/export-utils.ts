@@ -1,14 +1,6 @@
 import jsPDF from 'jspdf'
-import 'jspdf-autotable'
 import * as XLSX from 'xlsx-js-style'
 import html2canvas from 'html2canvas'
-
-// Extend jsPDF type to include autoTable
-declare module 'jspdf' {
-  interface jsPDF {
-    autoTable: (options: any) => jsPDF
-  }
-}
 
 export interface ExportData {
   id: number
@@ -111,6 +103,17 @@ export function exportToCSV(options: ExportOptions): void {
   document.body.removeChild(link)
 }
 
+// Values from the database are pasted into HTML for the PDF; escape them so a product or
+// customer name containing markup is shown as text instead of running in the browser.
+function escapeHtml(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 // Enhanced PDF Export
 export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?: 'category' | 'branch' | 'none'; includeCharts?: boolean; pageSize?: number }): void {
   const { data, title = 'تقرير الإصدارات', filename, filters, summaryStats, groupBy = 'none', includeCharts = false, pageSize = 30 } = options
@@ -145,7 +148,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
       return `
         <div style="margin:5px 0;">
           <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:2px;">
-            <span>${product.name}</span>
+            <span>${escapeHtml(product.name)}</span>
             <span>${product.count}</span>
           </div>
           <div style="background:#e5e7eb;height:12px;border-radius:6px;overflow:hidden;">
@@ -167,7 +170,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
   const headerHtml = `
     <div style="text-align:center;margin-bottom:12px;background:linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);color:white;padding:16px;border-radius:8px;box-shadow:0 4px 6px rgba(0,0,0,0.1);">
       <div style="font-size:22px;font-weight:700;text-shadow:0 2px 4px rgba(0,0,0,0.3);">ITMCO - نظام إدارة المخزون</div>
-      <div style="font-size:16px;margin-top:6px;opacity:0.95;">${title}</div>
+      <div style="font-size:16px;margin-top:6px;opacity:0.95;">${escapeHtml(title)}</div>
     </div>
     <div style="font-size:11px;margin-bottom:12px;background:#f8fafc;padding:8px;border-radius:4px;">
       <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
@@ -184,12 +187,12 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
       </div>
       ${stats.topProducts.length > 0 ? `
         <div style="margin-top:6px;">
-          <strong>أكثر منتج مبيعاً:</strong> ${stats.topProducts[0].name} (${stats.topProducts[0].count} قطعة)
+          <strong>أكثر منتج مبيعاً:</strong> ${escapeHtml(stats.topProducts[0].name)} (${stats.topProducts[0].count} قطعة)
         </div>
       ` : ''}
       ${stats.topBranches.length > 0 ? `
         <div style="margin-top:4px;">
-          <strong>أكثر فرع نشاطاً:</strong> ${stats.topBranches[0].name} (${stats.topBranches[0].count} قطعة)
+          <strong>أكثر فرع نشاطاً:</strong> ${escapeHtml(stats.topBranches[0].name)} (${stats.topBranches[0].count} قطعة)
         </div>
       ` : ''}
     </div>
@@ -203,7 +206,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
     filtersHtml = `
       <div style="font-size:12px;margin:8px 0;">
         <div style="font-weight:600;margin-bottom:4px;">الفلاتر المطبقة:</div>
-        <div>${parts.map(p => `<span style='margin-left:12px'>• ${p}</span>`).join('')}</div>
+        <div>${parts.map(p => `<span style='margin-left:12px'>• ${escapeHtml(p)}</span>`).join('')}</div>
       </div>
     `
   }
@@ -291,16 +294,16 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
          const cells = [
            `<td ${cellStyle}>${item.id ?? ''}</td>`,
            `<td ${cellStyle}>${new Date(item.date).toLocaleDateString('en-GB')}</td>`,
-           `<td ${cellStyle}>${truncate(item.productName, 25)}</td>`,
-           `<td ${cellStyle}>${truncate(item.customerName, 20)}</td>`,
-           `<td ${cellStyle}>${truncate(item.branch, 15)}</td>`,
+           `<td ${cellStyle}>${escapeHtml(truncate(item.productName, 25))}</td>`,
+           `<td ${cellStyle}>${escapeHtml(truncate(item.customerName, 20))}</td>`,
+           `<td ${cellStyle}>${escapeHtml(truncate(item.branch, 15))}</td>`,
            `<td ${cellStyle}>${item.quantity ?? ''}</td>`,
-           `<td ${cellStyle}>${truncate(item.engineer, 15)}</td>`,
-           `<td ${cellStyle}>${item.itemCode ?? ''}</td>`,
-           `<td ${cellStyle}>${truncate(item.model, 15)}</td>`,
-           `<td ${cellStyle}>${item.serialNumber ?? ''}</td>`,
+           `<td ${cellStyle}>${escapeHtml(truncate(item.engineer, 15))}</td>`,
+           `<td ${cellStyle}>${escapeHtml(item.itemCode)}</td>`,
+           `<td ${cellStyle}>${escapeHtml(truncate(item.model, 15))}</td>`,
+           `<td ${cellStyle}>${escapeHtml(item.serialNumber)}</td>`,
            `<td ${cellStyle}>${translateWarranty(item.warrantyType)}</td>`,
-           `<td ${cellStyle}>${truncate(item.notes, 20)}</td>`
+           `<td ${cellStyle}>${escapeHtml(truncate(item.notes, 20))}</td>`
          ]
          
          const rowClass = needsPageBreak ? 'page-break avoid-break' : 'avoid-break'
@@ -308,8 +311,8 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
        }).join('')
        
        const sectionHeader = sectionIdx > 0 && sectionIdx % 3 === 0 ? 
-         `<tr class="page-break"><td colspan="${filteredHeaders.length}" style="background:#dbeafe;padding:6px;font-weight:bold;text-align:center;border:1px solid #d1d5db;font-size:10px;">${section.title} (${section.data.length} عنصر)</td></tr>` :
-         `<tr><td colspan="${filteredHeaders.length}" style="background:#dbeafe;padding:6px;font-weight:bold;text-align:center;border:1px solid #d1d5db;font-size:10px;">${section.title} (${section.data.length} عنصر)</td></tr>`
+         `<tr class="page-break"><td colspan="${filteredHeaders.length}" style="background:#dbeafe;padding:6px;font-weight:bold;text-align:center;border:1px solid #d1d5db;font-size:10px;">${escapeHtml(section.title)} (${section.data.length} عنصر)</td></tr>` :
+         `<tr><td colspan="${filteredHeaders.length}" style="background:#dbeafe;padding:6px;font-weight:bold;text-align:center;border:1px solid #d1d5db;font-size:10px;">${escapeHtml(section.title)} (${section.data.length} عنصر)</td></tr>`
        
        return `
          ${sectionHeader}
@@ -329,16 +332,16 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
           const cells = [
             `<td ${cellStyle}>${item.id ?? ''}</td>`,
             `<td ${cellStyle}>${new Date(item.date).toLocaleDateString('en-GB')}</td>`,
-            `<td ${cellStyle}>${truncate(item.productName, 25)}</td>`,
-            `<td ${cellStyle}>${truncate(item.customerName, 20)}</td>`,
-            `<td ${cellStyle}>${truncate(item.branch, 15)}</td>`,
+            `<td ${cellStyle}>${escapeHtml(truncate(item.productName, 25))}</td>`,
+            `<td ${cellStyle}>${escapeHtml(truncate(item.customerName, 20))}</td>`,
+            `<td ${cellStyle}>${escapeHtml(truncate(item.branch, 15))}</td>`,
             `<td ${cellStyle}>${item.quantity ?? ''}</td>`,
-            `<td ${cellStyle}>${truncate(item.engineer, 15)}</td>`,
-            `<td ${cellStyle}>${item.itemCode ?? ''}</td>`,
-            `<td ${cellStyle}>${truncate(item.model, 15)}</td>`,
-            `<td ${cellStyle}>${item.serialNumber ?? ''}</td>`,
+            `<td ${cellStyle}>${escapeHtml(truncate(item.engineer, 15))}</td>`,
+            `<td ${cellStyle}>${escapeHtml(item.itemCode)}</td>`,
+            `<td ${cellStyle}>${escapeHtml(truncate(item.model, 15))}</td>`,
+            `<td ${cellStyle}>${escapeHtml(item.serialNumber)}</td>`,
             `<td ${cellStyle}>${translateWarranty(item.warrantyType)}</td>`,
-            `<td ${cellStyle}>${truncate(item.notes, 20)}</td>`
+            `<td ${cellStyle}>${escapeHtml(truncate(item.notes, 20))}</td>`
           ]
       
           const rowClass = chunkIdx > 0 && idx === 0 ? 'page-break avoid-break' : 'avoid-break'
@@ -382,7 +385,7 @@ export function exportToPDF(options: ExportOptions & { chartData?: any; groupBy?
   const footerHtml = `
     <div style="margin-top:20px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#6b7280;text-align:center;">
       <div>تم التصدير بواسطة نظام إدارة المخزون – ITMCO</div>
-      <div style="margin-top:4px;">تاريخ الإنشاء: ${new Date().toLocaleString('ar-SA')}</div>
+      <div style="margin-top:4px;">تاريخ الإنشاء: ${new Date().toLocaleString('en-GB', { timeZone: 'Africa/Cairo' })}</div>
     </div>
   `
 
